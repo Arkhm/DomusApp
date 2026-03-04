@@ -1,0 +1,22 @@
+import express, { Request, Response } from 'express';
+import cors from 'cors';
+import authRoutes from './routes/authRoutes';
+
+const app = express();
+app.use(cors());
+app.use(express.json());
+
+app.get('/api/status', (req: Request, res: Response) => {
+  res.json({ 
+    message: 'DomusApp API está rodando',
+    timestamp: new Date().toISOString()
+  });
+});
+
+app.use('/auth', authRoutes);
+
+const PORT = process.env.PORT || 3333;
+
+app.listen(PORT, () => {
+  console.log(`Servidor backend do DomusApp rodando na porta ${PORT}`);
+});
