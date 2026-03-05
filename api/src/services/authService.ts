@@ -54,7 +54,7 @@ export const authService = {
     { expiresIn: '1d' }
   );
 
-  // 🔥 remover senha antes de retornar
+  //  remover senha antes de retornar
   const { password: _, ...userWithoutPassword } = user;
 
   return { user: userWithoutPassword, token };
