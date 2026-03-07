@@ -1,19 +1,22 @@
+import "dotenv/config";
 import express, { Request, Response } from 'express';
 import cors from 'cors';
 import authRoutes from './routes/authRoutes';
+import userRoutes from './routes/userRoutes';
 
 const app = express();
 app.use(cors());
 app.use(express.json());
 
 app.get('/api/status', (req: Request, res: Response) => {
-  res.json({ 
+  res.json({
     message: 'DomusApp API está rodando',
     timestamp: new Date().toISOString()
   });
 });
 
 app.use('/auth', authRoutes);
+app.use('/users', userRoutes);
 
 const PORT = process.env.PORT || 3333;
 
