@@ -23,7 +23,7 @@ async function seed() {
             cpf: '00000000000',
             telefone: '(62) 99999-0000',
             password: hashedPassword,
-            role: 'ADMIN', // <-- Corrigido para nossa arquitetura
+            role: 'ADMIN',
             status: 'ATIVO',
             is_sindico: false,
             is_conselheiro: false,
