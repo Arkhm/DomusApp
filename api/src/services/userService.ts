@@ -39,9 +39,9 @@ export const userService = {
     }
 
     if (data.role !== 'MORADOR') {
-      data.unidade = null;
-      data.is_sindico = false;
-      data.is_conselheiro = false;
+      data.unitId = null;
+      data.isSyndic = false;
+      data.isCouncilMember = false;
     }
 
     data.password = await bcrypt.hash(data.password, 10);
@@ -75,9 +75,9 @@ export const userService = {
 
     // Limpa campos se mudar a role no update
     if (data.role && data.role !== 'MORADOR') {
-      data.unidade = null;
-      data.is_sindico = false;
-      data.is_conselheiro = false;
+      data.unitId = null;
+      data.isSyndic = false;
+      data.isCouncilMember = false;
     }
 
     if (data.password) {

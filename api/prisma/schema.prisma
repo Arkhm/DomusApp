@@ -13,17 +13,29 @@ datasource db {
 }
 
 model User {
-  id             String   @id @default(uuid())
-  name           String
-  email          String   @unique
-  cpf            String   @unique
-  telefone       String?         
-  password       String
-  role           String   @default("MORADOR")
-  unidade        String?     
-  status         String   @default("ATIVO") 
-  is_sindico     Boolean  @default(false)
-  is_conselheiro Boolean  @default(false)
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  id              String   @id @default(uuid())
+  name            String
+  email           String   @unique
+  cpf             String   @unique
+  phone           String? 
+  password        String
+  role            String   @default("MORADOR")
+  status          String   @default("ACTIVE") 
+  isSyndic        Boolean  @default(false)   
+  isCouncilMember Boolean  @default(false)   
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  unitId          String?  
+  unit            Unit?    @relation(fields: [unitId], references: [id])
+}
+
+model Unit {
+  id          String   @id @default(uuid())
+  block       String? 
+  number      String   
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  residents   User[]
 }
