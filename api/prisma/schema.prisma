@@ -28,6 +28,8 @@ model User {
 
   unitId          String?  
   unit            Unit?    @relation(fields: [unitId], references: [id])
+
+  notices         Notice[] @relation("NoticeAuthor")
 }
 
 model Unit {
@@ -38,4 +40,23 @@ model Unit {
   updatedAt   DateTime @updatedAt
 
   residents   User[]
+  
+  notices     Notice[] @relation("NoticeTargetUnit")
+}
+
+model Notice {
+  id           String   @id @default(uuid())
+  title        String
+  content      String   @db.Text 
+  targetType   String   @default("ALL") 
+  
+  targetUnitId String?
+  targetUnit   Unit?    @relation("NoticeTargetUnit", fields: [targetUnitId], references: [id])
+  
+  // Autor do aviso
+  authorId     String
+  author       User     @relation("NoticeAuthor", fields: [authorId], references: [id])
+
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 }

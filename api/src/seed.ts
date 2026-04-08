@@ -65,7 +65,6 @@ async function seed() {
             phone: '(62) 98888-3333', password: await bcrypt.hash('123456', 10),
             role: 'FUNCIONARIO', 
             status: 'ACTIVE', isSyndic: false, isCouncilMember: false,
-            // Funcionários não precisam de unitId (fica nulo automaticamente)
         }
     ];
 
@@ -74,6 +73,32 @@ async function seed() {
     }
 
     console.log(`✅ ${sampleUsers.length} usuários de teste criados e vinculados às unidades!`);
+
+    // 5. Criar Avisos de Teste (Notices)
+    console.log('📢 Criando avisos de teste...');
+    
+    // Aviso Geral, para "ALL"
+    await prisma.notice.create({
+        data: {
+            title: 'Dedetização Semestral',
+            content: 'Informamos que neste sábado, a partir das 08:00, realizaremos a dedetização nas áreas comuns do condomínio. Pedimos que mantenham seus animais de estimação dentro dos apartamentos.',
+            targetType: 'ALL',
+            authorId: admin.id,
+        }
+    });
+
+    // Aviso Específico
+    await prisma.notice.create({
+        data: {
+            title: 'Manutenção no Elevador do Bloco A',
+            content: 'O elevador de serviço do Bloco A estará em manutenção preventiva hoje das 14h às 16h.',
+            targetType: 'UNIT',
+            targetUnitId: unitA101.id, // Direcionado especificamente para a unidade A101
+            authorId: admin.id,
+        }
+    });
+
+    console.log('✅ Avisos criados com sucesso!');
 }
 
 seed()
