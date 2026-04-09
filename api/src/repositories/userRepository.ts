@@ -10,6 +10,10 @@ export const userRepository = {
   },
 
   findById: async (id: string) => {
+    return await prisma.user.findUnique({ 
+      where: { id },
+      include: { unit: true } // Opcional, mas ótimo para a rota getById já trazer a casa
+    });
     return await prisma.user.findUnique({ where: { id } });
   },
 
@@ -17,6 +21,12 @@ export const userRepository = {
     return await prisma.user.findMany({
       orderBy: { createdAt: 'desc' },
       select: {
+        id: true, name: true, email: true, cpf: true, phone: true,
+        role: true,
+        unitId: true,
+        unit: true,  
+        status: true, isSyndic: true, isCouncilMember: true,
+        createdAt: true, updatedAt: true,
         id: true,
         name: true,
         email: true,
@@ -44,6 +54,12 @@ export const userRepository = {
       },
       orderBy: { createdAt: 'desc' },
       select: {
+        id: true, name: true, email: true, cpf: true, phone: true,
+        role: true,
+        unitId: true,
+        unit: true, 
+        status: true, isSyndic: true, isCouncilMember: true,
+        createdAt: true, updatedAt: true,
         id: true,
         name: true,
         email: true,

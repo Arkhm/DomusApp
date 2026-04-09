@@ -3,6 +3,7 @@ import express, { Request, Response } from 'express';
 import cors from 'cors';
 import authRoutes from './routes/authRoutes';
 import userRoutes from './routes/userRoutes';
+import noticeRoutes from './routes/noticeRoutes';
 
 const app = express();
 app.use(cors());
@@ -17,6 +18,7 @@ app.get('/api/status', (req: Request, res: Response) => {
 
 app.use('/auth', authRoutes);
 app.use('/users', userRoutes);
+app.use('/notices', noticeRoutes);
 
 const PORT = process.env.PORT || 3333;
 
