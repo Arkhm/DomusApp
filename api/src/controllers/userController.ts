@@ -23,6 +23,7 @@ export const userController = {
         try {
             // Correção: Garantindo ao TypeScript que o id é uma string
             const id = req.params.id as string; 
+            const { id } = req.params;
             const user = await userService.getById(id);
             res.status(200).json(user);
         } catch (error: any) {
@@ -42,6 +43,7 @@ export const userController = {
     async update(req: Request, res: Response) {
         try {
             const id = req.params.id as string;
+            const { id } = req.params;
             const user = await userService.update(id, req.body);
             res.status(200).json(user);
         } catch (error: any) {
@@ -52,10 +54,12 @@ export const userController = {
     async delete(req: Request, res: Response) {
         try {
             const id = req.params.id as string;
+            const { id } = req.params;
             const result = await userService.delete(id);
             res.status(200).json(result);
         } catch (error: any) {
             res.status(400).json({ error: error.message });
         }
     },
+};
 };

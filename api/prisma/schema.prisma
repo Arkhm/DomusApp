@@ -1,9 +1,6 @@
 // This is your Prisma schema file,
 // learn more about it in the docs: https://pris.ly/d/prisma-schema
 
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -59,4 +56,13 @@ model Notice {
 
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
+  telefone        String?
+  password        String
+  perfil          String   @default("morador")   // morador | administrador | funcionario
+  unidade         String?                         // Only for morador
+  status          String   @default("ativo")      // ativo | inativo
+  is_sindico      Boolean  @default(false)
+  is_conselheiro  Boolean  @default(false)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 }

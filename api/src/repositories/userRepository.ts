@@ -14,6 +14,7 @@ export const userRepository = {
       where: { id },
       include: { unit: true } // Opcional, mas ótimo para a rota getById já trazer a casa
     });
+    return await prisma.user.findUnique({ where: { id } });
   },
 
   findAll: async () => {
@@ -26,6 +27,18 @@ export const userRepository = {
         unit: true,  
         status: true, isSyndic: true, isCouncilMember: true,
         createdAt: true, updatedAt: true,
+        id: true,
+        name: true,
+        email: true,
+        cpf: true,
+        telefone: true,
+        perfil: true,
+        unidade: true,
+        status: true,
+        is_sindico: true,
+        is_conselheiro: true,
+        createdAt: true,
+        updatedAt: true,
       },
     });
   },
@@ -47,6 +60,18 @@ export const userRepository = {
         unit: true, 
         status: true, isSyndic: true, isCouncilMember: true,
         createdAt: true, updatedAt: true,
+        id: true,
+        name: true,
+        email: true,
+        cpf: true,
+        telefone: true,
+        perfil: true,
+        unidade: true,
+        status: true,
+        is_sindico: true,
+        is_conselheiro: true,
+        createdAt: true,
+        updatedAt: true,
       },
     });
   },

@@ -1,3 +1,4 @@
+import "dotenv/config";
 import express, { Request, Response } from 'express';
 import cors from 'cors';
 import authRoutes from './routes/authRoutes';
@@ -9,7 +10,7 @@ app.use(cors());
 app.use(express.json());
 
 app.get('/api/status', (req: Request, res: Response) => {
-  res.json({ 
+  res.json({
     message: 'DomusApp API está rodando',
     timestamp: new Date().toISOString()
   });
