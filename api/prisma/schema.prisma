@@ -17,6 +17,7 @@ model User {
   id         Int      @id @default(autoincrement())
   name       String   @db.VarChar(100)
   email      String   @unique @db.VarChar(120)
+  telefone   String?  @db.VarChar(20)
   password   String   @db.VarChar(255)
   role_id    Int
   unit_id    Int?
@@ -26,6 +27,7 @@ model User {
 
   role       Role     @relation(fields: [role_id], references: [id])
   unit       Unit?    @relation(fields: [unit_id], references: [id])
+  notices    Notice[] @relation("NoticeAuthor")
 
   @@map("users")
 }
@@ -45,6 +47,25 @@ model Unit {
   number     String   @db.VarChar(10)
   created_at DateTime @default(now())
   users      User[]
+  notices    Notice[] @relation("NoticeTargetUnit")
 
   @@map("units")
+}
+
+model Notice {
+  id           Int      @id @default(autoincrement())
+  title        String   @db.VarChar(255)
+  content      String   @db.Text
+  targetType   String   @default("ALL")
+
+  targetUnitId Int?
+  targetUnit   Unit?    @relation("NoticeTargetUnit", fields: [targetUnitId], references: [id])
+
+  authorId     Int
+  author       User     @relation("NoticeAuthor", fields: [authorId], references: [id])
+
+  created_at   DateTime @default(now())
+  updated_at   DateTime? @updatedAt
+
+  @@map("notices")
 }

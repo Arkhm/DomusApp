@@ -21,8 +21,8 @@ export const userController = {
 
     async getById(req: Request, res: Response) {
         try {
-            // Correção: Garantindo ao TypeScript que o id é uma string
-            const id = req.params.id as string; 
+            
+            const id = Number(req.params.id);
             const user = await userService.getById(id);
             res.status(200).json(user);
         } catch (error: any) {

@@ -2,11 +2,12 @@ import { prisma } from '../lib/prisma';
 
 export const userRepository = {
   findByEmail: async (email: string) => {
-  return await prisma.user.findUnique({
-    where: { email },
-    include: { role: true },
-  });
-},
+    return await prisma.user.findUnique({
+      where: { email },
+      include: { role: true },
+    });
+  },
+
   findById: async (id: number) => {
     return await prisma.user.findUnique({
       where: { id },
@@ -18,7 +19,7 @@ export const userRepository = {
     return await prisma.user.findMany({
       orderBy: { created_at: 'desc' },
       select: {
-        id: true, name: true, email: true,
+        id: true, name: true, email: true, telefone: true,
         is_active: true, created_at: true, updated_at: true,
         role: { select: { id: true, name: true } },
         unit: { select: { id: true, block: true, number: true } },
@@ -36,7 +37,7 @@ export const userRepository = {
       },
       orderBy: { created_at: 'desc' },
       select: {
-        id: true, name: true, email: true,
+        id: true, name: true, email: true, telefone: true,
         is_active: true, created_at: true, updated_at: true,
         role: { select: { id: true, name: true } },
         unit: { select: { id: true, block: true, number: true } },
@@ -47,6 +48,7 @@ export const userRepository = {
   create: async (data: {
     name: string;
     email: string;
+    telefone?: string | null;
     password: string;
     role_id: number;
     unit_id?: number | null;
@@ -58,6 +60,7 @@ export const userRepository = {
   update: async (id: number, data: {
     name?: string;
     email?: string;
+    telefone?: string | null;
     password?: string;
     role_id?: number;
     unit_id?: number | null;
