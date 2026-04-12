@@ -2,30 +2,27 @@ import { prisma } from '../lib/prisma';
 
 export const userRepository = {
   findByEmail: async (email: string) => {
-    return await prisma.user.findUnique({ where: { email } });
+    return await prisma.user.findUnique({
+      where: { email },
+      include: { role: true },
+    });
   },
 
-  findByCpf: async (cpf: string) => {
-    return await prisma.user.findUnique({ where: { cpf } });
-  },
-
-  findById: async (id: string) => {
-    return await prisma.user.findUnique({ 
+  findById: async (id: number) => {
+    return await prisma.user.findUnique({
       where: { id },
-      include: { unit: true } // Opcional, mas ótimo para a rota getById já trazer a casa
+      include: { role: true, unit: true },
     });
   },
 
   findAll: async () => {
     return await prisma.user.findMany({
-      orderBy: { createdAt: 'desc' },
+      orderBy: { created_at: 'desc' },
       select: {
-        id: true, name: true, email: true, cpf: true, phone: true,
-        role: true,
-        unitId: true,
-        unit: true,  
-        status: true, isSyndic: true, isCouncilMember: true,
-        createdAt: true, updatedAt: true,
+        id: true, name: true, email: true, telefone: true,
+        is_active: true, created_at: true, updated_at: true,
+        role: { select: { id: true, name: true } },
+        unit: { select: { id: true, block: true, number: true } },
       },
     });
   },
@@ -36,33 +33,43 @@ export const userRepository = {
         OR: [
           { name: { contains: query } },
           { email: { contains: query } },
-          { cpf: { contains: query } },
         ],
       },
-      orderBy: { createdAt: 'desc' },
+      orderBy: { created_at: 'desc' },
       select: {
-        id: true, name: true, email: true, cpf: true, phone: true,
-        role: true,
-        unitId: true,
-        unit: true, 
-        status: true, isSyndic: true, isCouncilMember: true,
-        createdAt: true, updatedAt: true,
+        id: true, name: true, email: true, telefone: true,
+        is_active: true, created_at: true, updated_at: true,
+        role: { select: { id: true, name: true } },
+        unit: { select: { id: true, block: true, number: true } },
       },
     });
   },
 
-  create: async (data: any) => {
+  create: async (data: {
+    name: string;
+    email: string;
+    telefone?: string | null;
+    password: string;
+    role_id: number;
+    unit_id?: number | null;
+    is_active?: boolean;
+  }) => {
     return await prisma.user.create({ data });
   },
 
-  update: async (id: string, data: any) => {
-    return await prisma.user.update({
-      where: { id },
-      data,
-    });
+  update: async (id: number, data: {
+    name?: string;
+    email?: string;
+    telefone?: string | null;
+    password?: string;
+    role_id?: number;
+    unit_id?: number | null;
+    is_active?: boolean;
+  }) => {
+    return await prisma.user.update({ where: { id }, data });
   },
 
-  delete: async (id: string) => {
+  delete: async (id: number) => {
     return await prisma.user.delete({ where: { id } });
   },
 };

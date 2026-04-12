@@ -35,7 +35,7 @@ export const noticeController = {
 
   async delete(req: AuthRequest, res: Response) {
     try {
-      const id = req.params.id as string;
+      const id = Number(req.params.id);
       const userId = req.user?.id as string;
       const userRole = req.user?.role as string;
 
