@@ -12,13 +12,12 @@
   "license": "ISC",
   "dependencies": {
     "@prisma/adapter-mariadb": "^7.4.2",
-    "@prisma/client": "^6.19.3",
+    "@prisma/client": "^7.4.2",
     "bcryptjs": "^3.0.3",
     "cors": "^2.8.6",
     "dotenv": "^17.3.1",
     "express": "^5.2.1",
-    "jsonwebtoken": "^9.0.3",
-    "prisma": "^6.19.3"
+    "jsonwebtoken": "^9.0.3"
   },
   "devDependencies": {
     "@types/bcryptjs": "^2.4.6",
@@ -26,6 +25,7 @@
     "@types/express": "^5.0.6",
     "@types/jsonwebtoken": "^9.0.10",
     "@types/node": "^25.3.3",
+    "prisma": "^7.4.2",
     "tsx": "^4.21.0",
     "typescript": "^5.9.3"
   }

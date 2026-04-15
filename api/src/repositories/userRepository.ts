@@ -2,27 +2,30 @@ import { prisma } from '../lib/prisma';
 
 export const userRepository = {
   findByEmail: async (email: string) => {
-    return await prisma.user.findUnique({
-      where: { email },
-      include: { role: true },
-    });
+    return await prisma.user.findUnique({ where: { email } });
   },
 
-  findById: async (id: number) => {
-    return await prisma.user.findUnique({
+  findByCpf: async (cpf: string) => {
+    return await prisma.user.findUnique({ where: { cpf } });
+  },
+
+  findById: async (id: string) => {
+    return await prisma.user.findUnique({ 
       where: { id },
-      include: { role: true, unit: true },
+      include: { unit: true } // Opcional, mas ótimo para a rota getById já trazer a casa
     });
   },
 
   findAll: async () => {
     return await prisma.user.findMany({
-      orderBy: { created_at: 'desc' },
+      orderBy: { createdAt: 'desc' },
       select: {
-        id: true, name: true, email: true, telefone: true,
-        is_active: true, created_at: true, updated_at: true,
-        role: { select: { id: true, name: true } },
-        unit: { select: { id: true, block: true, number: true } },
+        id: true, name: true, email: true, cpf: true, phone: true,
+        role: true,
+        unitId: true,
+        unit: true,  
+        status: true, isSyndic: true, isCouncilMember: true,
+        createdAt: true, updatedAt: true,
       },
     });
   },
@@ -33,43 +36,33 @@ export const userRepository = {
         OR: [
           { name: { contains: query } },
           { email: { contains: query } },
+          { cpf: { contains: query } },
         ],
       },
-      orderBy: { created_at: 'desc' },
+      orderBy: { createdAt: 'desc' },
       select: {
-        id: true, name: true, email: true, telefone: true,
-        is_active: true, created_at: true, updated_at: true,
-        role: { select: { id: true, name: true } },
-        unit: { select: { id: true, block: true, number: true } },
+        id: true, name: true, email: true, cpf: true, phone: true,
+        role: true,
+        unitId: true,
+        unit: true, 
+        status: true, isSyndic: true, isCouncilMember: true,
+        createdAt: true, updatedAt: true,
       },
     });
   },
 
-  create: async (data: {
-    name: string;
-    email: string;
-    telefone?: string | null;
-    password: string;
-    role_id: number;
-    unit_id?: number | null;
-    is_active?: boolean;
-  }) => {
+  create: async (data: any) => {
     return await prisma.user.create({ data });
   },
 
-  update: async (id: number, data: {
-    name?: string;
-    email?: string;
-    telefone?: string | null;
-    password?: string;
-    role_id?: number;
-    unit_id?: number | null;
-    is_active?: boolean;
-  }) => {
-    return await prisma.user.update({ where: { id }, data });
+  update: async (id: string, data: any) => {
+    return await prisma.user.update({
+      where: { id },
+      data,
+    });
   },
 
-  delete: async (id: number) => {
+  delete: async (id: string) => {
     return await prisma.user.delete({ where: { id } });
   },
 };

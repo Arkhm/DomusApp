@@ -65,10 +65,10 @@ export const authService = {
     }
 
     const token = jwt.sign(
-  { id: user.id, role: user.role.name },
-  JWT_SECRET,
-  { expiresIn: '1d' }
-);
+      { id: user.id, role: user.role },
+      JWT_SECRET,
+      { expiresIn: '1d' }
+    );
 
     const { password: _, ...userWithoutPassword } = user;
     return { user: userWithoutPassword, token };

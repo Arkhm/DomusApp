@@ -8,9 +8,9 @@ export const noticeRepository = {
   // findAll para os Admins
   findAll: async () => {
     return await prisma.notice.findMany({
-      orderBy: { created_at: 'desc' },
+      orderBy: { createdAt: 'desc' },
       include: {
-        author: { select: { name: true, role_id: true } },
+        author: { select: { name: true, role: true } },
         targetUnit: true
       }
     });
@@ -30,7 +30,7 @@ export const noticeRepository = {
 
     return await prisma.notice.findMany({
       where: whereClause,
-      orderBy: { created_at: 'desc' },
+      orderBy: { createdAt: 'desc' },
       include: {
         author: { select: { name: true, role: true } },
         targetUnit: true
@@ -38,11 +38,11 @@ export const noticeRepository = {
     });
   },
 
-  findById: async (id: number) => {
+  findById: async (id: string) => {
     return await prisma.notice.findUnique({ where: { id } });
   },
 
-  delete: async (id: number) => {
+  delete: async (id: string) => {
     return await prisma.notice.delete({ where: { id } });
   }
 };
