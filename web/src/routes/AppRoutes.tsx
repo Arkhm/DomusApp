@@ -3,6 +3,7 @@ import { useAuth } from '../contexts/AuthContext';
 import Login from '../pages/Login';
 import ProtectedLayout from '../components/layout/ProtectedLayout';
 import UsersList from '../pages/Users/UsersList';
+import NoticesList from '../pages/Notices/NoticesList';
 
 export default function AppRoutes() {
     const { isAuthenticated, isLoading } = useAuth();
@@ -28,7 +29,7 @@ export default function AppRoutes() {
             {/* Protected routes */}
             <Route element={<ProtectedLayout />}>
                 <Route path="/usuarios" element={<UsersList />} />
-                {/* Future routes will go here */}
+                <Route path="/comunicados" element={<NoticesList />} />
                 <Route path="/dashboard" element={
                     <div className="flex items-center justify-center h-full text-text-secondary">
                         <p className="text-lg">Dashboard — Em breve</p>

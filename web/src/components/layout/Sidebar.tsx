@@ -20,7 +20,7 @@ const navItems = [
     { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { to: '/usuarios', label: 'Usuários', icon: Users },
     { to: '#', label: 'Unidades', icon: Building2, disabled: true },
-    { to: '#', label: 'Comunicados', icon: Megaphone, disabled: true },
+    { to: '/comunicados', label: 'Comunicados', icon: Megaphone },
     { to: '#', label: 'Eventos', icon: CalendarDays, disabled: true },
     { to: '#', label: 'Votações', icon: Vote, disabled: true },
     { to: '#', label: 'Áreas Comuns', icon: TreePalm, disabled: true },
