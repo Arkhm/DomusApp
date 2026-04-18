@@ -26,16 +26,10 @@ export const userService = {
     if (await userRepository.findByEmail(data.email)) throw new Error('E-mail já cadastrado.');
     if (await userRepository.findByCpf(data.cpf)) throw new Error('CPF já cadastrado.');
 
-    // TRADUÇÃO FRONT -> BACK: Pega o "perfil" do front, converte para a "role" do back
-    if (data.perfil) {
-      const perfilFormatado = data.perfil.toUpperCase();
-      if (perfilFormatado === 'ADMINISTRADOR') data.role = 'ADMIN';
-      else if (perfilFormatado === 'FUNCIONARIO') data.role = 'FUNCIONARIO';
-      else data.role = 'MORADOR';
-      
-      delete data.perfil; // Remove para o Prisma não dar erro
+    if (data.role) {
+      data.role = data.role.toUpperCase();
     } else {
-      data.role = 'MORADOR';
+      data.role = 'MORADOR'; 
     }
 
     if (data.role !== 'MORADOR') {
@@ -63,17 +57,10 @@ export const userService = {
       if (await userRepository.findByCpf(data.cpf)) throw new Error('CPF já cadastrado por outro.');
     }
 
-    // TRADUÇÃO NO UPDATE
-    if (data.perfil) {
-      const perfilFormatado = data.perfil.toUpperCase();
-      if (perfilFormatado === 'ADMINISTRADOR') data.role = 'ADMIN';
-      else if (perfilFormatado === 'FUNCIONARIO') data.role = 'FUNCIONARIO';
-      else data.role = 'MORADOR';
-      
-      delete data.perfil;
+    if (data.role) {
+      data.role = data.role.toUpperCase();
     }
 
-    // Limpa campos se mudar a role no update
     if (data.role && data.role !== 'MORADOR') {
       data.unitId = null;
       data.isSyndic = false;
