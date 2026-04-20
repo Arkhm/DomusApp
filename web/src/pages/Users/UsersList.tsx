@@ -14,8 +14,8 @@ import {
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { userService } from '../../services/userService';
-import { PERFIL_LABELS, STATUS_LABELS } from '../../types/user';
-import type { User, UserPerfil, UserStatus } from '../../types/user';
+import { ROLE_LABELS, STATUS_LABELS, formatUnitDisplay } from '../../types/user';
+import type { User, UserRole, UserStatus } from '../../types/user';
 import UserFormModal from './UserFormModal';
 import Header from '../../components/layout/Header';
 
@@ -24,7 +24,7 @@ export default function UsersList() {
     const [filteredUsers, setFilteredUsers] = useState<User[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [searchQuery, setSearchQuery] = useState('');
-    const [filterPerfil, setFilterPerfil] = useState<UserPerfil | ''>('');
+    const [filterRole, setFilterRole] = useState<UserRole | ''>('');
     const [filterStatus, setFilterStatus] = useState<UserStatus | ''>('');
     const [showFilters, setShowFilters] = useState(false);
 
@@ -70,8 +70,8 @@ export default function UsersList() {
             );
         }
 
-        if (filterPerfil) {
-            result = result.filter((u) => u.perfil === filterPerfil);
+        if (filterRole) {
+            result = result.filter((u) => u.role === filterRole);
         }
 
         if (filterStatus) {
@@ -79,7 +79,7 @@ export default function UsersList() {
         }
 
         setFilteredUsers(result);
-    }, [users, searchQuery, filterPerfil, filterStatus]);
+    }, [users, searchQuery, filterRole, filterStatus]);
 
     // Handlers
     const handleCreateUser = () => {
@@ -131,7 +131,7 @@ export default function UsersList() {
         return `${cleaned.slice(0, 3)}.${cleaned.slice(3, 6)}.${cleaned.slice(6, 9)}-${cleaned.slice(9)}`;
     };
 
-    const formatTelefone = (tel: string | null) => {
+    const formatPhone = (tel: string | null) => {
         if (!tel) return '—';
         const cleaned = tel.replace(/\D/g, '');
         if (cleaned.length === 11) {
@@ -166,16 +166,16 @@ export default function UsersList() {
                         {/* Filter toggle */}
                         <button
                             onClick={() => setShowFilters(!showFilters)}
-                            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl border text-sm font-medium transition-all duration-200 ${showFilters || filterPerfil || filterStatus
+                            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl border text-sm font-medium transition-all duration-200 ${showFilters || filterRole || filterStatus
                                 ? 'bg-accent-primary/10 border-accent-primary text-accent-primary'
                                 : 'bg-bg-input border-border-primary text-text-secondary hover:text-text-primary'
                                 }`}
                         >
                             <Filter className="w-4 h-4" />
                             Filtros
-                            {(filterPerfil || filterStatus) && (
+                            {(filterRole || filterStatus) && (
                                 <span className="w-5 h-5 bg-accent-primary text-white text-xs rounded-full flex items-center justify-center">
-                                    {(filterPerfil ? 1 : 0) + (filterStatus ? 1 : 0)}
+                                    {(filterRole ? 1 : 0) + (filterStatus ? 1 : 0)}
                                 </span>
                             )}
                         </button>
@@ -204,17 +204,17 @@ export default function UsersList() {
                             className="overflow-hidden mb-4"
                         >
                             <div className="flex items-center gap-4 p-4 bg-bg-card border border-border-primary rounded-xl">
-                                {/* Perfil filter */}
+                                {/* Role filter */}
                                 <div className="relative">
                                     <select
-                                        value={filterPerfil}
-                                        onChange={(e) => setFilterPerfil(e.target.value as UserPerfil | '')}
+                                        value={filterRole}
+                                        onChange={(e) => setFilterRole(e.target.value as UserRole | '')}
                                         className="appearance-none px-4 py-2 pr-10 bg-bg-input border border-border-primary rounded-lg text-sm text-text-primary focus:border-accent-primary focus:outline-none cursor-pointer"
                                     >
                                         <option value="">Todos os Perfis</option>
-                                        <option value="morador">Morador</option>
-                                        <option value="administrador">Administrador</option>
-                                        <option value="funcionario">Funcionário</option>
+                                        <option value="MORADOR">Morador</option>
+                                        <option value="ADMIN">Administrador</option>
+                                        <option value="FUNCIONARIO">Funcionário</option>
                                     </select>
                                     <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted pointer-events-none" />
                                 </div>
@@ -227,17 +227,17 @@ export default function UsersList() {
                                         className="appearance-none px-4 py-2 pr-10 bg-bg-input border border-border-primary rounded-lg text-sm text-text-primary focus:border-accent-primary focus:outline-none cursor-pointer"
                                     >
                                         <option value="">Todos os Status</option>
-                                        <option value="ativo">Ativo</option>
-                                        <option value="inativo">Inativo</option>
+                                        <option value="ACTIVE">Ativo</option>
+                                        <option value="INACTIVE">Inativo</option>
                                     </select>
                                     <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted pointer-events-none" />
                                 </div>
 
                                 {/* Clear filters */}
-                                {(filterPerfil || filterStatus) && (
+                                {(filterRole || filterStatus) && (
                                     <button
                                         onClick={() => {
-                                            setFilterPerfil('');
+                                            setFilterRole('');
                                             setFilterStatus('');
                                         }}
                                         className="text-sm text-accent-primary hover:text-accent-primary-hover transition-colors"
@@ -255,7 +255,7 @@ export default function UsersList() {
                     <Users className="w-4 h-4" />
                     <span>
                         {filteredUsers.length} {filteredUsers.length === 1 ? 'usuário' : 'usuários'}
-                        {searchQuery || filterPerfil || filterStatus ? ' encontrados' : ' cadastrados'}
+                        {searchQuery || filterRole || filterStatus ? ' encontrados' : ' cadastrados'}
                     </span>
                 </div>
 
@@ -271,7 +271,7 @@ export default function UsersList() {
                             <AlertCircle className="w-10 h-10 mb-3 opacity-50" />
                             <p className="text-base font-medium">Nenhum usuário encontrado</p>
                             <p className="text-sm mt-1">
-                                {searchQuery || filterPerfil || filterStatus
+                                {searchQuery || filterRole || filterStatus
                                     ? 'Tente ajustar os filtros de busca'
                                     : 'Clique em "+ Novo Usuário" para começar'}
                             </p>
@@ -321,12 +321,12 @@ export default function UsersList() {
                                                     <div className="min-w-0">
                                                         <p className="text-sm font-medium text-text-primary truncate">
                                                             {user.name}
-                                                            {user.is_sindico && (
+                                                            {user.isSyndic && (
                                                                 <span className="ml-1.5 text-[10px] px-1.5 py-0.5 rounded bg-warning-bg text-warning font-medium">
                                                                     Síndico
                                                                 </span>
                                                             )}
-                                                            {user.is_conselheiro && (
+                                                            {user.isCouncilMember && (
                                                                 <span className="ml-1 text-[10px] px-1.5 py-0.5 rounded bg-info-bg text-info font-medium">
                                                                     Conselheiro
                                                                 </span>
@@ -336,25 +336,25 @@ export default function UsersList() {
                                                 </div>
                                             </td>
                                             <td className="py-3 px-3 text-sm text-text-secondary truncate">{user.email}</td>
-                                            <td className="py-3 px-3 text-sm text-text-secondary">{formatTelefone(user.telefone)}</td>
+                                            <td className="py-3 px-3 text-sm text-text-secondary">{formatPhone(user.phone)}</td>
                                             <td className="py-3 px-3 text-sm text-text-secondary font-mono text-[13px]">{formatCpf(user.cpf)}</td>
                                             <td className="py-3 px-3">
-                                                <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium ${user.perfil === 'administrador'
+                                                <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium ${user.role === 'ADMIN'
                                                     ? 'bg-accent-primary/10 text-accent-primary'
-                                                    : user.perfil === 'funcionario'
+                                                    : user.role === 'FUNCIONARIO'
                                                         ? 'bg-warning-bg text-warning'
                                                         : 'bg-info-bg text-info'
                                                     }`}>
-                                                    {PERFIL_LABELS[user.perfil] || user.perfil}
+                                                    {ROLE_LABELS[user.role] || user.role}
                                                 </span>
                                             </td>
-                                            <td className="py-3 px-3 text-sm text-text-secondary truncate">{user.unidade || '—'}</td>
+                                            <td className="py-3 px-3 text-sm text-text-secondary truncate">{formatUnitDisplay(user.unit)}</td>
                                             <td className="py-3 px-3">
-                                                <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-xs font-medium ${user.status === 'ativo'
+                                                <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-xs font-medium ${user.status === 'ACTIVE'
                                                     ? 'bg-badge-ativo-bg text-badge-ativo'
                                                     : 'bg-badge-inativo-bg text-badge-inativo'
                                                     }`}>
-                                                    <span className={`w-1.5 h-1.5 rounded-full ${user.status === 'ativo' ? 'bg-badge-ativo' : 'bg-badge-inativo'
+                                                    <span className={`w-1.5 h-1.5 rounded-full ${user.status === 'ACTIVE' ? 'bg-badge-ativo' : 'bg-badge-inativo'
                                                         }`} />
                                                     {STATUS_LABELS[user.status] || user.status}
                                                 </span>

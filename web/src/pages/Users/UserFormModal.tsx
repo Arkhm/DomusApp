@@ -3,7 +3,9 @@ import { motion, AnimatePresence } from 'motion/react';
 import { X, Loader2, ChevronDown } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { userService } from '../../services/userService';
-import type { User, UserFormData, UserPerfil, UserStatus } from '../../types/user';
+import { unitService } from '../../services/unitService';
+import type { User, UserFormData, UserRole, UserStatus, Unit } from '../../types/user';
+import { formatUnitDisplay } from '../../types/user';
 
 interface UserFormModalProps {
     isOpen: boolean;
@@ -16,19 +18,37 @@ const emptyForm: UserFormData = {
     name: '',
     email: '',
     cpf: '',
-    telefone: '',
+    phone: '',
     password: '',
-    perfil: 'morador',
-    unidade: '',
-    status: 'ativo',
-    is_sindico: false,
-    is_conselheiro: false,
+    role: 'MORADOR',
+    unitId: '',
+    status: 'ACTIVE',
+    isSyndic: false,
+    isCouncilMember: false,
 };
 
 export default function UserFormModal({ isOpen, user, onClose, onSuccess }: UserFormModalProps) {
     const [form, setForm] = useState<UserFormData>(emptyForm);
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [units, setUnits] = useState<Unit[]>([]);
+    const [isLoadingUnits, setIsLoadingUnits] = useState(false);
     const isEditing = !!user;
+
+    // Load units from backend
+    useEffect(() => {
+        if (isOpen) {
+            setIsLoadingUnits(true);
+            unitService.getAll()
+                .then(setUnits)
+                .catch(() => {
+                    toast.error('Erro ao carregar unidades.', {
+                        position: 'top-right',
+                        style: { background: '#16161f', color: '#f0f0f5', border: '1px solid #ef4444' },
+                    });
+                })
+                .finally(() => setIsLoadingUnits(false));
+        }
+    }, [isOpen]);
 
     // Format CPF for display: 00000000000 → 000.000.000-00
     const formatCpfForDisplay = (cpf: string) => {
@@ -39,8 +59,8 @@ export default function UserFormModal({ isOpen, user, onClose, onSuccess }: User
         return cleaned;
     };
 
-    // Format telefone for display: 62999990000 → (62) 99999-0000
-    const formatTelefoneForDisplay = (tel: string) => {
+    // Format phone for display: 62999990000 → (62) 99999-0000
+    const formatPhoneForDisplay = (tel: string) => {
         const cleaned = tel.replace(/\D/g, '').slice(0, 11);
         if (cleaned.length > 6) return `(${cleaned.slice(0, 2)}) ${cleaned.slice(2, 7)}-${cleaned.slice(7)}`;
         if (cleaned.length > 2) return `(${cleaned.slice(0, 2)}) ${cleaned.slice(2)}`;
@@ -55,13 +75,13 @@ export default function UserFormModal({ isOpen, user, onClose, onSuccess }: User
                 name: user.name,
                 email: user.email,
                 cpf: formatCpfForDisplay(user.cpf),
-                telefone: user.telefone ? formatTelefoneForDisplay(user.telefone) : '',
+                phone: user.phone ? formatPhoneForDisplay(user.phone) : '',
                 password: '', // Don't show password when editing
-                perfil: user.perfil,
-                unidade: user.unidade || '',
+                role: user.role,
+                unitId: user.unitId || '',
                 status: user.status,
-                is_sindico: user.is_sindico,
-                is_conselheiro: user.is_conselheiro,
+                isSyndic: user.isSyndic,
+                isCouncilMember: user.isCouncilMember,
             });
         } else {
             setForm(emptyForm);
@@ -72,11 +92,11 @@ export default function UserFormModal({ isOpen, user, onClose, onSuccess }: User
         setForm((prev) => {
             const updated = { ...prev, [field]: value };
 
-            // If perfil changes away from morador, clear morador-specific fields
-            if (field === 'perfil' && value !== 'morador') {
-                updated.unidade = '';
-                updated.is_sindico = false;
-                updated.is_conselheiro = false;
+            // If role changes away from MORADOR, clear morador-specific fields
+            if (field === 'role' && value !== 'MORADOR') {
+                updated.unitId = '';
+                updated.isSyndic = false;
+                updated.isCouncilMember = false;
             }
 
             return updated;
@@ -96,8 +116,8 @@ export default function UserFormModal({ isOpen, user, onClose, onSuccess }: User
         handleChange('cpf', cleaned);
     };
 
-    // Telefone mask: (00) 00000-0000
-    const handleTelefoneChange = (value: string) => {
+    // Phone mask: (00) 00000-0000
+    const handlePhoneChange = (value: string) => {
         let cleaned = value.replace(/\D/g, '').slice(0, 11);
         if (cleaned.length > 6) {
             cleaned = `(${cleaned.slice(0, 2)}) ${cleaned.slice(2, 7)}-${cleaned.slice(7)}`;
@@ -106,7 +126,7 @@ export default function UserFormModal({ isOpen, user, onClose, onSuccess }: User
         } else if (cleaned.length > 0) {
             cleaned = `(${cleaned}`;
         }
-        handleChange('telefone', cleaned);
+        handleChange('phone', cleaned);
     };
 
     const handleSubmit = async (e: FormEvent) => {
@@ -129,15 +149,15 @@ export default function UserFormModal({ isOpen, user, onClose, onSuccess }: User
             toast.error('Senha é obrigatória para novo usuário.');
             return;
         }
-        // Validate telefone if provided
-        if (form.telefone) {
-            const telDigits = form.telefone.replace(/\D/g, '');
+        // Validate phone if provided
+        if (form.phone) {
+            const telDigits = form.phone.replace(/\D/g, '');
             if (telDigits.length < 10 || telDigits.length > 11) {
                 toast.error('Telefone inválido. Deve conter DDD (2 dígitos) + número (8-9 dígitos).');
                 return;
             }
         }
-        if (form.perfil === 'morador' && !form.unidade?.trim()) {
+        if (form.role === 'MORADOR' && !form.unitId?.trim()) {
             toast.error('Unidade é obrigatória para moradores.');
             return;
         }
@@ -145,23 +165,31 @@ export default function UserFormModal({ isOpen, user, onClose, onSuccess }: User
         setIsSubmitting(true);
 
         try {
-            // Prepare data — send CPF without mask
+            // Prepare data — send CPF and phone without mask
             const submitData: any = {
-                ...form,
+                name: form.name,
+                email: form.email,
                 cpf: form.cpf.replace(/\D/g, ''),
-                telefone: form.telefone?.replace(/\D/g, '') || null,
+                phone: form.phone?.replace(/\D/g, '') || null,
+                password: form.password || undefined,
+                role: form.role,
+                status: form.status,
+                isSyndic: form.isSyndic,
+                isCouncilMember: form.isCouncilMember,
             };
+
+            // Only include unitId for MORADOR
+            if (form.role === 'MORADOR') {
+                submitData.unitId = form.unitId || null;
+            } else {
+                submitData.unitId = null;
+                submitData.isSyndic = false;
+                submitData.isCouncilMember = false;
+            }
 
             // Remove empty password on edit
             if (isEditing && !submitData.password) {
                 delete submitData.password;
-            }
-
-            // Clear morador fields if not morador
-            if (submitData.perfil !== 'morador') {
-                submitData.unidade = null;
-                submitData.is_sindico = false;
-                submitData.is_conselheiro = false;
             }
 
             if (isEditing && user) {
@@ -268,7 +296,7 @@ export default function UserFormModal({ isOpen, user, onClose, onSuccess }: User
                                 </div>
                             </div>
 
-                            {/* Telefone + Senha row */}
+                            {/* Phone + Password row */}
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                 <div className="space-y-1.5">
                                     <label className="block text-sm font-medium text-text-secondary">
@@ -276,8 +304,8 @@ export default function UserFormModal({ isOpen, user, onClose, onSuccess }: User
                                     </label>
                                     <input
                                         type="text"
-                                        value={form.telefone}
-                                        onChange={(e) => handleTelefoneChange(e.target.value)}
+                                        value={form.phone}
+                                        onChange={(e) => handlePhoneChange(e.target.value)}
                                         placeholder="(00) 00000-0000"
                                         className="w-full px-4 py-2.5 bg-bg-input border border-border-primary rounded-xl text-sm text-text-primary placeholder-text-muted focus:border-accent-primary focus:outline-none transition-colors"
                                     />
@@ -296,7 +324,7 @@ export default function UserFormModal({ isOpen, user, onClose, onSuccess }: User
                                 </div>
                             </div>
 
-                            {/* Perfil + Status row */}
+                            {/* Role + Status row */}
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                 <div className="space-y-1.5">
                                     <label className="block text-sm font-medium text-text-secondary">
@@ -304,13 +332,13 @@ export default function UserFormModal({ isOpen, user, onClose, onSuccess }: User
                                     </label>
                                     <div className="relative">
                                         <select
-                                            value={form.perfil}
-                                            onChange={(e) => handleChange('perfil', e.target.value as UserPerfil)}
+                                            value={form.role}
+                                            onChange={(e) => handleChange('role', e.target.value as UserRole)}
                                             className="appearance-none w-full px-4 py-2.5 bg-bg-input border border-border-primary rounded-xl text-sm text-text-primary focus:border-accent-primary focus:outline-none transition-colors cursor-pointer pr-10"
                                         >
-                                            <option value="morador">Morador</option>
-                                            <option value="administrador">Administrador</option>
-                                            <option value="funcionario">Funcionário</option>
+                                            <option value="MORADOR">Morador</option>
+                                            <option value="ADMIN">Administrador</option>
+                                            <option value="FUNCIONARIO">Funcionário</option>
                                         </select>
                                         <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted pointer-events-none" />
                                     </div>
@@ -325,8 +353,8 @@ export default function UserFormModal({ isOpen, user, onClose, onSuccess }: User
                                             onChange={(e) => handleChange('status', e.target.value as UserStatus)}
                                             className="appearance-none w-full px-4 py-2.5 bg-bg-input border border-border-primary rounded-xl text-sm text-text-primary focus:border-accent-primary focus:outline-none transition-colors cursor-pointer pr-10"
                                         >
-                                            <option value="ativo">Ativo</option>
-                                            <option value="inativo">Inativo</option>
+                                            <option value="ACTIVE">Ativo</option>
+                                            <option value="INACTIVE">Inativo</option>
                                         </select>
                                         <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted pointer-events-none" />
                                     </div>
@@ -335,7 +363,7 @@ export default function UserFormModal({ isOpen, user, onClose, onSuccess }: User
 
                             {/* Conditional morador fields */}
                             <AnimatePresence>
-                                {form.perfil === 'morador' && (
+                                {form.role === 'MORADOR' && (
                                     <motion.div
                                         initial={{ opacity: 0, height: 0 }}
                                         animate={{ opacity: 1, height: 'auto' }}
@@ -348,32 +376,48 @@ export default function UserFormModal({ isOpen, user, onClose, onSuccess }: User
                                                 Campos do Morador
                                             </p>
 
-                                            {/* Unidade */}
+                                            {/* Unit dropdown */}
                                             <div className="space-y-1.5">
                                                 <label className="block text-sm font-medium text-text-secondary">
                                                     Unidade <span className="text-error">*</span>
                                                 </label>
-                                                <input
-                                                    type="text"
-                                                    value={form.unidade || ''}
-                                                    onChange={(e) => handleChange('unidade', e.target.value)}
-                                                    placeholder="Ex: Bloco A - 101"
-                                                    className="w-full px-4 py-2.5 bg-bg-input border border-border-primary rounded-xl text-sm text-text-primary placeholder-text-muted focus:border-accent-primary focus:outline-none transition-colors"
-                                                />
+                                                <div className="relative">
+                                                    <select
+                                                        value={form.unitId || ''}
+                                                        onChange={(e) => handleChange('unitId', e.target.value)}
+                                                        disabled={isLoadingUnits}
+                                                        className="appearance-none w-full px-4 py-2.5 bg-bg-input border border-border-primary rounded-xl text-sm text-text-primary focus:border-accent-primary focus:outline-none transition-colors cursor-pointer pr-10 disabled:opacity-50"
+                                                    >
+                                                        <option value="">
+                                                            {isLoadingUnits ? 'Carregando unidades...' : 'Selecione uma unidade'}
+                                                        </option>
+                                                        {units.map((unit) => (
+                                                            <option key={unit.id} value={unit.id}>
+                                                                {formatUnitDisplay(unit)}
+                                                            </option>
+                                                        ))}
+                                                    </select>
+                                                    <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted pointer-events-none" />
+                                                </div>
+                                                {units.length === 0 && !isLoadingUnits && (
+                                                    <p className="text-xs text-warning mt-1">
+                                                        Nenhuma unidade cadastrada. Cadastre unidades antes de criar um morador.
+                                                    </p>
+                                                )}
                                             </div>
 
-                                            {/* Sindico + Conselheiro checkboxes */}
+                                            {/* Syndic + Council checkboxes */}
                                             <div className="flex items-center gap-6">
                                                 <label className="flex items-center gap-2.5 cursor-pointer group">
                                                     <div className="relative">
                                                         <input
                                                             type="checkbox"
-                                                            checked={form.is_sindico}
-                                                            onChange={(e) => handleChange('is_sindico', e.target.checked)}
+                                                            checked={form.isSyndic}
+                                                            onChange={(e) => handleChange('isSyndic', e.target.checked)}
                                                             className="sr-only peer"
                                                         />
                                                         <div className="w-5 h-5 rounded-md border-2 border-border-secondary peer-checked:border-accent-primary peer-checked:bg-accent-primary transition-all flex items-center justify-center">
-                                                            {form.is_sindico && (
+                                                            {form.isSyndic && (
                                                                 <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
                                                                     <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
                                                                 </svg>
@@ -389,12 +433,12 @@ export default function UserFormModal({ isOpen, user, onClose, onSuccess }: User
                                                     <div className="relative">
                                                         <input
                                                             type="checkbox"
-                                                            checked={form.is_conselheiro}
-                                                            onChange={(e) => handleChange('is_conselheiro', e.target.checked)}
+                                                            checked={form.isCouncilMember}
+                                                            onChange={(e) => handleChange('isCouncilMember', e.target.checked)}
                                                             className="sr-only peer"
                                                         />
                                                         <div className="w-5 h-5 rounded-md border-2 border-border-secondary peer-checked:border-accent-primary peer-checked:bg-accent-primary transition-all flex items-center justify-center">
-                                                            {form.is_conselheiro && (
+                                                            {form.isCouncilMember && (
                                                                 <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
                                                                     <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
                                                                 </svg>

@@ -44,6 +44,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             response = await authService.login(data);
         }
 
+        // The backend returns the user with English field names directly.
+        // We store it as-is — no translation needed.
         setUser(response.user);
         setToken(response.token);
 
