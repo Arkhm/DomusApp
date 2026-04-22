@@ -4,6 +4,7 @@ import Login from '../pages/Login';
 import ProtectedLayout from '../components/layout/ProtectedLayout';
 import UsersList from '../pages/Users/UsersList';
 import NoticesList from '../pages/Notices/NoticesList';
+import Dashboard from '../pages/Dashboard';
 
 export default function AppRoutes() {
     const { isAuthenticated, isLoading } = useAuth();
@@ -18,27 +19,20 @@ export default function AppRoutes() {
 
     return (
         <Routes>
-            {/* Public routes */}
             <Route
                 path="/login"
                 element={
-                    isAuthenticated ? <Navigate to="/usuarios" replace /> : <Login />
+                    isAuthenticated ? <Navigate to="/dashboard" replace /> : <Login />
                 }
             />
 
-            {/* Protected routes */}
             <Route element={<ProtectedLayout />}>
                 <Route path="/usuarios" element={<UsersList />} />
                 <Route path="/comunicados" element={<NoticesList />} />
-                <Route path="/dashboard" element={
-                    <div className="flex items-center justify-center h-full text-text-secondary">
-                        <p className="text-lg">Dashboard — Em breve</p>
-                    </div>
-                } />
+                <Route path="/dashboard" element={<Dashboard />} />
             </Route>
 
-            {/* Default redirect */}
-            <Route path="*" element={<Navigate to={isAuthenticated ? '/usuarios' : '/login'} replace />} />
+            <Route path="*" element={<Navigate to={isAuthenticated ? '/dashboard' : '/login'} replace />} />
         </Routes>
     );
 }
