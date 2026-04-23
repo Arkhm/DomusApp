@@ -19,7 +19,7 @@ import { useAuth } from '../../contexts/AuthContext';
 const navItems = [
     { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { to: '/usuarios', label: 'Usuários', icon: Users },
-    { to: '#', label: 'Unidades', icon: Building2, disabled: true },
+    { to: '/unidades', label: 'Unidades', icon: Building2 },
     { to: '/comunicados', label: 'Comunicados', icon: Megaphone },
     { to: '#', label: 'Eventos', icon: CalendarDays, disabled: true },
     { to: '#', label: 'Votações', icon: Vote, disabled: true },

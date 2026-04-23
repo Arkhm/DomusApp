@@ -5,6 +5,7 @@ import ProtectedLayout from '../components/layout/ProtectedLayout';
 import UsersList from '../pages/Users/UsersList';
 import NoticesList from '../pages/Notices/NoticesList';
 import Dashboard from '../pages/Dashboard';
+import UnitsList from '../pages/Units/UnitsList';
 
 export default function AppRoutes() {
     const { isAuthenticated, isLoading } = useAuth();
@@ -27,9 +28,10 @@ export default function AppRoutes() {
             />
 
             <Route element={<ProtectedLayout />}>
-                <Route path="/usuarios" element={<UsersList />} />
-                <Route path="/comunicados" element={<NoticesList />} />
                 <Route path="/dashboard" element={<Dashboard />} />
+                <Route path="/usuarios" element={<UsersList />} />
+                <Route path="/unidades" element={<UnitsList />} />
+                <Route path="/comunicados" element={<NoticesList />} />
             </Route>
 
             <Route path="*" element={<Navigate to={isAuthenticated ? '/dashboard' : '/login'} replace />} />

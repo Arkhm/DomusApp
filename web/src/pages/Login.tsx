@@ -38,7 +38,7 @@ export default function Login() {
                     secondary: '#16161f',
                 },
             });
-            navigate('/usuarios');
+            navigate('/dashboard');
         } catch (error: any) {
             const message = error.response?.data?.error || 'Erro ao fazer login. Tente novamente.';
             toast.error(message, {

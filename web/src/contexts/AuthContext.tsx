@@ -1,10 +1,7 @@
 import { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from 'react';
 import { authService } from '../services/authService';
-import { mockAuthService } from '../services/mockData';
 import type { User } from '../types/user';
 import type { LoginRequest } from '../types/auth';
-
-const isMockMode = import.meta.env.VITE_MOCK_MODE === 'true';
 
 interface AuthContextData {
     user: User | null;
@@ -22,7 +19,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const [token, setToken] = useState<string | null>(null);
     const [isLoading, setIsLoading] = useState(true);
 
-    // Load stored auth on mount
     useEffect(() => {
         const storedToken = authService.getStoredToken();
         const storedUser = authService.getStoredUser();
@@ -36,16 +32,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }, []);
 
     const login = useCallback(async (data: LoginRequest) => {
-        let response;
+        const response = await authService.login(data);
 
-        if (isMockMode) {
-            response = await mockAuthService.login(data.email, data.password);
-        } else {
-            response = await authService.login(data);
-        }
-
-        // The backend returns the user with English field names directly.
-        // We store it as-is — no translation needed.
         setUser(response.user);
         setToken(response.token);
 
