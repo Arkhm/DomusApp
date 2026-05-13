@@ -21,7 +21,7 @@ const navItems = [
     { to: '/usuarios', label: 'Usuários', icon: Users },
     { to: '/unidades', label: 'Unidades', icon: Building2 },
     { to: '/comunicados', label: 'Comunicados', icon: Megaphone },
-    { to: '#', label: 'Eventos', icon: CalendarDays, disabled: true },
+    { to: '/eventos', label: 'Eventos', icon: CalendarDays },
     { to: '#', label: 'Votações', icon: Vote, disabled: true },
     { to: '#', label: 'Áreas Comuns', icon: TreePalm, disabled: true },
 ];

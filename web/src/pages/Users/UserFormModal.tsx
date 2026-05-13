@@ -141,6 +141,14 @@ export default function UserFormModal({ isOpen, user, onClose, onSuccess }: User
             toast.error('Email é obrigatório.');
             return;
         }
+        if (!form.email.includes('@') || !form.email.includes('.')) {
+            toast.error('Email inválido. O email deve conter "@" e "." (ex: usuario@email.com).');
+            return;
+        }
+        if (form.email.indexOf('@') === 0 || form.email.endsWith('@') || form.email.endsWith('.')) {
+            toast.error('Email inválido. Verifique o formato (ex: usuario@email.com).');
+            return;
+        }
         if (!form.cpf.trim() || form.cpf.replace(/\D/g, '').length !== 11) {
             toast.error('CPF inválido. Deve conter exatamente 11 dígitos numéricos.');
             return;
@@ -275,7 +283,7 @@ export default function UserFormModal({ isOpen, user, onClose, onSuccess }: User
                                         Email <span className="text-error">*</span>
                                     </label>
                                     <input
-                                        type="email"
+                                        type="text"
                                         value={form.email}
                                         onChange={(e) => handleChange('email', e.target.value)}
                                         placeholder="email@exemplo.com"

@@ -6,6 +6,7 @@ import UsersList from '../pages/Users/UsersList';
 import NoticesList from '../pages/Notices/NoticesList';
 import Dashboard from '../pages/Dashboard';
 import UnitsList from '../pages/Units/UnitsList';
+import EventsList from '../pages/Events/EventsList';
 
 export default function AppRoutes() {
     const { isAuthenticated, isLoading } = useAuth();
@@ -32,6 +33,7 @@ export default function AppRoutes() {
                 <Route path="/usuarios" element={<UsersList />} />
                 <Route path="/unidades" element={<UnitsList />} />
                 <Route path="/comunicados" element={<NoticesList />} />
+                <Route path="/eventos" element={<EventsList />} />
             </Route>
 
             <Route path="*" element={<Navigate to={isAuthenticated ? '/dashboard' : '/login'} replace />} />

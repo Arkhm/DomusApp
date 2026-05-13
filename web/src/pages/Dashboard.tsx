@@ -50,8 +50,8 @@ const initialStats: DashboardStats = {
 const moduleItems = [
   { label: 'Usuários', icon: Users, status: 'active' as const },
   { label: 'Comunicados', icon: Megaphone, status: 'active' as const },
-  { label: 'Unidades', icon: Building2, status: 'planned' as const },
-  { label: 'Eventos', icon: CalendarDays, status: 'planned' as const },
+  { label: 'Unidades', icon: Building2, status: 'active' as const },
+  { label: 'Eventos', icon: CalendarDays, status: 'active' as const },
   { label: 'Votações', icon: Vote, status: 'planned' as const },
   { label: 'Áreas Comuns', icon: TreePalm, status: 'planned' as const },
 ];
