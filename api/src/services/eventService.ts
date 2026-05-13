@@ -6,12 +6,20 @@ export const eventService = {
     if (!data.title || !data.content || !data.eventDate) {
       throw new Error('Título, conteúdo e data do evento são obrigatórios.');
     }
+    const parsedDate = new Date(data.eventDate);
+
+    if (isNaN(parsedDate.getTime())) {
+      throw new Error('Data do evento inválida.');
+    }
 
     if (!data.targetType) {
       data.targetType = 'ALL';
     }
 
-    return await eventRepository.create(data);
+    return await eventRepository.create({
+      ...data,
+      eventDate: parsedDate
+    });
   },
 
   async listForUser(userId: string, role: string) {
