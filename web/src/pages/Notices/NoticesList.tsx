@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { motion } from 'motion/react';
-import { Plus, Trash2, Loader2, CheckCheck } from 'lucide-react';
+import { Plus, Trash2, Loader2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import Header from '../../components/layout/Header';
 import PageBody from '../../components/luxury/PageBody';
@@ -20,7 +20,9 @@ const ROLE_LABELS: Record<string, string> = {
 
 export default function NoticesList() {
     const { user } = useAuth();
-    const isAdmin = user?.role === 'ADMIN';
+    // Só ADMIN cria/exclui comunicados. Síndica e funcionário acessam o painel
+    // em modo leitura — veem tudo (incluindo rascunhos e contadores), mas sem botões de mutação.
+    const canMutate = user?.role === 'ADMIN';
 
     const [notices, setNotices] = useState<Notice[]>([]);
     const [isLoading, setIsLoading] = useState(true);
@@ -31,7 +33,6 @@ export default function NoticesList() {
 
     const [deletingNotice, setDeletingNotice] = useState<Notice | null>(null);
     const [isDeleting, setIsDeleting] = useState(false);
-    const [markingId, setMarkingId] = useState<string | null>(null);
 
     const load = useCallback(async () => {
         setIsLoading(true);
@@ -69,21 +70,6 @@ export default function NoticesList() {
             toast.error(err.response?.data?.error || 'Erro ao remover comunicado.');
         } finally {
             setIsDeleting(false);
-        }
-    };
-
-    const handleMarkRead = async (id: string) => {
-        setMarkingId(id);
-        // otimista: marca local imediatamente
-        setNotices((prev) => prev.map((n) => (n.id === id ? { ...n, isRead: true } : n)));
-        try {
-            await noticeService.markAsRead(id);
-        } catch (err: any) {
-            // reverte em caso de erro
-            setNotices((prev) => prev.map((n) => (n.id === id ? { ...n, isRead: false } : n)));
-            toast.error(err.response?.data?.error || 'Erro ao marcar como lido.');
-        } finally {
-            setMarkingId(null);
         }
     };
 
@@ -142,7 +128,7 @@ export default function NoticesList() {
                             condomínio.
                         </p>
                     </div>
-                    {isAdmin && (
+                    {canMutate && (
                         <button onClick={() => setIsModalOpen(true)} className="btn-gold">
                             <Plus size={12} />
                             Novo comunicado
@@ -160,17 +146,15 @@ export default function NoticesList() {
                         flexWrap: 'wrap',
                     }}
                 >
-                    {isAdmin && (
-                        <FilterSelect
-                            value={filterStatus}
-                            onChange={(v) => setFilterStatus(v as NoticeStatus | '')}
-                            placeholder="Todos os status"
-                            options={[
-                                { value: 'PUBLISHED', label: 'Publicado' },
-                                { value: 'DRAFT', label: 'Rascunho' },
-                            ]}
-                        />
-                    )}
+                    <FilterSelect
+                        value={filterStatus}
+                        onChange={(v) => setFilterStatus(v as NoticeStatus | '')}
+                        placeholder="Todos os status"
+                        options={[
+                            { value: 'PUBLISHED', label: 'Publicado' },
+                            { value: 'DRAFT', label: 'Rascunho' },
+                        ]}
+                    />
                     <FilterSelect
                         value={filterPriority}
                         onChange={(v) => setFilterPriority(v as NoticePriority | '')}
@@ -225,9 +209,9 @@ export default function NoticesList() {
                             hint={
                                 isFiltering
                                     ? 'Ajuste os filtros para ver mais resultados.'
-                                    : isAdmin
+                                    : canMutate
                                       ? 'Clique em "Novo comunicado" para enviar o primeiro aviso.'
-                                      : 'Quando a administração publicar avisos, eles aparecerão aqui.'
+                                      : 'Aguarde a administração publicar comunicados.'
                             }
                         />
                     </div>
@@ -383,24 +367,6 @@ export default function NoticesList() {
                                                 >
                                                     {timeAgo(n.createdAt)}
                                                 </span>
-                                                {!isAdmin && !n.isRead && (
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => handleMarkRead(n.id)}
-                                                        disabled={markingId === n.id}
-                                                        className="btn-ghost"
-                                                        style={{
-                                                            padding: '6px 12px',
-                                                            display: 'inline-flex',
-                                                            alignItems: 'center',
-                                                            gap: 6,
-                                                            fontSize: 11,
-                                                        }}
-                                                    >
-                                                        <CheckCheck size={12} />
-                                                        {markingId === n.id ? 'Marcando…' : 'Marcar como lido'}
-                                                    </button>
-                                                )}
                                             </div>
                                         </div>
 
@@ -413,12 +379,7 @@ export default function NoticesList() {
                                                 gap: 10,
                                             }}
                                         >
-                                            {!isAdmin && !n.isRead && (
-                                                <Tag tone="gold" dot>
-                                                    Novo
-                                                </Tag>
-                                            )}
-                                            {isDraft && isAdmin && <Tag tone="neutral">Rascunho</Tag>}
+                                            {isDraft && <Tag tone="neutral">Rascunho</Tag>}
                                             {isUrgent && (
                                                 <Tag tone="err" dot>
                                                     Urgente
@@ -431,7 +392,7 @@ export default function NoticesList() {
                                                       ? `${n.targetUnit.block ? `${n.targetUnit.block} · ` : ''}${n.targetUnit.number}`
                                                       : 'Unidade específica'}
                                             </Tag>
-                                            {isAdmin && typeof n.readCount === 'number' && (
+                                            {typeof n.readCount === 'number' && (
                                                 <div
                                                     className="tracking-luxe"
                                                     style={{
@@ -443,7 +404,7 @@ export default function NoticesList() {
                                                     {n.readCount} de {n.totalAddressees ?? 0} leram
                                                 </div>
                                             )}
-                                            {isAdmin && (
+                                            {canMutate && (
                                                 <div style={{ display: 'flex', gap: 4 }}>
                                                     <IconBtn
                                                         icon={<Trash2 size={14} />}

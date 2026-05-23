@@ -1,5 +1,6 @@
 import { noticeRepository } from '../repositories/noticeRepository';
 import { userRepository } from '../repositories/userRepository';
+import { hasPanelAccess } from '../lib/access';
 
 const VALID_STATUS = new Set(['DRAFT', 'PUBLISHED']);
 const VALID_PRIORITY = new Set(['NORMAL', 'URGENT']);
@@ -35,10 +36,16 @@ export const noticeService = {
     return await noticeRepository.create(data);
   },
 
-  async listForUser(userId: string, role: string) {
-    if (role === 'ADMIN') {
+  async listForUser(userId: string, _role: string) {
+    const user = await userRepository.findById(userId);
+    if (!user) {
+      throw new Error('Usuário não encontrado.');
+    }
+
+    // Todos os usuários do painel (admin, funcionário, síndica) recebem a
+    // visão completa: tudo, incluindo rascunhos, com contadores de leitura.
+    if (hasPanelAccess(user)) {
       const notices = await noticeRepository.findAll();
-      // Anexa contagem de destinatários por aviso
       return await Promise.all(
         notices.map(async (n: any) => ({
           ...n,
@@ -52,11 +59,8 @@ export const noticeService = {
       );
     }
 
-    const user = await userRepository.findById(userId);
-    if (!user) {
-      throw new Error('Usuário não encontrado.');
-    }
-
+    // Codepath dormente: morador comum não usa o painel hoje, mas o endpoint
+    // continua respondendo a visão filtrada caso um app/canal externo o consuma.
     const notices = await noticeRepository.findForUser(userId, user.unitId);
     return notices.map((n: any) => {
       const isRead = Array.isArray(n.readBy) && n.readBy.length > 0;

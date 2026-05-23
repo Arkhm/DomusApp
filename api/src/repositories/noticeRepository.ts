@@ -56,12 +56,13 @@ export const noticeRepository = {
     });
   },
 
-  // Conta destinatários de um aviso (ativos, exceto ADMIN).
+  // Conta destinatários de um aviso (moradores ativos).
   // Se targetType=UNIT, conta apenas residentes daquela unidade.
+  // ADMIN/FUNCIONARIO não são destinatários — só MORADOR conta.
   countAddressees: async (notice: { targetType: string; targetUnitId: string | null }) => {
     const where: any = {
       status: 'ACTIVE',
-      role: { not: 'ADMIN' },
+      role: 'MORADOR',
     };
     if (notice.targetType === 'UNIT' && notice.targetUnitId) {
       where.unitId = notice.targetUnitId;

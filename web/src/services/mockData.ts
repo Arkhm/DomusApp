@@ -324,8 +324,4 @@ export const mockNoticeService = {
         if (index === -1) throw { response: { data: { error: 'Aviso não encontrado.' } } };
         mockNotices.splice(index, 1);
     },
-
-    async markAsRead(_id: string): Promise<void> {
-        await delay(200);
-    },
 };

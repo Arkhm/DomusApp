@@ -25,7 +25,9 @@ import {
 
 export default function EventsList() {
     const { user } = useAuth();
-    const isAdmin = user?.role === 'ADMIN';
+    // Síndica e funcionário acessam o painel em modo leitura.
+    // Só ADMIN cria/exclui eventos. Todos veem rascunhos e cancelados.
+    const canMutate = user?.role === 'ADMIN';
 
     const [events, setEvents] = useState<EventItem[]>([]);
     const [isLoading, setIsLoading] = useState(true);
@@ -149,7 +151,7 @@ export default function EventsList() {
                             Recitais, assembleias, soirées e encontros privativos curados para a comunidade Domus.
                         </p>
                     </div>
-                    {isAdmin && (
+                    {canMutate && (
                         <button onClick={() => setIsModalOpen(true)} className="btn-gold">
                             <Plus size={12} />
                             Novo evento
@@ -167,18 +169,16 @@ export default function EventsList() {
                         flexWrap: 'wrap',
                     }}
                 >
-                    {isAdmin && (
-                        <FilterSelect
-                            value={filterStatus}
-                            onChange={(v) => setFilterStatus(v as EventStatus | '')}
-                            placeholder="Todos os status"
-                            options={[
-                                { value: 'PUBLISHED', label: 'Publicado' },
-                                { value: 'DRAFT', label: 'Rascunho' },
-                                { value: 'CANCELLED', label: 'Cancelado' },
-                            ]}
-                        />
-                    )}
+                    <FilterSelect
+                        value={filterStatus}
+                        onChange={(v) => setFilterStatus(v as EventStatus | '')}
+                        placeholder="Todos os status"
+                        options={[
+                            { value: 'PUBLISHED', label: 'Publicado' },
+                            { value: 'DRAFT', label: 'Rascunho' },
+                            { value: 'CANCELLED', label: 'Cancelado' },
+                        ]}
+                    />
                     <FilterSelect
                         value={filterCategory}
                         onChange={(v) => setFilterCategory(v as EventCategory | '')}
@@ -235,9 +235,9 @@ export default function EventsList() {
                             hint={
                                 isFiltering
                                     ? 'Ajuste os filtros para ver mais resultados.'
-                                    : isAdmin
+                                    : canMutate
                                       ? 'Clique em "Novo evento" para criar o primeiro.'
-                                      : 'Quando a administração publicar eventos, eles aparecerão aqui.'
+                                      : 'Aguarde a administração publicar eventos.'
                             }
                         />
                     </div>
@@ -247,7 +247,7 @@ export default function EventsList() {
                             <FeaturedEvent
                                 event={featured}
                                 onDelete={() => setDeletingEvent(featured)}
-                                isAdmin={isAdmin}
+                                canMutate={canMutate}
                             />
                         )}
 
@@ -276,7 +276,7 @@ export default function EventsList() {
                                             event={e}
                                             delay={i * 0.05}
                                             onDelete={() => setDeletingEvent(e)}
-                                            isAdmin={isAdmin}
+                                            canMutate={canMutate}
                                         />
                                     ))}
                                 </div>
@@ -314,7 +314,7 @@ export default function EventsList() {
     );
 }
 
-function StatusTags({ event, isAdmin }: { event: EventItem; isAdmin: boolean }) {
+function StatusTags({ event }: { event: EventItem }) {
     const d = new Date(event.eventDate);
     const upcoming = d > new Date();
 
@@ -325,7 +325,7 @@ function StatusTags({ event, isAdmin }: { event: EventItem; isAdmin: boolean }) 
             </Tag>
         );
     }
-    if (event.status === 'DRAFT' && isAdmin) {
+    if (event.status === 'DRAFT') {
         return <Tag tone="neutral">Rascunho</Tag>;
     }
     return (
@@ -338,11 +338,11 @@ function StatusTags({ event, isAdmin }: { event: EventItem; isAdmin: boolean }) 
 function FeaturedEvent({
     event,
     onDelete,
-    isAdmin,
+    canMutate,
 }: {
     event: EventItem;
     onDelete: () => void;
-    isAdmin: boolean;
+    canMutate: boolean;
 }) {
     const d = new Date(event.eventDate);
     return (
@@ -501,7 +501,7 @@ function FeaturedEvent({
                             >
                                 Publicado por {event.author?.name?.split(' ')[0] || '—'}
                             </span>
-                            {isAdmin && (
+                            {canMutate && (
                                 <IconBtn
                                     icon={<Trash2 size={14} />}
                                     danger
@@ -521,12 +521,12 @@ function EventRow({
     event,
     delay,
     onDelete,
-    isAdmin,
+    canMutate,
 }: {
     event: EventItem;
     delay: number;
     onDelete: () => void;
-    isAdmin: boolean;
+    canMutate: boolean;
 }) {
     const d = new Date(event.eventDate);
     const dimmed = event.status !== 'PUBLISHED' || d <= new Date();
@@ -650,7 +650,7 @@ function EventRow({
                     }}
                 >
                     <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-                        <StatusTags event={event} isAdmin={isAdmin} />
+                        <StatusTags event={event} />
                         <Tag tone="purple">{EVENT_CATEGORY_LABEL[event.category]}</Tag>
                     </div>
                     {typeof event.capacity === 'number' && event.capacity > 0 && (
@@ -660,7 +660,7 @@ function EventRow({
                             </span>
                         </Tag>
                     )}
-                    {isAdmin && (
+                    {canMutate && (
                         <IconBtn
                             icon={<Trash2 size={14} />}
                             danger

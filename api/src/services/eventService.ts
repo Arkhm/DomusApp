@@ -1,5 +1,6 @@
 import { eventRepository } from '../repositories/eventRepository';
 import { userRepository } from '../repositories/userRepository';
+import { hasPanelAccess } from '../lib/access';
 
 const VALID_STATUS = new Set(['DRAFT', 'PUBLISHED', 'CANCELLED']);
 const VALID_CATEGORY = new Set([
@@ -56,16 +57,18 @@ export const eventService = {
     });
   },
 
-  async listForUser(userId: string, role: string) {
-    if (role === 'ADMIN') {
-      return await eventRepository.findAll();
-    }
-
+  async listForUser(userId: string, _role: string) {
     const user = await userRepository.findById(userId);
     if (!user) {
       throw new Error('Usuário não encontrado.');
     }
 
+    // Todos os usuários do painel veem a programação completa, inclusive rascunhos.
+    if (hasPanelAccess(user)) {
+      return await eventRepository.findAll();
+    }
+
+    // Codepath dormente para morador comum (sem painel).
     return await eventRepository.findForUser(user.unitId);
   },
 
