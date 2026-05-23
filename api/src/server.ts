@@ -5,6 +5,7 @@ import userRoutes from './routes/userRoutes';
 import noticeRoutes from './routes/noticeRoutes';
 import unitRoutes from './routes/unitRoutes';
 import eventRoutes from './routes/eventRoutes';
+import votingRoutes from './routes/votingRoutes';
 const app = express();
 app.use(cors());
 app.use(express.json());
@@ -21,6 +22,7 @@ app.use('/users', userRoutes);
 app.use('/notices', noticeRoutes);
 app.use('/units', unitRoutes);
 app.use('/events', eventRoutes);
+app.use('/votings', votingRoutes);
 
 const PORT = process.env.PORT || 3333;
 

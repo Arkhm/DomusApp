@@ -112,6 +112,52 @@ async function seed() {
     });
 
     console.log('✅ Avisos criados com sucesso!');
+
+    // 6. Criar Votações de Teste (Votings)
+    console.log('🗳️  Criando votações de teste...');
+
+    const now = new Date();
+    const inOneWeek = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+    const oneMonthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+    const oneWeekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+
+    // Votação ATIVA (endDate futura)
+    await prisma.voting.create({
+        data: {
+            title: 'Nova cor da fachada do condomínio',
+            description: 'Vamos escolher a nova cor da fachada para a próxima pintura. Sua opinião é fundamental!',
+            startDate: now,
+            endDate: inOneWeek,
+            authorId: admin.id,
+            options: {
+                create: [
+                    { text: 'Branco gelo', votes: 4 },
+                    { text: 'Cinza claro', votes: 7 },
+                    { text: 'Bege areia', votes: 2 }
+                ]
+            }
+        }
+    });
+
+    // Votação ENCERRADA (endDate passada)
+    await prisma.voting.create({
+        data: {
+            title: 'Horário de uso do salão de festas',
+            description: 'Definição do horário limite para uso do salão de festas aos finais de semana.',
+            startDate: oneMonthAgo,
+            endDate: oneWeekAgo,
+            authorId: admin.id,
+            options: {
+                create: [
+                    { text: 'Até 22h', votes: 3 },
+                    { text: 'Até 00h', votes: 12 },
+                    { text: 'Até 02h', votes: 5 }
+                ]
+            }
+        }
+    });
+
+    console.log('✅ Votações criadas com sucesso!');
 }
 
 seed()

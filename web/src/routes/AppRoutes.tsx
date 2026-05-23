@@ -7,6 +7,7 @@ import NoticesList from '../pages/Notices/NoticesList';
 import Dashboard from '../pages/Dashboard';
 import UnitsList from '../pages/Units/UnitsList';
 import EventsList from '../pages/Events/EventsList';
+import VotingsList from '../pages/Votings/VotingsList';
 
 export default function AppRoutes() {
     const { isAuthenticated, isLoading } = useAuth();
@@ -34,6 +35,7 @@ export default function AppRoutes() {
                 <Route path="/unidades" element={<UnitsList />} />
                 <Route path="/comunicados" element={<NoticesList />} />
                 <Route path="/eventos" element={<EventsList />} />
+                <Route path="/votacoes" element={<VotingsList />} />
             </Route>
 
             <Route path="*" element={<Navigate to={isAuthenticated ? '/dashboard' : '/login'} replace />} />

@@ -25,6 +25,7 @@ model User {
 
   notices         Notice[] @relation("NoticeAuthor")
   events          Event[]  @relation("EventAuthor")
+  votings         Voting[] @relation("VotingAuthor")
 }
 
 model Unit {
@@ -74,4 +75,26 @@ model Event {
 
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
+}
+
+model Voting {
+  id          String         @id @default(uuid())
+  title       String
+  description String         @db.Text
+  startDate   DateTime
+  endDate     DateTime
+  authorId    String
+  author      User           @relation("VotingAuthor", fields: [authorId], references: [id])
+  options     VotingOption[]
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+}
+
+model VotingOption {
+  id        String   @id @default(uuid())
+  text      String
+  votingId  String
+  voting    Voting   @relation(fields: [votingId], references: [id], onDelete: Cascade)
+  votes     Int      @default(0)
+  createdAt DateTime @default(now())
 }
