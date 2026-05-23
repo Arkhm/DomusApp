@@ -7,6 +7,49 @@ import { unitService } from '../../services/unitService';
 import type { EventFormData } from '../../types/event';
 import type { Unit } from '../../types/user';
 
+// ---- Date/time helpers (24h, DD/MM/AAAA) -----------------------------------
+// Chrome ignores `lang` on <input type="datetime-local"> and always uses the
+// browser/OS locale, so we hand-roll two masked text inputs to guarantee
+// Brazilian format regardless of where the admin's machine is configured.
+
+function maskDate(input: string): string {
+    const digits = input.replace(/\D/g, '').slice(0, 8);
+    if (digits.length <= 2) return digits;
+    if (digits.length <= 4) return `${digits.slice(0, 2)}/${digits.slice(2)}`;
+    return `${digits.slice(0, 2)}/${digits.slice(2, 4)}/${digits.slice(4)}`;
+}
+
+function maskTime(input: string): string {
+    const digits = input.replace(/\D/g, '').slice(0, 4);
+    if (digits.length <= 2) return digits;
+    return `${digits.slice(0, 2)}:${digits.slice(2)}`;
+}
+
+/**
+ * Combine BR date + 24h time into the ISO format the backend expects.
+ * Returns '' when either piece is missing/invalid so the parent's required
+ * check on form.eventDate still works.
+ */
+function brToIso(date: string, time: string): string {
+    const d = date.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+    const t = time.match(/^(\d{2}):(\d{2})$/);
+    if (!d || !t) return '';
+    const [, dd, mm, yyyy] = d;
+    const [, hh, mi] = t;
+    const day = +dd,
+        month = +mm,
+        year = +yyyy,
+        hour = +hh,
+        minute = +mi;
+    if (month < 1 || month > 12 || day < 1 || day > 31) return '';
+    if (year < 1900 || year > 2099) return '';
+    if (hour > 23 || minute > 59) return '';
+    // Verify it's a real calendar date (catches 31/02, 31/04 etc.)
+    const dt = new Date(year, month - 1, day, hour, minute);
+    if (dt.getFullYear() !== year || dt.getMonth() !== month - 1 || dt.getDate() !== day) return '';
+    return `${yyyy}-${mm}-${dd}T${hh}:${mi}`;
+}
+
 interface Props {
     isOpen: boolean;
     onClose: () => void;
@@ -16,6 +59,10 @@ interface Props {
 export default function EventFormModal({ isOpen, onClose, onSuccess }: Props) {
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [units, setUnits] = useState<Unit[]>([]);
+
+    // Date/time are kept as displayed BR strings and combined into form.eventDate.
+    const [dateStr, setDateStr] = useState('');
+    const [timeStr, setTimeStr] = useState('');
 
     const [form, setForm] = useState<EventFormData>({
         title: '',
@@ -36,9 +83,17 @@ export default function EventFormModal({ isOpen, onClose, onSuccess }: Props) {
                 targetType: 'ALL',
                 targetUnitId: undefined,
             });
+            setDateStr('');
+            setTimeStr('');
             unitService.getAll().then(setUnits).catch(() => {});
         }
     }, [isOpen]);
+
+    // Whenever the displayed date or time changes, derive the ISO eventDate.
+    useEffect(() => {
+        const iso = brToIso(dateStr, timeStr);
+        setForm((prev) => (prev.eventDate === iso ? prev : { ...prev, eventDate: iso }));
+    }, [dateStr, timeStr]);
 
     const handleChange = (
         e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
@@ -50,8 +105,18 @@ export default function EventFormModal({ isOpen, onClose, onSuccess }: Props) {
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
 
-        if (!form.title.trim() || !form.content.trim() || !form.eventDate) {
-            toast.error('Título, conteúdo e data do evento são obrigatórios.');
+        if (!form.title.trim() || !form.content.trim()) {
+            toast.error('Título e descrição são obrigatórios.');
+            return;
+        }
+
+        if (!dateStr || !timeStr) {
+            toast.error('Informe a data e a hora do evento.');
+            return;
+        }
+
+        if (!form.eventDate) {
+            toast.error('Data ou hora inválida. Use DD/MM/AAAA e HH:MM (24h).');
             return;
         }
 
@@ -78,11 +143,7 @@ export default function EventFormModal({ isOpen, onClose, onSuccess }: Props) {
             }
 
             await eventService.create(payload);
-            toast.success('Evento criado com sucesso!', {
-                position: 'top-right',
-                style: { background: '#16161f', color: '#f0f0f5', border: '1px solid #22c55e' },
-                iconTheme: { primary: '#22c55e', secondary: '#16161f' },
-            });
+            toast.success('Evento criado com sucesso!');
             onSuccess();
         } catch (error: any) {
             toast.error(error.response?.data?.error || 'Erro ao criar evento.');
@@ -165,38 +226,50 @@ export default function EventFormModal({ isOpen, onClose, onSuccess }: Props) {
                                 />
                             </div>
 
-                            {/* Data e Local */}
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                <div>
-                                    <label className="block text-sm font-medium text-text-secondary mb-1.5">
-                                        Data e Hora <span className="text-error">*</span>
-                                    </label>
-                                    <input
-                                        type="datetime-local"
-                                        name="eventDate"
-                                        value={form.eventDate}
-                                        onChange={handleChange}
-                                        min="2024-01-01T00:00"
-                                        max="2099-12-31T23:59"
-                                        step={60}
-                                        lang="pt-BR"
-                                        className="w-full px-4 py-2.5 rounded-xl bg-bg-secondary border border-border-primary text-text-primary focus:outline-none focus:border-accent-primary focus:ring-1 focus:ring-accent-primary/30 text-sm transition-colors"
-                                    />
-                                </div>
-
-                                <div>
-                                    <label className="block text-sm font-medium text-text-secondary mb-1.5">
-                                        Local
-                                    </label>
+                            {/* Data, Hora e Local */}
+                            <div>
+                                <label className="block text-sm font-medium text-text-secondary mb-1.5">
+                                    Data e Hora <span className="text-error">*</span>
+                                </label>
+                                <div className="grid grid-cols-[1.4fr_1fr] gap-3">
                                     <input
                                         type="text"
-                                        name="location"
-                                        value={form.location}
-                                        onChange={handleChange}
-                                        placeholder="Ex: Salão de festas"
-                                        className="w-full px-4 py-2.5 rounded-xl bg-bg-secondary border border-border-primary text-text-primary placeholder-text-muted focus:outline-none focus:border-accent-primary focus:ring-1 focus:ring-accent-primary/30 text-sm transition-colors"
+                                        inputMode="numeric"
+                                        value={dateStr}
+                                        onChange={(e) => setDateStr(maskDate(e.target.value))}
+                                        placeholder="DD/MM/AAAA"
+                                        maxLength={10}
+                                        aria-label="Data do evento"
+                                        className="w-full px-4 py-2.5 rounded-xl bg-bg-secondary border border-border-primary text-text-primary placeholder-text-muted focus:outline-none focus:border-accent-primary focus:ring-1 focus:ring-accent-primary/30 text-sm transition-colors font-mono tabular-nums"
+                                    />
+                                    <input
+                                        type="text"
+                                        inputMode="numeric"
+                                        value={timeStr}
+                                        onChange={(e) => setTimeStr(maskTime(e.target.value))}
+                                        placeholder="HH:MM"
+                                        maxLength={5}
+                                        aria-label="Hora do evento (formato 24h)"
+                                        className="w-full px-4 py-2.5 rounded-xl bg-bg-secondary border border-border-primary text-text-primary placeholder-text-muted focus:outline-none focus:border-accent-primary focus:ring-1 focus:ring-accent-primary/30 text-sm transition-colors font-mono tabular-nums"
                                     />
                                 </div>
+                                <p className="mt-1.5 text-[11px] text-text-muted">
+                                    Formato 24h. Ex.: 23/05/2026 19:30.
+                                </p>
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-medium text-text-secondary mb-1.5">
+                                    Local
+                                </label>
+                                <input
+                                    type="text"
+                                    name="location"
+                                    value={form.location}
+                                    onChange={handleChange}
+                                    placeholder="Ex: Salão de festas"
+                                    className="w-full px-4 py-2.5 rounded-xl bg-bg-secondary border border-border-primary text-text-primary placeholder-text-muted focus:outline-none focus:border-accent-primary focus:ring-1 focus:ring-accent-primary/30 text-sm transition-colors"
+                                />
                             </div>
 
                             {/* Público-alvo */}
