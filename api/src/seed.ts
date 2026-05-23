@@ -8,11 +8,24 @@ async function seed() {
     // 1. Criar Unidades (Units) primeiro para podermos vinculá-las aos moradores
     console.log('🏠 Criando unidades...');
     const unitA101 = await prisma.unit.create({
-        data: { block: 'Bloco A', number: '101' }
+        data: { type: 'APARTMENT', block: 'Bloco A', number: '101' }
     });
-    
+
     const unitB202 = await prisma.unit.create({
-        data: { block: 'Bloco B', number: '202' }
+        data: { type: 'APARTMENT', block: 'Bloco B', number: '202' }
+    });
+
+    // Algumas casas para demonstrar o modelo misto (Quadra + Casa)
+    await prisma.unit.create({
+        data: { type: 'HOUSE', block: 'Quadra 1', number: '12' }
+    });
+
+    await prisma.unit.create({
+        data: { type: 'HOUSE', block: 'Quadra 2', number: '07' }
+    });
+
+    await prisma.unit.create({
+        data: { type: 'HOUSE', block: null, number: '23' }
     });
 
     // 2. Verificar se o Admin já existe

@@ -29,13 +29,14 @@ model User {
 
 model Unit {
   id          String   @id @default(uuid())
-  block       String? 
-  number      String   
+  type        String   @default("APARTMENT") // "APARTMENT" | "HOUSE"
+  block       String?  // APARTMENT: bloco/torre · HOUSE: quadra/setor (opcional)
+  number      String   // identificador da unidade (número do apto ou da casa)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
   residents   User[]
-  
+
   notices     Notice[] @relation("NoticeTargetUnit")
   events      Event[]  @relation("EventTargetUnit")
 }

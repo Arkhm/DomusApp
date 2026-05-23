@@ -1,9 +1,16 @@
 export type UserRole = 'MORADOR' | 'ADMIN' | 'FUNCIONARIO';
 export type UserStatus = 'ACTIVE' | 'INACTIVE';
 
+/** Tipologia da unidade — define rótulos e visual no UI */
+export type UnitType = 'APARTMENT' | 'HOUSE';
+
 export interface Unit {
     id: string;
+    /** Default 'APARTMENT' no backend para compat com registros antigos */
+    type: UnitType;
+    /** APARTMENT: Bloco/Torre · HOUSE: Quadra/Setor (opcional) */
     block: string | null;
+    /** Identificador da unidade (nº do apto ou da casa) */
     number: string;
     createdAt?: string;
     updatedAt?: string;
@@ -50,8 +57,41 @@ export const STATUS_LABELS: Record<UserStatus, string> = {
     INACTIVE: 'Inativo',
 };
 
-/** Format unit object as display string */
+/** Rótulos curtos para o tipo da unidade */
+export const UNIT_TYPE_LABELS: Record<UnitType, string> = {
+    APARTMENT: 'Apartamento',
+    HOUSE: 'Casa',
+};
+
+/**
+ * Rótulos dos campos exibidos no formulário e no card, baseados no tipo:
+ * - APARTMENT: "Bloco" + "Número" (ex: "Bloco A · 101")
+ * - HOUSE: "Quadra" + "Casa" (ex: "Quadra 1 · Casa 12")
+ */
+export const UNIT_FIELD_LABELS: Record<
+    UnitType,
+    { block: string; number: string; eyebrow: string; numberPrefix: string }
+> = {
+    APARTMENT: {
+        block: 'Bloco',
+        number: 'Número',
+        eyebrow: 'Torre',
+        numberPrefix: '',
+    },
+    HOUSE: {
+        block: 'Quadra',
+        number: 'Casa',
+        eyebrow: 'Quadra',
+        numberPrefix: 'Casa ',
+    },
+};
+
+/** Format unit object as display string, adapting to APARTMENT vs HOUSE. */
 export function formatUnitDisplay(unit: Unit | null | undefined): string {
     if (!unit) return '—';
-    return unit.block ? `${unit.block} - ${unit.number}` : unit.number;
+    const type: UnitType = unit.type || 'APARTMENT';
+    if (type === 'HOUSE') {
+        return unit.block ? `${unit.block} · Casa ${unit.number}` : `Casa ${unit.number}`;
+    }
+    return unit.block ? `${unit.block} · ${unit.number}` : unit.number;
 }

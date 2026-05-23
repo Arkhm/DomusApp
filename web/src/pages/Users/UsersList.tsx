@@ -338,7 +338,9 @@ export default function UsersList() {
                                                         className="serif"
                                                         style={{ fontSize: 16, color: 'var(--color-bone)' }}
                                                     >
-                                                        {u.unit.number}
+                                                        {u.unit.type === 'HOUSE'
+                                                            ? `Casa ${u.unit.number}`
+                                                            : u.unit.number}
                                                     </span>
                                                     {u.unit.block && (
                                                         <span
@@ -349,7 +351,7 @@ export default function UsersList() {
                                                                 marginLeft: 8,
                                                             }}
                                                         >
-                                                            Torre {u.unit.block}
+                                                            {u.unit.block}
                                                         </span>
                                                     )}
                                                 </div>
