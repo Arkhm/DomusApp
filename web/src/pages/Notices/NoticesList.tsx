@@ -106,7 +106,7 @@ export default function NoticesList() {
                             }}
                         >
                             Avisos oficiais, manutenções programadas e novidades publicadas pela administração do
-                            edifício.
+                            condomínio.
                         </p>
                     </div>
                     <button onClick={() => setIsModalOpen(true)} className="btn-gold">
@@ -305,7 +305,7 @@ export default function NoticesList() {
                                                 {n.targetType === 'ALL'
                                                     ? 'Todos os residentes'
                                                     : n.targetUnit
-                                                      ? `${n.targetUnit.block ? `Torre ${n.targetUnit.block} · ` : ''}${n.targetUnit.number}`
+                                                      ? `${n.targetUnit.block ? `${n.targetUnit.block} · ` : ''}${n.targetUnit.number}`
                                                       : 'Unidade específica'}
                                             </Tag>
                                             <div style={{ display: 'flex', gap: 4 }}>

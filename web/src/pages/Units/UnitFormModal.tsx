@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
-import { Building2, Loader2, X } from 'lucide-react';
+import { Building2, Home, Loader2, X } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { unitService } from '../../services/unitService';
+import { UNIT_FIELD_LABELS, type UnitType } from '../../types/user';
 
 interface UnitFormModalProps {
     isOpen: boolean;
@@ -11,30 +12,27 @@ interface UnitFormModalProps {
 }
 
 export default function UnitFormModal({ isOpen, onClose, onSuccess }: UnitFormModalProps) {
+    const [type, setType] = useState<UnitType>('APARTMENT');
     const [block, setBlock] = useState('');
     const [number, setNumber] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
 
     useEffect(() => {
         if (isOpen) {
+            setType('APARTMENT');
             setBlock('');
             setNumber('');
             setIsSubmitting(false);
         }
     }, [isOpen]);
 
+    const labels = UNIT_FIELD_LABELS[type];
+
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
 
         if (!number.trim()) {
-            toast.error('Informe o número da unidade.', {
-                position: 'top-right',
-                style: {
-                    background: '#16161f',
-                    color: '#f0f0f5',
-                    border: '1px solid #ef4444',
-                },
-            });
+            toast.error(`Informe o ${labels.number.toLowerCase()} da unidade.`);
             return;
         }
 
@@ -42,30 +40,18 @@ export default function UnitFormModal({ isOpen, onClose, onSuccess }: UnitFormMo
 
         try {
             await unitService.create({
+                type,
                 block: block.trim() || undefined,
                 number: number.trim(),
             });
 
-            toast.success('Unidade cadastrada com sucesso!', {
-                position: 'top-right',
-                style: {
-                    background: '#16161f',
-                    color: '#f0f0f5',
-                    border: '1px solid #22c55e',
-                },
-                iconTheme: { primary: '#22c55e', secondary: '#16161f' },
-            });
+            toast.success(
+                type === 'HOUSE' ? 'Casa cadastrada com sucesso!' : 'Apartamento cadastrado com sucesso!',
+            );
 
             onSuccess();
         } catch (error: any) {
-            toast.error(error.response?.data?.error || 'Erro ao cadastrar unidade.', {
-                position: 'top-right',
-                style: {
-                    background: '#16161f',
-                    color: '#f0f0f5',
-                    border: '1px solid #ef4444',
-                },
-            });
+            toast.error(error.response?.data?.error || 'Erro ao cadastrar unidade.');
         } finally {
             setIsSubmitting(false);
         }
@@ -92,11 +78,15 @@ export default function UnitFormModal({ isOpen, onClose, onSuccess }: UnitFormMo
                         <div className="flex items-center justify-between px-6 py-4 border-b border-border-primary">
                             <div className="flex items-center gap-3">
                                 <div className="w-10 h-10 rounded-xl bg-accent-primary/10 text-accent-primary flex items-center justify-center">
-                                    <Building2 className="w-5 h-5" />
+                                    {type === 'HOUSE' ? <Home className="w-5 h-5" /> : <Building2 className="w-5 h-5" />}
                                 </div>
                                 <div>
-                                    <h2 className="text-lg font-semibold text-text-primary">Nova Unidade</h2>
-                                    <p className="text-sm text-text-muted">Cadastre um bloco e número</p>
+                                    <h2 className="text-lg font-semibold text-text-primary">
+                                        {type === 'HOUSE' ? 'Nova Casa' : 'Novo Apartamento'}
+                                    </h2>
+                                    <p className="text-sm text-text-muted">
+                                        Cadastre uma unidade do condomínio
+                                    </p>
                                 </div>
                             </div>
 
@@ -110,15 +100,47 @@ export default function UnitFormModal({ isOpen, onClose, onSuccess }: UnitFormMo
                         </div>
 
                         <form onSubmit={handleSubmit} className="p-6 space-y-5">
+                            {/* Type toggle */}
                             <div>
                                 <label className="block text-sm font-medium text-text-secondary mb-2">
-                                    Bloco
+                                    Tipo de unidade
+                                </label>
+                                <div
+                                    role="radiogroup"
+                                    aria-label="Tipo de unidade"
+                                    style={{
+                                        display: 'grid',
+                                        gridTemplateColumns: '1fr 1fr',
+                                        gap: 8,
+                                    }}
+                                >
+                                    <TypeOption
+                                        active={type === 'APARTMENT'}
+                                        icon={<Building2 size={16} />}
+                                        label="Apartamento"
+                                        helper="Bloco · Número"
+                                        onClick={() => setType('APARTMENT')}
+                                    />
+                                    <TypeOption
+                                        active={type === 'HOUSE'}
+                                        icon={<Home size={16} />}
+                                        label="Casa"
+                                        helper="Quadra · Lote"
+                                        onClick={() => setType('HOUSE')}
+                                    />
+                                </div>
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-medium text-text-secondary mb-2">
+                                    {labels.block}{' '}
+                                    <span className="text-text-muted text-xs font-normal">(opcional)</span>
                                 </label>
                                 <input
                                     type="text"
                                     value={block}
                                     onChange={(e) => setBlock(e.target.value)}
-                                    placeholder="Ex: A"
+                                    placeholder={type === 'HOUSE' ? 'Ex: Quadra 1' : 'Ex: A'}
                                     maxLength={24}
                                     className="w-full px-4 py-3 bg-bg-input border border-border-primary rounded-xl text-text-primary placeholder-text-muted focus:border-accent-primary focus:outline-none transition-colors"
                                 />
@@ -126,13 +148,13 @@ export default function UnitFormModal({ isOpen, onClose, onSuccess }: UnitFormMo
 
                             <div>
                                 <label className="block text-sm font-medium text-text-secondary mb-2">
-                                    Número
+                                    {labels.number}
                                 </label>
                                 <input
                                     type="text"
                                     value={number}
                                     onChange={(e) => setNumber(e.target.value)}
-                                    placeholder="Ex: 101"
+                                    placeholder={type === 'HOUSE' ? 'Ex: 12' : 'Ex: 101'}
                                     maxLength={12}
                                     className="w-full px-4 py-3 bg-bg-input border border-border-primary rounded-xl text-text-primary placeholder-text-muted focus:border-accent-primary focus:outline-none transition-colors"
                                 />
@@ -143,7 +165,7 @@ export default function UnitFormModal({ isOpen, onClose, onSuccess }: UnitFormMo
                                     type="button"
                                     onClick={onClose}
                                     disabled={isSubmitting}
-                                    className="px-4 py-2.5 rounded-xl border border-border-primary text-text-secondary hover:text-text-primary hover:bg-bg-hover transition-colors"
+                                    className="btn-ghost"
                                 >
                                     Cancelar
                                 </button>
@@ -151,12 +173,12 @@ export default function UnitFormModal({ isOpen, onClose, onSuccess }: UnitFormMo
                                 <button
                                     type="submit"
                                     disabled={isSubmitting}
-                                    className="px-4 py-2.5 rounded-xl bg-accent-primary hover:bg-accent-primary-hover text-white font-medium transition-colors disabled:opacity-60 flex items-center gap-2"
+                                    className="btn-gold"
                                 >
                                     {isSubmitting ? (
                                         <>
                                             <Loader2 className="w-4 h-4 animate-spin" />
-                                            Salvando...
+                                            Salvando…
                                         </>
                                     ) : (
                                         'Cadastrar'
@@ -168,5 +190,64 @@ export default function UnitFormModal({ isOpen, onClose, onSuccess }: UnitFormMo
                 </motion.div>
             )}
         </AnimatePresence>
+    );
+}
+
+function TypeOption({
+    active,
+    icon,
+    label,
+    helper,
+    onClick,
+}: {
+    active: boolean;
+    icon: React.ReactNode;
+    label: string;
+    helper: string;
+    onClick: () => void;
+}) {
+    return (
+        <button
+            type="button"
+            role="radio"
+            aria-checked={active}
+            onClick={onClick}
+            style={{
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'flex-start',
+                gap: 6,
+                padding: '14px 16px',
+                background: active
+                    ? 'color-mix(in srgb, var(--color-metal-1) 8%, transparent)'
+                    : 'var(--color-ink-1)',
+                border: `1px solid ${active ? 'var(--color-metal-1)' : 'var(--color-line-strong)'}`,
+                borderRadius: 3,
+                cursor: 'pointer',
+                transition: 'all 0.2s ease',
+                fontFamily: 'var(--font-sans)',
+                textAlign: 'left',
+            }}
+        >
+            <div
+                style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 8,
+                    color: active ? 'var(--color-metal-1)' : 'var(--color-bone)',
+                    fontSize: 13,
+                    fontWeight: 500,
+                }}
+            >
+                {icon}
+                {label}
+            </div>
+            <div
+                className="tracking-luxe"
+                style={{ fontSize: 8, color: 'var(--color-bone-muted)' }}
+            >
+                {helper}
+            </div>
+        </button>
     );
 }

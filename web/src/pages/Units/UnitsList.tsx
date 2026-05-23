@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { motion } from 'motion/react';
-import { Plus, Search, Filter, Loader2, Trash2 } from 'lucide-react';
+import { Plus, Search, Filter, Loader2, Trash2, Home } from 'lucide-react';
 import toast from 'react-hot-toast';
 import Header from '../../components/layout/Header';
 import PageBody from '../../components/luxury/PageBody';
 import { unitService } from '../../services/unitService';
 import { userService } from '../../services/userService';
-import type { Unit, User } from '../../types/user';
+import type { Unit, User, UnitType } from '../../types/user';
+import { UNIT_FIELD_LABELS } from '../../types/user';
 import UnitFormModal from './UnitFormModal';
 import {
     FilterSelect,
@@ -61,11 +62,15 @@ export default function UnitsList() {
 
     const stats = useMemo(() => {
         const occupied = users.filter((r) => r.unit).length;
+        const apartments = units.filter((u) => (u.type || 'APARTMENT') === 'APARTMENT').length;
+        const houses = units.filter((u) => u.type === 'HOUSE').length;
         return {
             total: units.length,
             blocks: blocks.length,
             occupancy: units.length ? Math.round((occupied / units.length) * 100) : 0,
             occupied,
+            apartments,
+            houses,
         };
     }, [units, blocks, users]);
 
@@ -86,7 +91,7 @@ export default function UnitsList() {
 
     return (
         <div>
-            <Header title="Unidades" eyebrow="Torres · Apartamentos" />
+            <Header title="Unidades" eyebrow="Apartamentos · Casas" />
 
             <PageBody>
                 {/* Top stats */}
@@ -105,9 +110,15 @@ export default function UnitsList() {
                         footnote="No empreendimento"
                     />
                     <StatCard
-                        eyebrow="Torres"
-                        value={isLoading ? '—' : stats.blocks}
-                        footnote={blocks.length ? blocks.map((b) => `Torre ${b}`).join(' · ') : 'Sem blocos'}
+                        eyebrow="Apartamentos · Casas"
+                        value={isLoading ? '—' : `${stats.apartments} · ${stats.houses}`}
+                        footnote={
+                            stats.apartments && stats.houses
+                                ? 'Empreendimento misto'
+                                : stats.houses
+                                  ? 'Condomínio de casas'
+                                  : 'Condomínio de apartamentos'
+                        }
                     />
                     <StatCard
                         eyebrow="Ocupação"
@@ -143,7 +154,7 @@ export default function UnitsList() {
                                     type="text"
                                     value={searchQuery}
                                     onChange={(e) => setSearchQuery(e.target.value)}
-                                    placeholder="Buscar por torre ou número…"
+                                    placeholder="Buscar por bloco/quadra ou número…"
                                     className="luxe-input"
                                     style={{ paddingLeft: 40 }}
                                 />
@@ -186,8 +197,8 @@ export default function UnitsList() {
                             <FilterSelect
                                 value={selectedBlock}
                                 onChange={setSelectedBlock}
-                                placeholder="Todas as torres"
-                                options={blocks.map((b) => ({ value: b, label: `Torre ${b}` }))}
+                                placeholder="Todos os blocos / quadras"
+                                options={blocks.map((b) => ({ value: b, label: b }))}
                             />
                             {selectedBlock && (
                                 <button
@@ -254,6 +265,16 @@ export default function UnitsList() {
                             const resident = users.find(
                                 (r) => r.unit?.id === u.id || (r.unit?.block === u.block && r.unit?.number === u.number),
                             );
+                            const unitType: UnitType = u.type || 'APARTMENT';
+                            const labels = UNIT_FIELD_LABELS[unitType];
+                            const eyebrowText = u.block
+                                ? `${labels.eyebrow} ${blockLetter(u.block)}`
+                                : unitType === 'HOUSE'
+                                  ? 'Sem quadra'
+                                  : 'Sem bloco';
+                            // Casas exibem "Lote N"; apartamentos só o número.
+                            const numberDisplay =
+                                unitType === 'HOUSE' ? `${labels.numberPrefix}${u.number}` : u.number;
                             return (
                                 <motion.div
                                     key={u.id}
@@ -276,7 +297,7 @@ export default function UnitsList() {
                                         <div style={{ minWidth: 0, flex: 1 }}>
                                             <div
                                                 className="tracking-luxe"
-                                                title={u.block ? `Torre ${blockLetter(u.block)}` : 'Sem bloco'}
+                                                title={eyebrowText}
                                                 style={{
                                                     fontSize: 9,
                                                     color: 'var(--color-metal-1)',
@@ -286,13 +307,13 @@ export default function UnitsList() {
                                                     whiteSpace: 'nowrap',
                                                 }}
                                             >
-                                                {u.block ? `Torre ${blockLetter(u.block)}` : 'Sem bloco'}
+                                                {eyebrowText}
                                             </div>
                                             <div
                                                 className="serif"
-                                                title={u.number}
+                                                title={numberDisplay}
                                                 style={{
-                                                    fontSize: numberFontSize(u.number),
+                                                    fontSize: numberFontSize(numberDisplay),
                                                     fontWeight: 300,
                                                     color: 'var(--color-bone)',
                                                     lineHeight: 1,
@@ -302,10 +323,14 @@ export default function UnitsList() {
                                                     whiteSpace: 'nowrap',
                                                 }}
                                             >
-                                                {u.number}
+                                                {numberDisplay}
                                             </div>
                                         </div>
-                                        <UnitMonogram block={u.block || ''} />
+                                        {unitType === 'HOUSE' ? (
+                                            <HouseMonogram />
+                                        ) : (
+                                            <UnitMonogram block={u.block || ''} />
+                                        )}
                                     </div>
 
                                     <div className="gold-rule" style={{ marginBottom: 20 }} />
@@ -319,8 +344,8 @@ export default function UnitsList() {
                                             marginBottom: 24,
                                         }}
                                     >
-                                        <Detail label="Bloco" value={u.block || '—'} />
-                                        <Detail label="Número" value={u.number} />
+                                        <Detail label={labels.block} value={u.block || '—'} />
+                                        <Detail label={labels.number} value={u.number} />
                                         <Detail
                                             label="Status"
                                             value={resident ? 'Habitada' : 'Disponível'}
@@ -412,14 +437,15 @@ export default function UnitsList() {
             <DeleteModal
                 open={!!deletingUnit}
                 isDeleting={isDeleting}
-                title="Remover unidade"
+                title={deletingUnit?.type === 'HOUSE' ? 'Remover casa' : 'Remover apartamento'}
                 description={
                     deletingUnit ? (
                         <>
-                            Tem certeza que deseja remover a unidade{' '}
+                            Tem certeza que deseja remover{' '}
                             <strong style={{ color: 'var(--color-bone)' }}>
-                                {deletingUnit.block ? `Torre ${deletingUnit.block} · ` : ''}
-                                {deletingUnit.number}
+                                {deletingUnit.type === 'HOUSE'
+                                    ? `${deletingUnit.block ? `${deletingUnit.block} · ` : ''}Lote ${deletingUnit.number}`
+                                    : `${deletingUnit.block ? `${deletingUnit.block} · ` : ''}${deletingUnit.number}`}
                             </strong>
                             ? Verifique se há moradores vinculados antes de prosseguir.
                         </>
@@ -569,6 +595,29 @@ function UnitMonogram({ block }: { block: string }) {
             >
                 {text}
             </span>
+        </div>
+    );
+}
+
+/** Variante do monograma para casas — ícone de casa em vez de letra do bloco. */
+function HouseMonogram() {
+    return (
+        <div
+            title="Casa"
+            style={{
+                width: 44,
+                height: 44,
+                border: '1px solid var(--metal-line-strong)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                background: 'color-mix(in srgb, var(--color-metal-1) 8%, transparent)',
+                borderRadius: 2,
+                flexShrink: 0,
+                color: 'var(--color-metal-1)',
+            }}
+        >
+            <Home size={20} strokeWidth={1.4} />
         </div>
     );
 }

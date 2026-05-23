@@ -25,17 +25,19 @@ model User {
 
   notices         Notice[] @relation("NoticeAuthor")
   events          Event[]  @relation("EventAuthor")
+  votings         Voting[] @relation("VotingAuthor")
 }
 
 model Unit {
   id          String   @id @default(uuid())
-  block       String? 
-  number      String   
+  type        String   @default("APARTMENT") // "APARTMENT" | "HOUSE"
+  block       String?  // APARTMENT: bloco/torre · HOUSE: quadra/setor (opcional)
+  number      String   // identificador da unidade (número do apto ou da casa)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
   residents   User[]
-  
+
   notices     Notice[] @relation("NoticeTargetUnit")
   events      Event[]  @relation("EventTargetUnit")
 }
@@ -73,4 +75,26 @@ model Event {
 
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
+}
+
+model Voting {
+  id          String         @id @default(uuid())
+  title       String
+  description String         @db.Text
+  startDate   DateTime
+  endDate     DateTime
+  authorId    String
+  author      User           @relation("VotingAuthor", fields: [authorId], references: [id])
+  options     VotingOption[]
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+}
+
+model VotingOption {
+  id        String   @id @default(uuid())
+  text      String
+  votingId  String
+  voting    Voting   @relation(fields: [votingId], references: [id], onDelete: Cascade)
+  votes     Int      @default(0)
+  createdAt DateTime @default(now())
 }

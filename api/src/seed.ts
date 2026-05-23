@@ -8,11 +8,24 @@ async function seed() {
     // 1. Criar Unidades (Units) primeiro para podermos vinculá-las aos moradores
     console.log('🏠 Criando unidades...');
     const unitA101 = await prisma.unit.create({
-        data: { block: 'Bloco A', number: '101' }
+        data: { type: 'APARTMENT', block: 'Bloco A', number: '101' }
     });
-    
+
     const unitB202 = await prisma.unit.create({
-        data: { block: 'Bloco B', number: '202' }
+        data: { type: 'APARTMENT', block: 'Bloco B', number: '202' }
+    });
+
+    // Algumas casas para demonstrar o modelo misto (Quadra + Lote)
+    await prisma.unit.create({
+        data: { type: 'HOUSE', block: 'Quadra 1', number: '12' }
+    });
+
+    await prisma.unit.create({
+        data: { type: 'HOUSE', block: 'Quadra 2', number: '07' }
+    });
+
+    await prisma.unit.create({
+        data: { type: 'HOUSE', block: null, number: '23' }
     });
 
     // 2. Verificar se o Admin já existe
@@ -99,6 +112,52 @@ async function seed() {
     });
 
     console.log('✅ Avisos criados com sucesso!');
+
+    // 6. Criar Votações de Teste (Votings)
+    console.log('🗳️  Criando votações de teste...');
+
+    const now = new Date();
+    const inOneWeek = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+    const oneMonthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+    const oneWeekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+
+    // Votação ATIVA (endDate futura)
+    await prisma.voting.create({
+        data: {
+            title: 'Nova cor da fachada do condomínio',
+            description: 'Vamos escolher a nova cor da fachada para a próxima pintura. Sua opinião é fundamental!',
+            startDate: now,
+            endDate: inOneWeek,
+            authorId: admin.id,
+            options: {
+                create: [
+                    { text: 'Branco gelo', votes: 4 },
+                    { text: 'Cinza claro', votes: 7 },
+                    { text: 'Bege areia', votes: 2 }
+                ]
+            }
+        }
+    });
+
+    // Votação ENCERRADA (endDate passada)
+    await prisma.voting.create({
+        data: {
+            title: 'Horário de uso do salão de festas',
+            description: 'Definição do horário limite para uso do salão de festas aos finais de semana.',
+            startDate: oneMonthAgo,
+            endDate: oneWeekAgo,
+            authorId: admin.id,
+            options: {
+                create: [
+                    { text: 'Até 22h', votes: 3 },
+                    { text: 'Até 00h', votes: 12 },
+                    { text: 'Até 02h', votes: 5 }
+                ]
+            }
+        }
+    });
+
+    console.log('✅ Votações criadas com sucesso!');
 }
 
 seed()

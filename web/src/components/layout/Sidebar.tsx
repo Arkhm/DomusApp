@@ -21,10 +21,10 @@ const navItems = [
     { to: '/unidades', label: 'Unidades', icon: Building2 },
     { to: '/comunicados', label: 'Comunicados', icon: Megaphone },
     { to: '/eventos', label: 'Programação', icon: CalendarDays },
+    { to: '/votacoes', label: 'Votações', icon: Vote },
 ];
 
 const plannedItems = [
-    { label: 'Deliberações', icon: Vote },
     { label: 'Áreas Comuns', icon: TreePalm },
 ];
 

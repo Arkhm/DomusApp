@@ -1,7 +1,8 @@
 import api from './api';
-import type { Unit } from '../types/user';
+import type { Unit, UnitType } from '../types/user';
 
 export interface UnitFormData {
+    type: UnitType;
     block?: string;
     number: string;
 }

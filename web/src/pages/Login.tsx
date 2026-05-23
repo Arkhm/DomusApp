@@ -431,9 +431,9 @@ function FloatingField({
 
 function CondominiumSelect({ value, onChange }: { value: string; onChange: (v: string) => void }) {
     const opts = [
-        { v: 'torreA', label: 'Domus Residence — Torre A' },
-        { v: 'torreB', label: 'Domus Residence — Torre B' },
-        { v: 'torreC', label: 'Domus Residence — Torre C' },
+        { v: 'setorA', label: 'Domus Residence — Setor Norte' },
+        { v: 'setorB', label: 'Domus Residence — Setor Sul' },
+        { v: 'setorC', label: 'Domus Residence — Setor Central' },
     ];
     const filled = !!value;
     return (
