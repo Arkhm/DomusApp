@@ -11,16 +11,95 @@ import type { Unit } from '../../types/user';
 // Chrome ignores `lang` on <input type="datetime-local"> and always uses the
 // browser/OS locale, so we hand-roll two masked text inputs to guarantee
 // Brazilian format regardless of where the admin's machine is configured.
+//
+// Both masks filter digit-by-digit: only digits that can still form a valid
+// date/time at their position are accepted, so "99/99/9999" can never even be
+// typed — the rogue 9 is dropped at the source.
+
+/**
+ * Returns true if `digit` is a legal character for position `prior.length`
+ * given the digits already accepted (e.g. day position 1 depends on day
+ * position 0: if "3" was typed, only "0" or "1" come next).
+ */
+function isValidDateDigit(digit: string, prior: string): boolean {
+    const pos = prior.length;
+    switch (pos) {
+        case 0: // D1: 0,1,2,3
+            return '0123'.includes(digit);
+        case 1: {
+            // D2: depends on D1 — 0X (1-9), 1X/2X (0-9), 3X (0,1 → 30, 31)
+            const d1 = prior[0];
+            if (d1 === '0') return '123456789'.includes(digit);
+            if (d1 === '1' || d1 === '2') return /\d/.test(digit);
+            if (d1 === '3') return '01'.includes(digit);
+            return false;
+        }
+        case 2: // M1: 0 or 1
+            return '01'.includes(digit);
+        case 3: {
+            // M2: depends on M1 — 0X (1-9), 1X (0,1,2 → 10, 11, 12)
+            const m1 = prior[2];
+            if (m1 === '0') return '123456789'.includes(digit);
+            if (m1 === '1') return '012'.includes(digit);
+            return false;
+        }
+        case 4: // Y1: 1 or 2 (anos 1xxx ou 2xxx)
+            return '12'.includes(digit);
+        case 5:
+        case 6:
+        case 7:
+            return /\d/.test(digit);
+        default:
+            return false;
+    }
+}
+
+function isValidTimeDigit(digit: string, prior: string): boolean {
+    const pos = prior.length;
+    switch (pos) {
+        case 0: // H1: 0, 1 ou 2
+            return '012'.includes(digit);
+        case 1: {
+            // H2: depends on H1 — 0X/1X (0-9), 2X (0,1,2,3 → 20-23)
+            const h1 = prior[0];
+            if (h1 === '0' || h1 === '1') return /\d/.test(digit);
+            if (h1 === '2') return '0123'.includes(digit);
+            return false;
+        }
+        case 2: // M1: 0-5
+            return '012345'.includes(digit);
+        case 3:
+            return /\d/.test(digit);
+        default:
+            return false;
+    }
+}
+
+/**
+ * Filter raw input one digit at a time. As soon as an invalid digit appears
+ * at its position, we stop accepting — anything after it would be in the
+ * wrong slot anyway.
+ */
+function filterDigits(input: string, max: number, validate: (d: string, prior: string) => boolean): string {
+    const digits = input.replace(/\D/g, '');
+    let result = '';
+    for (const d of digits) {
+        if (result.length >= max) break;
+        if (!validate(d, result)) break;
+        result += d;
+    }
+    return result;
+}
 
 function maskDate(input: string): string {
-    const digits = input.replace(/\D/g, '').slice(0, 8);
+    const digits = filterDigits(input, 8, isValidDateDigit);
     if (digits.length <= 2) return digits;
     if (digits.length <= 4) return `${digits.slice(0, 2)}/${digits.slice(2)}`;
     return `${digits.slice(0, 2)}/${digits.slice(2, 4)}/${digits.slice(4)}`;
 }
 
 function maskTime(input: string): string {
-    const digits = input.replace(/\D/g, '').slice(0, 4);
+    const digits = filterDigits(input, 4, isValidTimeDigit);
     if (digits.length <= 2) return digits;
     return `${digits.slice(0, 2)}:${digits.slice(2)}`;
 }
