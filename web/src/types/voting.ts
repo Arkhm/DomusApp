@@ -24,13 +24,30 @@ export interface VotingFormData {
     options: string[]; // min 2
 }
 
-export type VotingStatus = 'ACTIVE' | 'CLOSED';
+export type VotingStatus = 'SCHEDULED' | 'ACTIVE' | 'CLOSED';
 
+export const VOTING_STATUS_LABELS: Record<VotingStatus, string> = {
+    SCHEDULED: 'Agendada',
+    ACTIVE: 'Ativa',
+    CLOSED: 'Encerrada',
+};
+
+/**
+ * Status derivado por janela de tempo:
+ * - SCHEDULED: ainda não começou (now < startDate)
+ * - ACTIVE: dentro da janela [startDate, endDate]
+ * - CLOSED: já encerrada (now > endDate)
+ *
+ * Antes só havia ACTIVE/CLOSED — votações futuras eram rotuladas como
+ * "Encerrada" por padrão, o que enganava o admin.
+ */
 export function getVotingStatus(v: Voting, now: Date = new Date()): VotingStatus {
     const start = new Date(v.startDate).getTime();
     const end = new Date(v.endDate).getTime();
     const n = now.getTime();
-    return n >= start && n <= end ? 'ACTIVE' : 'CLOSED';
+    if (n < start) return 'SCHEDULED';
+    if (n > end) return 'CLOSED';
+    return 'ACTIVE';
 }
 
 export function totalVotes(v: Voting): number {

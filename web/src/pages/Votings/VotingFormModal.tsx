@@ -365,6 +365,7 @@ export default function VotingFormModal({ isOpen, onClose, onSuccess }: Props) {
                                     advanceIfFull={advanceIfFull}
                                     backspaceToPrev={backspaceToPrev}
                                     dateError={startDateError}
+                                    showTodayShortcut
                                 />
                                 <DateTimePicker
                                     label="Data de Término"
@@ -416,6 +417,8 @@ interface DateTimePickerProps {
         prev: RefObject<HTMLInputElement | null>,
     ) => (e: KeyboardEvent<HTMLInputElement>) => void;
     dateError: string;
+    /** Mostra um atalho "Hoje" inline ao lado do label que preenche só os 3 segmentos de data (dia/mês/ano). */
+    showTodayShortcut?: boolean;
 }
 
 function DateTimePicker({
@@ -426,16 +429,53 @@ function DateTimePicker({
     advanceIfFull,
     backspaceToPrev,
     dateError,
+    showTodayShortcut,
 }: DateTimePickerProps) {
     const update = (field: keyof DateState, value: string) => {
         setState((prev) => ({ ...prev, [field]: value }));
     };
 
+    /** Preenche só dia/mês/ano com hoje — preserva hora/minuto se o admin já digitou. */
+    const fillToday = () => {
+        const d = new Date();
+        const pad = (n: number) => String(n).padStart(2, '0');
+        setState((prev) => ({
+            ...prev,
+            day: pad(d.getDate()),
+            month: pad(d.getMonth() + 1),
+            year: String(d.getFullYear()),
+        }));
+    };
+
     return (
         <div>
-            <label className="block text-sm font-medium text-text-secondary mb-1.5">
-                {label} <span className="text-error">*</span>
-            </label>
+            {/* Label + atalho "Hoje" inline (gap em vez de space-between, pra ficar
+                colado no label e não derivar pro meio do form em layouts em grid). */}
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, marginBottom: 6 }}>
+                <label className="block text-sm font-medium text-text-secondary">
+                    {label} <span className="text-error">*</span>
+                </label>
+                {showTodayShortcut && (
+                    <button
+                        type="button"
+                        onClick={fillToday}
+                        title="Usar a data de hoje"
+                        style={{
+                            background: 'none',
+                            border: 'none',
+                            padding: 0,
+                            fontSize: 10,
+                            color: 'var(--color-metal-1)',
+                            cursor: 'pointer',
+                            fontFamily: 'var(--font-sans)',
+                            textTransform: 'uppercase',
+                            letterSpacing: '0.16em',
+                        }}
+                    >
+                        Hoje
+                    </button>
+                )}
+            </div>
             <div className="flex flex-wrap items-center gap-2">
                 <div
                     className={`flex items-center bg-bg-secondary border rounded-xl px-2 py-1 transition-colors focus-within:ring-1 ${

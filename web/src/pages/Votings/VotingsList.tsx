@@ -10,6 +10,7 @@ import { votingService } from '../../services/votingService';
 import {
     getVotingStatus,
     totalVotes,
+    VOTING_STATUS_LABELS,
     type Voting,
     type VotingStatus,
 } from '../../types/voting';
@@ -194,6 +195,7 @@ export default function VotingsList() {
                         onChange={(v) => setFilterStatus(v as VotingStatus | '')}
                         placeholder="Todos os status"
                         options={[
+                            { value: 'SCHEDULED', label: 'Agendada' },
                             { value: 'ACTIVE', label: 'Ativa' },
                             { value: 'CLOSED', label: 'Encerrada' },
                         ]}
@@ -414,8 +416,12 @@ function VotingCard({
             {/* Header */}
             <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-                    <Tag tone={status === 'ACTIVE' ? 'ok' : 'neutral'} dot>
-                        {status === 'ACTIVE' ? 'Ativa' : 'Encerrada'}
+                    <Tag
+                        // Agendada: gold (em espera); Ativa: ok (em curso); Encerrada: neutral.
+                        tone={status === 'ACTIVE' ? 'ok' : status === 'SCHEDULED' ? 'gold' : 'neutral'}
+                        dot
+                    >
+                        {VOTING_STATUS_LABELS[status]}
                     </Tag>
                     <span
                         className="tracking-luxe"
