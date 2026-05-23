@@ -96,7 +96,7 @@ export default function EventsList() {
                             }}
                         >
                             Calendário{' '}
-                            <span className="serif-it" style={{ color: 'var(--color-metal-1)' }}>
+                            <span className="serif-it brand-mark" style={{ color: 'var(--color-metal-1)' }}>
                                 do condomínio
                             </span>
                         </h2>
@@ -289,7 +289,8 @@ function FeaturedEvent({ event, onDelete }: { event: EventItem; onDelete: () => 
                         <Tag tone="gold" dot>
                             Em destaque
                         </Tag>
-                        <Tag tone="neutral">Próximo evento</Tag>
+                        {/* "Próximo evento" Tag removida — redundante: o card já é
+                            visualmente o evento em destaque, não precisa rotular duas vezes. */}
                     </div>
 
                     <h3
@@ -475,7 +476,7 @@ function EventRow({
                             className="tracking-luxe"
                             style={{ fontSize: 9, color: 'var(--color-bone-muted)' }}
                         >
-                            Curado por {event.author.name.split(' ').slice(0, 2).join(' ')}
+                            Curado por {event.author?.name?.split(' ').slice(0, 2).join(' ') || '—'}
                         </span>
                     </div>
                     <p

@@ -67,7 +67,15 @@ export default function Dashboard() {
                 units: unitsCount,
                 notices: notices.length,
             });
-            setRecentNotices(notices.slice(0, 3)); // spec pede "últimos 3"
+            // Defensivo: ordena por createdAt desc antes de cortar. Não assume
+            // que a API devolve em ordem cronológica reversa — se mudar o default
+            // do backend, "recentes" deixaria de ser recente silenciosamente.
+            setRecentNotices(
+                notices
+                    .slice()
+                    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+                    .slice(0, 3),
+            );
             setUpcomingEvents(
                 events
                     .filter((e) => new Date(e.eventDate) > new Date())
@@ -121,10 +129,10 @@ export default function Dashboard() {
                 >
                     <div className="aurora" />
 
-                    {/* Watermark D */}
+                    {/* Watermark D — brand-mark mantém Cormorant mesmo no app-shell */}
                     <div
                         aria-hidden
-                        className="serif"
+                        className="serif brand-mark"
                         style={{
                             position: 'absolute',
                             right: -40,
@@ -166,7 +174,9 @@ export default function Dashboard() {
                                 className="serif"
                                 style={{
                                     fontSize: 64,
-                                    fontWeight: 300,
+                                    // weight 400 (era 300) — Inter Light em 64px ficava
+                                    // anêmico; 400 mantém a presença sem virar pesado.
+                                    fontWeight: 400,
                                     lineHeight: 1,
                                     letterSpacing: '-0.02em',
                                     color: 'var(--color-bone)',
@@ -176,7 +186,8 @@ export default function Dashboard() {
                                 {greeting}, {firstName}.
                             </h2>
                             <p
-                                className="serif-it"
+                                // brand-mark: pull-quote editorial mantém Cormorant italic.
+                                className="serif-it brand-mark"
                                 style={{
                                     fontSize: 22,
                                     color: 'var(--color-metal-1)',
@@ -313,7 +324,7 @@ export default function Dashboard() {
 
                         <div style={{ display: 'flex', flexDirection: 'column' }}>
                             {isLoading ? (
-                                Array.from({ length: 2 }).map((_, i) => <EventSkeleton key={i} />)
+                                Array.from({ length: 3 }).map((_, i) => <EventSkeleton key={i} />)
                             ) : upcomingEvents.length === 0 ? (
                                 <EmptyState
                                     icon={<CalendarDays size={28} strokeWidth={1.2} />}
@@ -745,7 +756,7 @@ function DistributionCard({ stats }: { stats: DashboardStats }) {
             <div className="gold-rule" style={{ margin: '32px 0 20px' }} />
 
             <div
-                className="serif-it"
+                className="serif-it brand-mark"
                 style={{ fontSize: 14, color: 'var(--color-bone-dim)', lineHeight: 1.5 }}
             >
                 “Em uma residência refinada, cada vínculo conta — e cada detalhe é registrado.”

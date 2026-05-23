@@ -93,7 +93,7 @@ export default function NoticesList() {
                             }}
                         >
                             Comunicados{' '}
-                            <span className="serif-it" style={{ color: 'var(--color-metal-1)' }}>
+                            <span className="serif-it brand-mark" style={{ color: 'var(--color-metal-1)' }}>
                                 aos residentes
                             </span>
                         </h2>
@@ -183,7 +183,10 @@ export default function NoticesList() {
                                                 {d.toLocaleDateString('pt-BR', { month: 'short' }).replace('.', '')}
                                             </div>
                                             <div
-                                                className="serif"
+                                                // brand-mark: numeral 48px da data é o âncora editorial
+                                                // do "boletim". Sem serif, a grid 92px|1fr|200px perde
+                                                // o motivo de existir.
+                                                className="serif brand-mark"
                                                 style={{
                                                     fontSize: 48,
                                                     fontWeight: 300,
@@ -228,6 +231,9 @@ export default function NoticesList() {
                                                     fontSize: 14,
                                                     color: 'var(--color-bone-dim)',
                                                     lineHeight: 1.7,
+                                                    // Preserva quebras de linha digitadas no textarea.
+                                                    // Sem isso, todo o conteúdo virava parágrafo único.
+                                                    whiteSpace: 'pre-wrap',
                                                 }}
                                             >
                                                 {n.content}

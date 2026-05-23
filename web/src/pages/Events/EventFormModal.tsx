@@ -1,11 +1,13 @@
 import { useState, useEffect, useRef, type KeyboardEvent, type RefObject } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
-import { X, Loader2, CalendarDays } from 'lucide-react';
+import { motion } from 'motion/react';
+import { CalendarDays } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { eventService } from '../../services/eventService';
 import { unitService } from '../../services/unitService';
 import type { EventFormData } from '../../types/event';
 import type { Unit } from '../../types/user';
+import { formatUnitDisplay } from '../../types/user';
+import LuxuryModal, { LuxuryModalFooter } from '../../components/luxury/LuxuryModal';
 
 // ---- Date/time helpers (24h, DD/MM/AAAA, per-field) ------------------------
 // We split the date/time into 5 independent inputs (DD / MM / AAAA — HH : MM)
@@ -255,49 +257,17 @@ export default function EventFormModal({ isOpen, onClose, onSuccess }: Props) {
     };
 
     return (
-        <AnimatePresence>
-            {isOpen && (
-                <motion.div
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    exit={{ opacity: 0 }}
-                    className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
-                    onClick={() => !isSubmitting && onClose()}
-                >
-                    <motion.div
-                        initial={{ scale: 0.9, opacity: 0 }}
-                        animate={{ scale: 1, opacity: 1 }}
-                        exit={{ scale: 0.9, opacity: 0 }}
-                        transition={{ type: 'spring', duration: 0.3 }}
-                        onClick={(e) => e.stopPropagation()}
-                        className="bg-bg-card border border-border-primary rounded-2xl w-full max-w-lg shadow-2xl max-h-[90vh] overflow-y-auto"
-                    >
-                        {/* Header */}
-                        <div className="flex items-center justify-between p-6 pb-0">
-                            <div className="flex items-center gap-3">
-                                <div className="w-10 h-10 rounded-xl bg-accent-primary/10 flex items-center justify-center">
-                                    <CalendarDays className="w-5 h-5 text-accent-primary" />
-                                </div>
-                                <div>
-                                    <h2 className="text-lg font-semibold text-text-primary">
-                                        Novo Evento
-                                    </h2>
-                                    <p className="text-sm text-text-muted">
-                                        Crie um evento para o condomínio
-                                    </p>
-                                </div>
-                            </div>
-                            <button
-                                onClick={onClose}
-                                disabled={isSubmitting}
-                                className="p-2 rounded-lg text-text-muted hover:text-text-primary hover:bg-bg-hover transition-colors"
-                            >
-                                <X className="w-5 h-5" />
-                            </button>
-                        </div>
-
+        <LuxuryModal
+            open={isOpen}
+            onClose={onClose}
+            busy={isSubmitting}
+            icon={<CalendarDays size={18} strokeWidth={1.4} />}
+            title="Novo Evento"
+            subtitle="Crie um evento para o condomínio"
+            size="lg"
+        >
                         {/* Form */}
-                        <form onSubmit={handleSubmit} className="p-6 space-y-5">
+                        <form onSubmit={handleSubmit} style={{ padding: '24px 28px 28px', display: 'flex', flexDirection: 'column', gap: 18 }}>
                             {/* Título */}
                             <div>
                                 <label className="block text-sm font-medium text-text-secondary mb-1.5">
@@ -480,43 +450,21 @@ export default function EventFormModal({ isOpen, onClose, onSuccess }: Props) {
                                         <option value="">Selecione uma unidade</option>
                                         {units.map((unit) => (
                                             <option key={unit.id} value={unit.id}>
-                                                {unit.block ? `${unit.block} - ${unit.number}` : unit.number}
+                                                {formatUnitDisplay(unit)}
                                             </option>
                                         ))}
                                     </select>
                                 </motion.div>
                             )}
 
-                            {/* Actions */}
-                            <div className="flex items-center justify-end gap-3 pt-2">
-                                <button
-                                    type="button"
-                                    onClick={onClose}
-                                    disabled={isSubmitting}
-                                    className="px-5 py-2.5 text-sm font-medium text-text-secondary hover:text-text-primary border border-border-primary rounded-xl hover:bg-bg-hover transition-colors"
-                                >
-                                    Cancelar
-                                </button>
-                                <button
-                                    type="submit"
-                                    disabled={isSubmitting}
-                                    className="px-5 py-2.5 text-sm font-medium text-white bg-gradient-to-r from-accent-gradient-start to-accent-gradient-end rounded-xl hover:shadow-lg hover:shadow-accent-primary/20 transition-all disabled:opacity-60 flex items-center gap-2"
-                                >
-                                    {isSubmitting ? (
-                                        <>
-                                            <Loader2 className="w-4 h-4 animate-spin" />
-                                            Criando...
-                                        </>
-                                    ) : (
-                                        'Criar Evento'
-                                    )}
-                                </button>
-                            </div>
+                            <LuxuryModalFooter
+                                onCancel={onClose}
+                                submitLabel="Criar evento"
+                                loadingLabel="Criando…"
+                                isSubmitting={isSubmitting}
+                            />
                         </form>
-                    </motion.div>
-                </motion.div>
-            )}
-        </AnimatePresence>
+        </LuxuryModal>
     );
 }
 

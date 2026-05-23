@@ -67,6 +67,9 @@ interface ListMetaProps {
 }
 
 export function ListMeta({ count, singular, plural, filtered }: ListMetaProps) {
+    // Concordância: "1 residente encontrado" vs "3 residentes encontrados".
+    // Antes saía "1 residente encontrados", quebrando português.
+    const suffix = filtered ? (count === 1 ? ' encontrado' : ' encontrados') : '';
     return (
         <div
             style={{
@@ -79,8 +82,7 @@ export function ListMeta({ count, singular, plural, filtered }: ListMetaProps) {
         >
             <span style={{ width: 16, height: 1, background: 'var(--metal-line-strong)' }} />
             <span className="tracking-luxe" style={{ fontSize: 9 }}>
-                {count} {count === 1 ? singular : plural}
-                {filtered ? ' encontrados' : ''}
+                {count} {count === 1 ? singular : plural}{suffix}
             </span>
         </div>
     );

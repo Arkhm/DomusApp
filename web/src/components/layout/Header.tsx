@@ -5,7 +5,7 @@ import { AnimatePresence, motion } from 'motion/react';
 import toast from 'react-hot-toast';
 import { useAuth } from '../../contexts/AuthContext';
 import LiveClock from '../luxury/LiveClock';
-import { getInitials } from '../luxury/formatters';
+import { getInitials, roleLabel } from '../luxury/formatters';
 import { useGeoCity } from '../../hooks/useGeoCity';
 
 interface HeaderProps {
@@ -163,7 +163,7 @@ export default function Header({ title, eyebrow }: HeaderProps) {
                                 className="tracking-luxe"
                                 style={{ fontSize: 8, color: 'var(--color-metal-1)', marginTop: 2 }}
                             >
-                                {user?.role === 'ADMIN' ? 'Administração' : user?.isSyndic ? 'Síndico' : 'Residente'}
+                                {roleLabel(user)}
                             </div>
                         </div>
                         <ChevronDown

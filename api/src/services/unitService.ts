@@ -1,6 +1,11 @@
 import { unitRepository } from '../repositories/unitRepository';
 
-const VALID_TYPES = new Set(['APARTMENT', 'HOUSE']);
+type UnitType = 'APARTMENT' | 'HOUSE';
+const VALID_TYPES: ReadonlyArray<UnitType> = ['APARTMENT', 'HOUSE'];
+
+function isValidType(s: string): s is UnitType {
+  return (VALID_TYPES as ReadonlyArray<string>).includes(s);
+}
 
 export const unitService = {
   async create(data: { type?: string; block?: string; number: string }) {
@@ -8,10 +13,11 @@ export const unitService = {
       throw new Error('O número da unidade é obrigatório.');
     }
 
-    const type = (data.type || 'APARTMENT').toUpperCase();
-    if (!VALID_TYPES.has(type)) {
+    const upper = (data.type || 'APARTMENT').toUpperCase();
+    if (!isValidType(upper)) {
       throw new Error('Tipo de unidade inválido. Use APARTMENT ou HOUSE.');
     }
+    const type: UnitType = upper;
 
     // Duplicata é escopada por tipo: um apartamento "A · 101" não conflita com
     // uma casa "A · 101" — são tipologias distintas em condomínios mistos.

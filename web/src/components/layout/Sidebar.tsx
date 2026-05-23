@@ -13,7 +13,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import Monogram from '../luxury/Monogram';
-import { getInitials } from '../luxury/formatters';
+import { getInitials, roleLabel } from '../luxury/formatters';
 
 const navItems = [
     { to: '/dashboard', label: 'Painel', icon: LayoutDashboard },
@@ -195,7 +195,7 @@ export default function Sidebar() {
                             className="tracking-luxe"
                             style={{ fontSize: 8, color: 'var(--color-metal-2)', marginTop: 2 }}
                         >
-                            {user?.isSyndic ? 'Síndico' : user?.role === 'ADMIN' ? 'Administração' : 'Residente'}
+                            {roleLabel(user)}
                         </div>
                     </div>
                 )}

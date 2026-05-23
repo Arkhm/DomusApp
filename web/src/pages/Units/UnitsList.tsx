@@ -267,8 +267,16 @@ export default function UnitsList() {
                         }}
                     >
                         {filtered.map((u, i) => {
+                            // Match por id é o caminho confiável (FK estável). Fallback por
+                            // block+number AGORA inclui type — sem isso, uma casa "A·101"
+                            // e um apto "A·101" no mesmo condomínio misto pegavam o mesmo
+                            // morador no card errado.
                             const resident = users.find(
-                                (r) => r.unit?.id === u.id || (r.unit?.block === u.block && r.unit?.number === u.number),
+                                (r) =>
+                                    r.unit?.id === u.id ||
+                                    (r.unit?.block === u.block &&
+                                        r.unit?.number === u.number &&
+                                        (r.unit?.type || 'APARTMENT') === (u.type || 'APARTMENT')),
                             );
                             const unitType: UnitType = u.type || 'APARTMENT';
                             const labels = UNIT_FIELD_LABELS[unitType];
@@ -574,6 +582,9 @@ function UnitMonogram({ block }: { block: string }) {
     const text = monogramText(block);
     return (
         <div
+            // brand-mark: preserva Cormorant mesmo dentro de .app-shell.
+            // É o único elemento serif que dá identidade visual ao card.
+            className="brand-mark"
             title={block || undefined}
             style={{
                 width: 44,

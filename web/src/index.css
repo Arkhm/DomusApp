@@ -261,6 +261,16 @@
 .app-shell .serif-it {
   font-family: var(--font-sans);
 }
+
+/* Exceção: elementos marcados como brand-mark mantêm Cormorant mesmo dentro
+   do app-shell. São âncoras de identidade visual (monograma do card, data
+   gigante do boletim, watermark "D", pull-quotes editoriais) — não conteúdo
+   operacional. Sem isso o restyle perde alma editorial onde ela é deliberada. */
+.app-shell .brand-mark,
+.app-shell .brand-mark .serif,
+.app-shell .brand-mark .serif-it {
+  font-family: var(--font-display);
+}
 .mono { font-family: var(--font-mono); }
 .tracking-luxe { letter-spacing: 0.18em; text-transform: uppercase; }
 
