@@ -10,10 +10,10 @@ export default function ProtectedLayout() {
     }
 
     return (
-        <div className="flex min-h-screen bg-bg-primary">
+        <div style={{ minHeight: '100vh', background: 'var(--color-ink-0)' }}>
             <Sidebar />
-            {/* Main content area — offset by sidebar width */}
-            <main className="flex-1 ml-56 transition-all duration-200 min-h-screen overflow-auto">
+            {/* Offset by collapsed sidebar width (76px). Sidebar expands as overlay. */}
+            <main style={{ marginLeft: 76, minHeight: '100vh' }}>
                 <Outlet />
             </main>
         </div>

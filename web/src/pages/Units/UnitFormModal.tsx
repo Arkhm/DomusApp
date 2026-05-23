@@ -119,6 +119,7 @@ export default function UnitFormModal({ isOpen, onClose, onSuccess }: UnitFormMo
                                     value={block}
                                     onChange={(e) => setBlock(e.target.value)}
                                     placeholder="Ex: A"
+                                    maxLength={24}
                                     className="w-full px-4 py-3 bg-bg-input border border-border-primary rounded-xl text-text-primary placeholder-text-muted focus:border-accent-primary focus:outline-none transition-colors"
                                 />
                             </div>
@@ -132,6 +133,7 @@ export default function UnitFormModal({ isOpen, onClose, onSuccess }: UnitFormMo
                                     value={number}
                                     onChange={(e) => setNumber(e.target.value)}
                                     placeholder="Ex: 101"
+                                    maxLength={12}
                                     className="w-full px-4 py-3 bg-bg-input border border-border-primary rounded-xl text-text-primary placeholder-text-muted focus:border-accent-primary focus:outline-none transition-colors"
                                 />
                             </div>

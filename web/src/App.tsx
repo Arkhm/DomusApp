@@ -13,11 +13,25 @@ export default function App() {
           toastOptions={{
             duration: 4000,
             style: {
-              background: '#16161f',
-              color: '#f0f0f5',
-              border: '1px solid #2a2a3d',
-              borderRadius: '12px',
-              fontSize: '14px',
+              background: 'var(--color-ink-1)',
+              color: 'var(--color-bone)',
+              border: '1px solid var(--color-line-strong)',
+              borderRadius: '2px',
+              fontSize: '13px',
+              fontFamily: 'var(--font-sans)',
+              padding: '12px 16px',
+            },
+            success: {
+              iconTheme: {
+                primary: 'var(--color-metal-1)',
+                secondary: 'var(--color-ink-1)',
+              },
+            },
+            error: {
+              iconTheme: {
+                primary: 'var(--color-err)',
+                secondary: 'var(--color-ink-1)',
+              },
             },
           }}
         />

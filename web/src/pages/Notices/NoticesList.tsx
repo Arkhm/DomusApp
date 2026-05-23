@@ -1,41 +1,20 @@
-import { useState, useEffect, useCallback } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
-import {
-    Plus,
-    Trash2,
-    Megaphone,
-    Loader2,
-    AlertCircle,
-    X,
-    Clock,
-    Users,
-    Send,
-} from 'lucide-react';
+import { useCallback, useEffect, useState } from 'react';
+import { motion } from 'motion/react';
+import { Plus, Trash2, Loader2 } from 'lucide-react';
 import toast from 'react-hot-toast';
+import Header from '../../components/layout/Header';
+import PageBody from '../../components/luxury/PageBody';
+import Tag from '../../components/luxury/Tag';
+import { timeAgo, getInitials } from '../../components/luxury/formatters';
 import { noticeService } from '../../services/noticeService';
 import type { Notice } from '../../types/notice';
 import NoticeFormModal from './NoticeFormModal';
-import Header from '../../components/layout/Header';
-
-function timeAgo(dateStr: string): string {
-    const now = new Date();
-    const date = new Date(dateStr);
-    const diffMs = now.getTime() - date.getTime();
-    const diffMin = Math.floor(diffMs / 60000);
-    const diffH = Math.floor(diffMin / 60);
-    const diffD = Math.floor(diffH / 24);
-
-    if (diffMin < 1) return 'Agora mesmo';
-    if (diffMin < 60) return `${diffMin}min atrás`;
-    if (diffH < 24) return `${diffH}h atrás`;
-    if (diffD < 7) return `${diffD}d atrás`;
-    return date.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' });
-}
+import { ListMeta, IconBtn, EmptyTable, DeleteModal } from '../Users/UsersList';
 
 const ROLE_LABELS: Record<string, string> = {
-    ADMIN: 'Administrador',
-    MORADOR: 'Morador',
-    FUNCIONARIO: 'Funcionário',
+    ADMIN: 'Administração',
+    MORADOR: 'Residente',
+    FUNCIONARIO: 'Equipe',
 };
 
 export default function NoticesList() {
@@ -43,16 +22,15 @@ export default function NoticesList() {
     const [isLoading, setIsLoading] = useState(true);
     const [isModalOpen, setIsModalOpen] = useState(false);
 
-    // Delete confirmation
     const [deletingNotice, setDeletingNotice] = useState<Notice | null>(null);
     const [isDeleting, setIsDeleting] = useState(false);
 
-    const loadNotices = useCallback(async () => {
+    const load = useCallback(async () => {
         setIsLoading(true);
         try {
             const data = await noticeService.getAll();
             setNotices(data);
-        } catch (error: any) {
+        } catch {
             toast.error('Erro ao carregar comunicados.');
         } finally {
             setIsLoading(false);
@@ -60,215 +38,317 @@ export default function NoticesList() {
     }, []);
 
     useEffect(() => {
-        loadNotices();
-    }, [loadNotices]);
+        load();
+    }, [load]);
 
     const handleDelete = async () => {
         if (!deletingNotice) return;
-
         setIsDeleting(true);
         try {
             await noticeService.delete(deletingNotice.id);
-            toast.success('Comunicado removido com sucesso!', {
-                position: 'top-right',
-                style: { background: '#16161f', color: '#f0f0f5', border: '1px solid #22c55e' },
-                iconTheme: { primary: '#22c55e', secondary: '#16161f' },
-            });
+            toast.success('Comunicado removido.');
             setDeletingNotice(null);
-            loadNotices();
-        } catch (error: any) {
-            toast.error(error.response?.data?.error || 'Erro ao remover comunicado.');
+            load();
+        } catch (err: any) {
+            toast.error(err.response?.data?.error || 'Erro ao remover comunicado.');
         } finally {
             setIsDeleting(false);
         }
     };
 
-    const handleModalSuccess = () => {
-        setIsModalOpen(false);
-        loadNotices();
-    };
-
     return (
-        <div className="bg-bg-primary">
-            <Header title="Comunicados" />
+        <div>
+            <Header title="Comunicados" eyebrow="Boletim oficial" />
 
-            <div className="p-8">
-                {/* Top bar */}
-                <div className="flex items-center justify-between mb-6">
-                    <div className="flex items-center gap-2 text-sm text-text-muted">
-                        <Megaphone className="w-4 h-4" />
-                        <span>
-                            {notices.length} {notices.length === 1 ? 'comunicado' : 'comunicados'} publicados
-                        </span>
+            <PageBody>
+                {/* Editorial header */}
+                <div
+                    style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'flex-end',
+                        marginBottom: 40,
+                        gap: 24,
+                        flexWrap: 'wrap',
+                    }}
+                >
+                    <div style={{ maxWidth: 560 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
+                            <span style={{ width: 24, height: 1, background: 'var(--color-metal-1)' }} />
+                            <div
+                                className="tracking-luxe"
+                                style={{ fontSize: 9, color: 'var(--color-metal-1)' }}
+                            >
+                                Boletim · Edição corrente
+                            </div>
+                        </div>
+                        <h2
+                            className="serif"
+                            style={{
+                                fontSize: 40,
+                                fontWeight: 400,
+                                color: 'var(--color-bone)',
+                                letterSpacing: '-0.01em',
+                                lineHeight: 1.1,
+                            }}
+                        >
+                            Comunicados{' '}
+                            <span className="serif-it" style={{ color: 'var(--color-metal-1)' }}>
+                                aos residentes
+                            </span>
+                        </h2>
+                        <p
+                            style={{
+                                fontSize: 14,
+                                color: 'var(--color-bone-dim)',
+                                marginTop: 12,
+                                lineHeight: 1.6,
+                            }}
+                        >
+                            Avisos oficiais, manutenções programadas e novidades publicadas pela administração do
+                            edifício.
+                        </p>
                     </div>
-
-                    <motion.button
-                        whileHover={{ scale: 1.02 }}
-                        whileTap={{ scale: 0.98 }}
-                        onClick={() => setIsModalOpen(true)}
-                        className="flex items-center gap-2 px-7 py-2.5 bg-gradient-to-r from-accent-gradient-start to-accent-gradient-end text-white font-medium rounded-lg shadow-lg shadow-accent-primary/20 hover:shadow-accent-primary/30 transition-shadow text-sm whitespace-nowrap flex-shrink-0"
-                    >
-                        <Plus className="w-4 h-4" />
-                        Novo Comunicado
-                    </motion.button>
+                    <button onClick={() => setIsModalOpen(true)} className="btn-gold">
+                        <Plus size={12} />
+                        Novo comunicado
+                    </button>
                 </div>
+
+                <ListMeta
+                    count={notices.length}
+                    singular="comunicado publicado"
+                    plural="comunicados publicados"
+                />
 
                 {/* Content */}
                 {isLoading ? (
-                    <div className="flex items-center justify-center py-20">
-                        <Loader2 className="w-6 h-6 text-accent-primary animate-spin" />
-                        <span className="ml-3 text-text-secondary">Carregando comunicados...</span>
+                    <div
+                        className="luxe-card"
+                        style={{
+                            padding: 80,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: 12,
+                            color: 'var(--color-bone-dim)',
+                        }}
+                    >
+                        <Loader2 size={18} className="animate-spin" />
+                        <span>Carregando comunicados…</span>
                     </div>
                 ) : notices.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center py-20 text-text-muted">
-                        <Megaphone className="w-12 h-12 mb-3 opacity-30" />
-                        <p className="text-base font-medium">Nenhum comunicado publicado</p>
-                        <p className="text-sm mt-1">Clique em "+ Novo Comunicado" para enviar o primeiro aviso</p>
+                    <div className="luxe-card">
+                        <EmptyTable
+                            title="Nenhum comunicado publicado"
+                            hint='Clique em "Novo comunicado" para enviar o primeiro aviso.'
+                        />
                     </div>
                 ) : (
-                    <div className="grid gap-4">
-                        {notices.map((notice, index) => (
-                            <motion.div
-                                key={notice.id}
-                                initial={{ opacity: 0, y: 16 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                transition={{ delay: index * 0.05 }}
-                                className="group bg-bg-card border border-border-primary rounded-xl p-5 hover:border-border-secondary transition-colors"
-                            >
-                                <div className="flex items-start justify-between gap-4">
-                                    {/* Content */}
-                                    <div className="flex-1 min-w-0">
-                                        {/* Title */}
-                                        <h3 className="text-base font-semibold text-text-primary mb-1.5">
-                                            {notice.title}
-                                        </h3>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                        {notices.map((n, i) => {
+                            const d = new Date(n.createdAt);
+                            return (
+                                <motion.article
+                                    key={n.id}
+                                    className="luxe-card fade-up"
+                                    initial={{ opacity: 0, y: 12 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    transition={{ delay: i * 0.05 }}
+                                    style={{ padding: 36 }}
+                                >
+                                    <div
+                                        style={{
+                                            display: 'grid',
+                                            gridTemplateColumns: '92px 1fr 200px',
+                                            gap: 32,
+                                            alignItems: 'start',
+                                        }}
+                                    >
+                                        {/* Date column */}
+                                        <div
+                                            style={{
+                                                borderRight: '1px solid var(--color-line)',
+                                                paddingRight: 24,
+                                            }}
+                                        >
+                                            <div
+                                                className="tracking-luxe"
+                                                style={{
+                                                    fontSize: 9,
+                                                    color: 'var(--color-metal-1)',
+                                                    marginBottom: 4,
+                                                }}
+                                            >
+                                                {d.toLocaleDateString('pt-BR', { month: 'short' }).replace('.', '')}
+                                            </div>
+                                            <div
+                                                className="serif"
+                                                style={{
+                                                    fontSize: 48,
+                                                    fontWeight: 300,
+                                                    color: 'var(--color-bone)',
+                                                    lineHeight: 0.9,
+                                                    letterSpacing: '-0.02em',
+                                                }}
+                                            >
+                                                {d.toLocaleDateString('pt-BR', { day: '2-digit' })}
+                                            </div>
+                                            <div
+                                                className="mono"
+                                                style={{
+                                                    fontSize: 10,
+                                                    color: 'var(--color-bone-muted)',
+                                                    marginTop: 12,
+                                                }}
+                                            >
+                                                {d.toLocaleTimeString('pt-BR', {
+                                                    hour: '2-digit',
+                                                    minute: '2-digit',
+                                                })}
+                                            </div>
+                                        </div>
 
-                                        {/* Body preview */}
-                                        <p className="text-sm text-text-secondary leading-relaxed line-clamp-3 mb-3">
-                                            {notice.content}
-                                        </p>
+                                        {/* Body */}
+                                        <div>
+                                            <h3
+                                                className="serif"
+                                                style={{
+                                                    fontSize: 24,
+                                                    fontWeight: 500,
+                                                    color: 'var(--color-bone)',
+                                                    lineHeight: 1.2,
+                                                    marginBottom: 12,
+                                                }}
+                                            >
+                                                {n.title}
+                                            </h3>
+                                            <p
+                                                style={{
+                                                    fontSize: 14,
+                                                    color: 'var(--color-bone-dim)',
+                                                    lineHeight: 1.7,
+                                                }}
+                                            >
+                                                {n.content}
+                                            </p>
 
-                                        {/* Footer meta */}
-                                        <div className="flex items-center flex-wrap gap-x-4 gap-y-1.5">
-                                            {/* Author */}
-                                            <div className="flex items-center gap-1.5 text-xs text-text-muted">
-                                                <div className="w-5 h-5 rounded-full bg-gradient-to-br from-accent-gradient-start to-accent-gradient-end flex items-center justify-center flex-shrink-0">
-                                                    <span className="text-[9px] font-bold text-white">
-                                                        {notice.author.name.charAt(0).toUpperCase()}
-                                                    </span>
+                                            <div
+                                                style={{
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    gap: 16,
+                                                    marginTop: 20,
+                                                    flexWrap: 'wrap',
+                                                }}
+                                            >
+                                                <div
+                                                    style={{
+                                                        display: 'flex',
+                                                        alignItems: 'center',
+                                                        gap: 10,
+                                                    }}
+                                                >
+                                                    <div
+                                                        className="avatar"
+                                                        style={{ width: 26, height: 26, fontSize: 11 }}
+                                                    >
+                                                        {getInitials(n.author.name)}
+                                                    </div>
+                                                    <div>
+                                                        <div
+                                                            style={{
+                                                                fontSize: 12,
+                                                                color: 'var(--color-bone)',
+                                                                lineHeight: 1.2,
+                                                            }}
+                                                        >
+                                                            {n.author.name}
+                                                        </div>
+                                                        <div
+                                                            className="tracking-luxe"
+                                                            style={{
+                                                                fontSize: 8,
+                                                                color: 'var(--color-bone-muted)',
+                                                            }}
+                                                        >
+                                                            {ROLE_LABELS[n.author.role] || n.author.role}
+                                                        </div>
+                                                    </div>
                                                 </div>
-                                                <span>
-                                                    {notice.author.name}
-                                                    <span className="text-text-muted/60 ml-1">
-                                                        ({ROLE_LABELS[notice.author.role] || notice.author.role})
-                                                    </span>
+                                                <span
+                                                    style={{
+                                                        width: 1,
+                                                        height: 22,
+                                                        background: 'var(--color-line-strong)',
+                                                    }}
+                                                />
+                                                <span
+                                                    className="tracking-luxe"
+                                                    style={{ fontSize: 9, color: 'var(--color-bone-muted)' }}
+                                                >
+                                                    {timeAgo(n.createdAt)}
                                                 </span>
                                             </div>
+                                        </div>
 
-                                            {/* Timestamp */}
-                                            <div className="flex items-center gap-1 text-xs text-text-muted">
-                                                <Clock className="w-3.5 h-3.5" />
-                                                <span>{timeAgo(notice.createdAt)}</span>
-                                            </div>
-
-                                            {/* Target badge */}
-                                            <div className="flex items-center gap-1 text-xs">
-                                                {notice.targetType === 'ALL' ? (
-                                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-info-bg text-info font-medium">
-                                                        <Users className="w-3 h-3" />
-                                                        Todos
-                                                    </span>
-                                                ) : (
-                                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-warning-bg text-warning font-medium">
-                                                        <Send className="w-3 h-3" />
-                                                        {notice.targetUnit
-                                                            ? `${notice.targetUnit.block || ''} ${notice.targetUnit.number}`
-                                                            : 'Unidade'}
-                                                    </span>
-                                                )}
+                                        {/* Meta column */}
+                                        <div
+                                            style={{
+                                                display: 'flex',
+                                                flexDirection: 'column',
+                                                alignItems: 'flex-end',
+                                                gap: 16,
+                                            }}
+                                        >
+                                            <Tag tone={n.targetType === 'ALL' ? 'gold' : 'purple'}>
+                                                {n.targetType === 'ALL'
+                                                    ? 'Todos os residentes'
+                                                    : n.targetUnit
+                                                      ? `${n.targetUnit.block ? `Torre ${n.targetUnit.block} · ` : ''}${n.targetUnit.number}`
+                                                      : 'Unidade específica'}
+                                            </Tag>
+                                            <div style={{ display: 'flex', gap: 4 }}>
+                                                <IconBtn
+                                                    icon={<Trash2 size={14} />}
+                                                    danger
+                                                    onClick={() => setDeletingNotice(n)}
+                                                    title="Excluir comunicado"
+                                                />
                                             </div>
                                         </div>
                                     </div>
-
-                                    {/* Delete button */}
-                                    <button
-                                        onClick={() => setDeletingNotice(notice)}
-                                        className="p-2 rounded-lg text-text-muted hover:text-error hover:bg-error-bg transition-colors opacity-0 group-hover:opacity-100 flex-shrink-0"
-                                        title="Excluir comunicado"
-                                    >
-                                        <Trash2 className="w-4 h-4" />
-                                    </button>
-                                </div>
-                            </motion.div>
-                        ))}
+                                </motion.article>
+                            );
+                        })}
                     </div>
                 )}
-            </div>
+            </PageBody>
 
-            {/* Delete confirmation modal */}
-            <AnimatePresence>
-                {deletingNotice && (
-                    <motion.div
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        exit={{ opacity: 0 }}
-                        className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
-                        onClick={() => !isDeleting && setDeletingNotice(null)}
-                    >
-                        <motion.div
-                            initial={{ scale: 0.9, opacity: 0 }}
-                            animate={{ scale: 1, opacity: 1 }}
-                            exit={{ scale: 0.9, opacity: 0 }}
-                            transition={{ type: 'spring', duration: 0.3 }}
-                            onClick={(e) => e.stopPropagation()}
-                            className="bg-bg-card border border-border-primary rounded-2xl p-6 w-full max-w-sm shadow-2xl"
-                        >
-                            <div className="flex items-center justify-between mb-4">
-                                <h3 className="text-lg font-semibold text-text-primary">Confirmar Exclusão</h3>
-                                <button
-                                    onClick={() => setDeletingNotice(null)}
-                                    disabled={isDeleting}
-                                    className="p-1 rounded-lg text-text-muted hover:text-text-primary transition-colors"
-                                >
-                                    <X className="w-5 h-5" />
-                                </button>
-                            </div>
-                            <p className="text-sm text-text-secondary mb-6">
-                                Tem certeza que deseja remover o comunicado <strong className="text-text-primary">"{deletingNotice.title}"</strong>? Esta ação não pode ser desfeita.
-                            </p>
-                            <div className="flex items-center justify-end gap-3">
-                                <button
-                                    onClick={() => setDeletingNotice(null)}
-                                    disabled={isDeleting}
-                                    className="px-4 py-2 text-sm font-medium text-text-secondary hover:text-text-primary border border-border-primary rounded-xl hover:bg-bg-hover transition-colors"
-                                >
-                                    Cancelar
-                                </button>
-                                <button
-                                    onClick={handleDelete}
-                                    disabled={isDeleting}
-                                    className="px-4 py-2 text-sm font-medium text-white bg-error rounded-xl hover:bg-error/90 transition-colors disabled:opacity-60 flex items-center gap-2"
-                                >
-                                    {isDeleting ? (
-                                        <>
-                                            <Loader2 className="w-3 h-3 animate-spin" />
-                                            Excluindo...
-                                        </>
-                                    ) : (
-                                        'Excluir'
-                                    )}
-                                </button>
-                            </div>
-                        </motion.div>
-                    </motion.div>
-                )}
-            </AnimatePresence>
+            <DeleteModal
+                open={!!deletingNotice}
+                isDeleting={isDeleting}
+                title="Remover comunicado"
+                description={
+                    deletingNotice ? (
+                        <>
+                            Tem certeza que deseja remover o comunicado{' '}
+                            <strong style={{ color: 'var(--color-bone)' }}>{deletingNotice.title}</strong>? Esta
+                            ação não pode ser desfeita.
+                        </>
+                    ) : null
+                }
+                onClose={() => setDeletingNotice(null)}
+                onConfirm={handleDelete}
+            />
 
-            {/* Create Modal */}
             <NoticeFormModal
                 isOpen={isModalOpen}
                 onClose={() => setIsModalOpen(false)}
-                onSuccess={handleModalSuccess}
+                onSuccess={() => {
+                    setIsModalOpen(false);
+                    load();
+                }}
             />
         </div>
     );

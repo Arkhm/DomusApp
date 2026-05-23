@@ -6,6 +6,7 @@ import { userService } from '../../services/userService';
 import { unitService } from '../../services/unitService';
 import type { User, UserFormData, UserRole, UserStatus, Unit } from '../../types/user';
 import { formatUnitDisplay } from '../../types/user';
+import { isValidCpf } from '../../components/luxury/formatters';
 
 interface UserFormModalProps {
     isOpen: boolean;
@@ -151,6 +152,10 @@ export default function UserFormModal({ isOpen, user, onClose, onSuccess }: User
         }
         if (!form.cpf.trim() || form.cpf.replace(/\D/g, '').length !== 11) {
             toast.error('CPF inválido. Deve conter exatamente 11 dígitos numéricos.');
+            return;
+        }
+        if (!isValidCpf(form.cpf)) {
+            toast.error('CPF inválido. Verifique os dígitos verificadores.');
             return;
         }
         if (!isEditing && !form.password) {
