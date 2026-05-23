@@ -10,7 +10,10 @@ export default function ProtectedLayout() {
     }
 
     return (
-        <div style={{ minHeight: '100vh', background: 'var(--color-ink-0)' }}>
+        // `app-shell` class ativa o swap automático de .serif/.serif-it → Inter
+        // dentro de todas as telas internas. Login está fora deste shell e
+        // continua com Cormorant Garamond.
+        <div className="app-shell" style={{ minHeight: '100vh', background: 'var(--color-ink-0)' }}>
             <Sidebar />
             {/* Offset by collapsed sidebar width (76px). Sidebar expands as overlay. */}
             <main style={{ marginLeft: 76, minHeight: '100vh' }}>

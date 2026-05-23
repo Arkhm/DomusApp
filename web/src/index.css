@@ -252,6 +252,15 @@
 
 .serif { font-family: var(--font-display); font-feature-settings: 'lnum'; }
 .serif-it { font-family: var(--font-display); font-style: italic; }
+
+/* Telas internas (qualquer descendente de .app-shell) trocam .serif/.serif-it
+   por Inter automaticamente. Login fica intacto — Cormorant editorial
+   preservado como "momento de marca". Diretriz do design system: serif
+   só no momento da marca; telas operacionais ganham clareza sans. */
+.app-shell .serif,
+.app-shell .serif-it {
+  font-family: var(--font-sans);
+}
 .mono { font-family: var(--font-mono); }
 .tracking-luxe { letter-spacing: 0.18em; text-transform: uppercase; }
 
