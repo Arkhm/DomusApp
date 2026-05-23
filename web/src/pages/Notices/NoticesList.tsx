@@ -9,7 +9,7 @@ import { timeAgo, getInitials } from '../../components/luxury/formatters';
 import { noticeService } from '../../services/noticeService';
 import type { Notice } from '../../types/notice';
 import NoticeFormModal from './NoticeFormModal';
-import { ListMeta, IconBtn, EmptyTable, DeleteModal } from '../Users/UsersList';
+import { ListMeta, IconBtn, EmptyTable, DeleteModal } from '../../components/luxury/ListHelpers';
 
 const ROLE_LABELS: Record<string, string> = {
     ADMIN: 'Administração',

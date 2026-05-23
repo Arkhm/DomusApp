@@ -136,10 +136,17 @@ export default function EventFormModal({ isOpen, onClose, onSuccess }: Props) {
     }, [isOpen]);
 
     // Derive form.eventDate from the 5 segments whenever any changes.
+    // Build a Date in **local time** (admin's timezone) and serialize to UTC ISO
+    // so the backend stores the actual moment, not a naive timestamp interpreted
+    // as UTC (which would shift the displayed hour for users in BRT/BRST).
     useEffect(() => {
         const dateOk = isValidBrDateParts(day, month, year);
         const timeOk = hour.length === 2 && minute.length === 2;
-        const iso = dateOk && timeOk ? `${year}-${month}-${day}T${hour}:${minute}` : '';
+        let iso = '';
+        if (dateOk && timeOk) {
+            const local = new Date(+year, +month - 1, +day, +hour, +minute, 0, 0);
+            iso = local.toISOString();
+        }
         setForm((prev) => (prev.eventDate === iso ? prev : { ...prev, eventDate: iso }));
     }, [day, month, year, hour, minute]);
 
@@ -172,10 +179,20 @@ export default function EventFormModal({ isOpen, onClose, onSuccess }: Props) {
     // Inline calendar error — only shown when all 3 date parts are complete
     // but produce an impossible date (31/02, 29/02 não-bissexto, 31/04, …).
     const dateComplete = day.length === 2 && month.length === 2 && year.length === 4;
-    const dateError =
-        dateComplete && !isValidBrDateParts(day, month, year)
-            ? 'Data inexistente no calendário (verifique os dias do mês).'
-            : '';
+    const dateError = (() => {
+        if (!dateComplete) return '';
+        if (!isValidBrDateParts(day, month, year)) {
+            return 'Data inexistente no calendário (verifique os dias do mês).';
+        }
+        // If the time is also set, reject moments in the past — events should be future.
+        if (hour.length === 2 && minute.length === 2) {
+            const candidate = new Date(+year, +month - 1, +day, +hour, +minute, 0, 0);
+            if (candidate.getTime() <= Date.now()) {
+                return 'A data do evento deve ser futura.';
+            }
+        }
+        return '';
+    })();
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();

@@ -67,7 +67,7 @@ export default function Dashboard() {
                 units: unitsCount,
                 notices: notices.length,
             });
-            setRecentNotices(notices.slice(0, 4));
+            setRecentNotices(notices.slice(0, 3)); // spec pede "últimos 3"
             setUpcomingEvents(
                 events
                     .filter((e) => new Date(e.eventDate) > new Date())
@@ -568,7 +568,7 @@ function NoticeRow({ notice, last }: { notice: Notice; last: boolean }) {
                         className="tracking-luxe"
                         style={{ fontSize: 9, color: 'var(--color-bone-muted)' }}
                     >
-                        {notice.author.name.split(' ').slice(0, 2).join(' ')}
+                        {notice.author?.name?.split(' ').slice(0, 2).join(' ') || '—'}
                     </span>
                     <span
                         style={{

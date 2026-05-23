@@ -13,12 +13,16 @@ export const unitService = {
       throw new Error('Tipo de unidade inválido. Use APARTMENT ou HOUSE.');
     }
 
+    // Duplicata é escopada por tipo: um apartamento "A · 101" não conflita com
+    // uma casa "A · 101" — são tipologias distintas em condomínios mistos.
     const existingUnit = await unitRepository.findByBlockAndNumber(
       data.block || null,
       data.number,
+      type,
     );
     if (existingUnit) {
-      throw new Error('Já existe uma unidade cadastrada com este bloco e número.');
+      const label = type === 'HOUSE' ? 'casa' : 'apartamento';
+      throw new Error(`Já existe um(a) ${label} com este bloco/quadra e número.`);
     }
 
     return await unitRepository.create({

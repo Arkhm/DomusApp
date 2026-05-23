@@ -21,9 +21,9 @@ export const unitRepository = {
     });
   },
 
-  findByBlockAndNumber: async (block: string | null, number: string) => {
+  findByBlockAndNumber: async (block: string | null, number: string, type?: string) => {
     return await prisma.unit.findFirst({
-      where: { block, number }
+      where: { block, number, ...(type ? { type } : {}) }
     });
   },
 

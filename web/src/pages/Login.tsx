@@ -9,7 +9,6 @@ import aerial from '../assets/aerial-residence.webp';
 export default function Login() {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
-    const [condominium, setCondominium] = useState('');
     const [showPassword, setShowPassword] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
     const [emailFocus, setEmailFocus] = useState(false);
@@ -253,8 +252,6 @@ export default function Login() {
                             }
                         />
 
-                        <CondominiumSelect value={condominium} onChange={setCondominium} />
-
                         <button
                             type="submit"
                             disabled={isLoading}
@@ -429,58 +426,7 @@ function FloatingField({
     );
 }
 
-function CondominiumSelect({ value, onChange }: { value: string; onChange: (v: string) => void }) {
-    const opts = [
-        { v: 'setorA', label: 'Domus Residence — Setor Norte' },
-        { v: 'setorB', label: 'Domus Residence — Setor Sul' },
-        { v: 'setorC', label: 'Domus Residence — Setor Central' },
-    ];
-    const filled = !!value;
-    return (
-        <div style={{ position: 'relative', paddingTop: 6 }}>
-            <label
-                style={{
-                    position: 'absolute',
-                    left: 0,
-                    top: 0,
-                    fontSize: 10,
-                    fontFamily: 'var(--font-sans)',
-                    letterSpacing: '0.16em',
-                    textTransform: 'uppercase',
-                    color: filled ? '#B8941F' : '#5A5160',
-                    fontWeight: 500,
-                    pointerEvents: 'none',
-                }}
-            >
-                Condomínio
-            </label>
-            <select
-                value={value}
-                onChange={(e) => onChange(e.target.value)}
-                style={{
-                    width: '100%',
-                    padding: '12px 0 10px',
-                    background: 'transparent',
-                    border: 'none',
-                    borderBottom: '1px solid #D8CDB6',
-                    outline: 'none',
-                    fontSize: 15,
-                    color: filled ? '#181020' : '#8C8395',
-                    fontFamily: 'var(--font-sans)',
-                    appearance: 'none',
-                    backgroundImage: `url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%23B8941F' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'><polyline points='6 9 12 15 18 9'/></svg>")`,
-                    backgroundRepeat: 'no-repeat',
-                    backgroundPosition: 'right center',
-                    cursor: 'pointer',
-                }}
-            >
-                <option value="">Escolha um condomínio</option>
-                {opts.map((o) => (
-                    <option key={o.v} value={o.v}>
-                        {o.label}
-                    </option>
-                ))}
-            </select>
-        </div>
-    );
-}
+// CondominiumSelect removido: era um dropdown de demo que coletava um valor
+// (`condominium`) nunca enviado para a API — dead code que confundia o fluxo.
+// Quando virar multi-tenant de verdade, deve ser reintroduzido conectado ao
+// backend e ao token JWT, não como input solto no login.
