@@ -97,7 +97,7 @@ export default function EventsList() {
                         >
                             Calendário{' '}
                             <span className="serif-it" style={{ color: 'var(--color-metal-1)' }}>
-                                do edifício
+                                do condomínio
                             </span>
                         </h2>
                         <p

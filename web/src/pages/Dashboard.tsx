@@ -184,7 +184,7 @@ export default function Dashboard() {
                                     marginBottom: 32,
                                 }}
                             >
-                                Tudo em ordem no edifício esta manhã.
+                                Tudo em ordem no condomínio hoje.
                             </p>
 
                             <p

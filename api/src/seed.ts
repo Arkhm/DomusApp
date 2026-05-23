@@ -15,7 +15,7 @@ async function seed() {
         data: { type: 'APARTMENT', block: 'Bloco B', number: '202' }
     });
 
-    // Algumas casas para demonstrar o modelo misto (Quadra + Casa)
+    // Algumas casas para demonstrar o modelo misto (Quadra + Lote)
     await prisma.unit.create({
         data: { type: 'HOUSE', block: 'Quadra 1', number: '12' }
     });

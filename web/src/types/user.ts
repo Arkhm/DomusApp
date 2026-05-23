@@ -66,7 +66,7 @@ export const UNIT_TYPE_LABELS: Record<UnitType, string> = {
 /**
  * Rótulos dos campos exibidos no formulário e no card, baseados no tipo:
  * - APARTMENT: "Bloco" + "Número" (ex: "Bloco A · 101")
- * - HOUSE: "Quadra" + "Casa" (ex: "Quadra 1 · Casa 12")
+ * - HOUSE: "Quadra" + "Lote" (ex: "Quadra 1 · Lote 12") — padrão de condomínio horizontal
  */
 export const UNIT_FIELD_LABELS: Record<
     UnitType,
@@ -80,9 +80,9 @@ export const UNIT_FIELD_LABELS: Record<
     },
     HOUSE: {
         block: 'Quadra',
-        number: 'Casa',
+        number: 'Lote',
         eyebrow: 'Quadra',
-        numberPrefix: 'Casa ',
+        numberPrefix: 'Lote ',
     },
 };
 
@@ -91,7 +91,7 @@ export function formatUnitDisplay(unit: Unit | null | undefined): string {
     if (!unit) return '—';
     const type: UnitType = unit.type || 'APARTMENT';
     if (type === 'HOUSE') {
-        return unit.block ? `${unit.block} · Casa ${unit.number}` : `Casa ${unit.number}`;
+        return unit.block ? `${unit.block} · Lote ${unit.number}` : `Lote ${unit.number}`;
     }
     return unit.block ? `${unit.block} · ${unit.number}` : unit.number;
 }

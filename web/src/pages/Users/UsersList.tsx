@@ -339,7 +339,7 @@ export default function UsersList() {
                                                         style={{ fontSize: 16, color: 'var(--color-bone)' }}
                                                     >
                                                         {u.unit.type === 'HOUSE'
-                                                            ? `Casa ${u.unit.number}`
+                                                            ? `Lote ${u.unit.number}`
                                                             : u.unit.number}
                                                     </span>
                                                     {u.unit.block && (

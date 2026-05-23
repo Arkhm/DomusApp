@@ -272,6 +272,7 @@ export default function UnitsList() {
                                 : unitType === 'HOUSE'
                                   ? 'Sem quadra'
                                   : 'Sem bloco';
+                            // Casas exibem "Lote N"; apartamentos só o número.
                             const numberDisplay =
                                 unitType === 'HOUSE' ? `${labels.numberPrefix}${u.number}` : u.number;
                             return (
@@ -443,7 +444,7 @@ export default function UnitsList() {
                             Tem certeza que deseja remover{' '}
                             <strong style={{ color: 'var(--color-bone)' }}>
                                 {deletingUnit.type === 'HOUSE'
-                                    ? `${deletingUnit.block ? `${deletingUnit.block} · ` : ''}Casa ${deletingUnit.number}`
+                                    ? `${deletingUnit.block ? `${deletingUnit.block} · ` : ''}Lote ${deletingUnit.number}`
                                     : `${deletingUnit.block ? `${deletingUnit.block} · ` : ''}${deletingUnit.number}`}
                             </strong>
                             ? Verifique se há moradores vinculados antes de prosseguir.

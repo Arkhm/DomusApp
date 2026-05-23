@@ -125,7 +125,7 @@ export default function UnitFormModal({ isOpen, onClose, onSuccess }: UnitFormMo
                                         active={type === 'HOUSE'}
                                         icon={<Home size={16} />}
                                         label="Casa"
-                                        helper="Quadra · Casa"
+                                        helper="Quadra · Lote"
                                         onClick={() => setType('HOUSE')}
                                     />
                                 </div>
