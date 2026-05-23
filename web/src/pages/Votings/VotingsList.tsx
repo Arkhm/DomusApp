@@ -14,7 +14,7 @@ import {
     type VotingStatus,
 } from '../../types/voting';
 import VotingFormModal from './VotingFormModal';
-import { ListMeta, IconBtn, EmptyTable, DeleteModal, FilterSelect } from '../Users/UsersList';
+import { ListMeta, IconBtn, EmptyTable, DeleteModal, FilterSelect } from '../../components/luxury/ListHelpers';
 
 export default function VotingsList() {
     const [votings, setVotings] = useState<Voting[]>([]);

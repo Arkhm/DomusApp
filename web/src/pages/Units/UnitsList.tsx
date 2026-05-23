@@ -15,7 +15,7 @@ import {
     IconBtn,
     EmptyTable,
     DeleteModal,
-} from '../Users/UsersList';
+} from '../../components/luxury/ListHelpers';
 
 export default function UnitsList() {
     const [units, setUnits] = useState<Unit[]>([]);
@@ -61,7 +61,12 @@ export default function UnitsList() {
     }, [units, searchQuery, selectedBlock]);
 
     const stats = useMemo(() => {
-        const occupied = users.filter((r) => r.unit).length;
+        // Conta unidades ÚNICAS habitadas (não usuários — uma unidade com 3
+        // moradores ainda é 1 unidade ocupada). Sem o Set, a ocupação inflaria
+        // sempre que mais de um morador estivesse vinculado à mesma unidade.
+        const occupied = new Set(
+            users.filter((u) => u.unitId).map((u) => u.unitId as string),
+        ).size;
         const apartments = units.filter((u) => (u.type || 'APARTMENT') === 'APARTMENT').length;
         const houses = units.filter((u) => u.type === 'HOUSE').length;
         return {

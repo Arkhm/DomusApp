@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { motion } from 'motion/react';
-import { Plus, Trash2, Loader2, MapPin, Edit3 } from 'lucide-react';
+import { Plus, Trash2, Loader2, MapPin } from 'lucide-react';
 import toast from 'react-hot-toast';
 import Header from '../../components/layout/Header';
 import PageBody from '../../components/luxury/PageBody';
@@ -9,7 +9,7 @@ import { getInitials } from '../../components/luxury/formatters';
 import { eventService } from '../../services/eventService';
 import type { Event as EventItem } from '../../types/event';
 import EventFormModal from './EventFormModal';
-import { ListMeta, IconBtn, EmptyTable, DeleteModal } from '../Users/UsersList';
+import { ListMeta, IconBtn, EmptyTable, DeleteModal } from '../../components/luxury/ListHelpers';
 
 export default function EventsList() {
     const [events, setEvents] = useState<EventItem[]>([]);
@@ -334,11 +334,12 @@ function FeaturedEvent({ event, onDelete }: { event: EventItem; onDelete: () => 
                     </p>
 
                     <div style={{ display: 'flex', alignItems: 'center', gap: 20, flexWrap: 'wrap' }}>
-                        <button className="btn-gold">
-                            <Edit3 size={12} />
-                            Editar evento
-                        </button>
-                        <button className="btn-ghost">Ver confirmações</button>
+                        {/*
+                          Botões "Editar evento" / "Ver confirmações" foram removidos:
+                          - Editar não tem endpoint PUT /events ainda (Sprint 3.5).
+                          - Confirmações de presença são feature do morador (Sprint 9+).
+                          Quando esses fluxos existirem, reintroduzir como botões com onClick real.
+                        */}
                         <div
                             style={{
                                 marginLeft: 'auto',
@@ -348,13 +349,13 @@ function FeaturedEvent({ event, onDelete }: { event: EventItem; onDelete: () => 
                             }}
                         >
                             <div className="avatar" style={{ width: 24, height: 24, fontSize: 10 }}>
-                                {getInitials(event.author.name)}
+                                {getInitials(event.author?.name)}
                             </div>
                             <span
                                 className="tracking-luxe"
                                 style={{ fontSize: 9, color: 'var(--color-bone-muted)' }}
                             >
-                                Publicado por {event.author.name.split(' ')[0]}
+                                Publicado por {event.author?.name?.split(' ')[0] || '—'}
                             </span>
                             <IconBtn
                                 icon={<Trash2 size={14} />}
