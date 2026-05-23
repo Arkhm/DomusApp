@@ -44,7 +44,15 @@ export default function VotingsList() {
         load();
     }, [load]);
 
-    const now = useMemo(() => new Date(), [votings]);
+    // `now` precisa atualizar com o relógio real — não basta recalcular no
+    // fetch. Sem o tick, uma votação que encerra entre dois fetches continua
+    // marcada como Ativa até o próximo reload. Refresh a cada 60s é
+    // suficiente pra ACTIVE/CLOSED virar sem custo perceptível.
+    const [now, setNow] = useState<Date>(() => new Date());
+    useEffect(() => {
+        const t = setInterval(() => setNow(new Date()), 60_000);
+        return () => clearInterval(t);
+    }, []);
 
     const enriched = useMemo(
         () => votings.map((v) => ({ voting: v, status: getVotingStatus(v, now), total: totalVotes(v) })),
@@ -114,7 +122,7 @@ export default function VotingsList() {
                             }}
                         >
                             Deliberações{' '}
-                            <span className="serif-it" style={{ color: 'var(--color-metal-1)' }}>
+                            <span className="serif-it brand-mark" style={{ color: 'var(--color-metal-1)' }}>
                                 em curso
                             </span>
                         </h2>

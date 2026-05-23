@@ -1,9 +1,9 @@
 import { useState, useEffect, useRef, type KeyboardEvent, type RefObject } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
-import { X, Loader2, Vote, Plus, Trash2 } from 'lucide-react';
+import { Vote, Plus, Trash2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { votingService } from '../../services/votingService';
 import type { VotingFormData } from '../../types/voting';
+import LuxuryModal, { LuxuryModalFooter } from '../../components/luxury/LuxuryModal';
 
 // ---- Date/time helpers (24h, DD/MM/AAAA, per-field) ------------------------
 // Mirrored from EventFormModal: 5 independent segments (DD / MM / AAAA - HH : MM)
@@ -86,7 +86,12 @@ interface DateState {
 function buildIso(s: DateState): string {
     const dateOk = isValidBrDateParts(s.day, s.month, s.year);
     const timeOk = s.hour.length === 2 && s.minute.length === 2;
-    return dateOk && timeOk ? `${s.year}-${s.month}-${s.day}T${s.hour}:${s.minute}` : '';
+    if (!dateOk || !timeOk) return '';
+    // Construir Date em hora LOCAL e serializar como UTC ISO — mesmo padrão do
+    // EventFormModal. Antes era string ISO naïve (sem TZ) que o backend
+    // interpretava como UTC, deslocando a hora exibida em BRT.
+    const local = new Date(+s.year, +s.month - 1, +s.day, +s.hour, +s.minute, 0, 0);
+    return local.toISOString();
 }
 
 interface Props {
@@ -240,49 +245,17 @@ export default function VotingFormModal({ isOpen, onClose, onSuccess }: Props) {
     };
 
     return (
-        <AnimatePresence>
-            {isOpen && (
-                <motion.div
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    exit={{ opacity: 0 }}
-                    className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
-                    onClick={() => !isSubmitting && onClose()}
-                >
-                    <motion.div
-                        initial={{ scale: 0.9, opacity: 0 }}
-                        animate={{ scale: 1, opacity: 1 }}
-                        exit={{ scale: 0.9, opacity: 0 }}
-                        transition={{ type: 'spring', duration: 0.3 }}
-                        onClick={(e) => e.stopPropagation()}
-                        className="bg-bg-card border border-border-primary rounded-2xl w-full max-w-xl shadow-2xl max-h-[92vh] overflow-y-auto"
-                    >
-                        {/* Header */}
-                        <div className="flex items-center justify-between p-6 pb-0">
-                            <div className="flex items-center gap-3">
-                                <div className="w-10 h-10 rounded-xl bg-accent-primary/10 flex items-center justify-center">
-                                    <Vote className="w-5 h-5 text-accent-primary" />
-                                </div>
-                                <div>
-                                    <h2 className="text-lg font-semibold text-text-primary">
-                                        Nova Votação
-                                    </h2>
-                                    <p className="text-sm text-text-muted">
-                                        Submeta uma deliberação à comunidade
-                                    </p>
-                                </div>
-                            </div>
-                            <button
-                                onClick={onClose}
-                                disabled={isSubmitting}
-                                className="p-2 rounded-lg text-text-muted hover:text-text-primary hover:bg-bg-hover transition-colors"
-                            >
-                                <X className="w-5 h-5" />
-                            </button>
-                        </div>
-
+        <LuxuryModal
+            open={isOpen}
+            onClose={onClose}
+            busy={isSubmitting}
+            icon={<Vote size={18} strokeWidth={1.4} />}
+            title="Nova Votação"
+            subtitle="Submeta uma deliberação à comunidade"
+            size="xl"
+        >
                         {/* Form */}
-                        <form onSubmit={handleSubmit} className="p-6 space-y-5">
+                        <form onSubmit={handleSubmit} style={{ padding: '24px 28px 28px', display: 'flex', flexDirection: 'column', gap: 18 }}>
                             {/* Título */}
                             <div>
                                 <label className="block text-sm font-medium text-text-secondary mb-1.5">
@@ -413,36 +386,14 @@ export default function VotingFormModal({ isOpen, onClose, onSuccess }: Props) {
                                 <p className="text-[11px] text-error -mt-2">{rangeError}</p>
                             )}
 
-                            {/* Actions */}
-                            <div className="flex items-center justify-end gap-3 pt-2">
-                                <button
-                                    type="button"
-                                    onClick={onClose}
-                                    disabled={isSubmitting}
-                                    className="px-5 py-2.5 text-sm font-medium text-text-secondary hover:text-text-primary border border-border-primary rounded-xl hover:bg-bg-hover transition-colors"
-                                >
-                                    Cancelar
-                                </button>
-                                <button
-                                    type="submit"
-                                    disabled={isSubmitting}
-                                    className="px-5 py-2.5 text-sm font-medium text-white bg-gradient-to-r from-accent-gradient-start to-accent-gradient-end rounded-xl hover:shadow-lg hover:shadow-accent-primary/20 transition-all disabled:opacity-60 flex items-center gap-2"
-                                >
-                                    {isSubmitting ? (
-                                        <>
-                                            <Loader2 className="w-4 h-4 animate-spin" />
-                                            Criando...
-                                        </>
-                                    ) : (
-                                        'Criar Votação'
-                                    )}
-                                </button>
-                            </div>
+                            <LuxuryModalFooter
+                                onCancel={onClose}
+                                submitLabel="Criar votação"
+                                loadingLabel="Criando…"
+                                isSubmitting={isSubmitting}
+                            />
                         </form>
-                    </motion.div>
-                </motion.div>
-            )}
-        </AnimatePresence>
+        </LuxuryModal>
     );
 }
 

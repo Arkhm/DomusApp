@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react';
-import { AnimatePresence, motion } from 'motion/react';
-import { Building2, Home, Loader2, X } from 'lucide-react';
+import { Building2, Home } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { unitService } from '../../services/unitService';
 import { UNIT_FIELD_LABELS, type UnitType } from '../../types/user';
+import LuxuryModal, { LuxuryModalFooter } from '../../components/luxury/LuxuryModal';
 
 interface UnitFormModalProps {
     isOpen: boolean;
@@ -58,138 +58,90 @@ export default function UnitFormModal({ isOpen, onClose, onSuccess }: UnitFormMo
     };
 
     return (
-        <AnimatePresence>
-            {isOpen && (
-                <motion.div
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    exit={{ opacity: 0 }}
-                    className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
-                    onClick={() => !isSubmitting && onClose()}
-                >
-                    <motion.div
-                        initial={{ scale: 0.95, opacity: 0, y: 10 }}
-                        animate={{ scale: 1, opacity: 1, y: 0 }}
-                        exit={{ scale: 0.95, opacity: 0, y: 10 }}
-                        transition={{ type: 'spring', duration: 0.3 }}
-                        onClick={(e) => e.stopPropagation()}
-                        className="w-full max-w-md bg-bg-card border border-border-primary rounded-2xl shadow-2xl overflow-hidden"
-                    >
-                        <div className="flex items-center justify-between px-6 py-4 border-b border-border-primary">
-                            <div className="flex items-center gap-3">
-                                <div className="w-10 h-10 rounded-xl bg-accent-primary/10 text-accent-primary flex items-center justify-center">
-                                    {type === 'HOUSE' ? <Home className="w-5 h-5" /> : <Building2 className="w-5 h-5" />}
-                                </div>
-                                <div>
-                                    <h2 className="text-lg font-semibold text-text-primary">
-                                        {type === 'HOUSE' ? 'Nova Casa' : 'Novo Apartamento'}
-                                    </h2>
-                                    <p className="text-sm text-text-muted">
-                                        Cadastre uma unidade do condomínio
-                                    </p>
-                                </div>
-                            </div>
+        <LuxuryModal
+            open={isOpen}
+            onClose={onClose}
+            busy={isSubmitting}
+            icon={type === 'HOUSE' ? <Home size={18} strokeWidth={1.4} /> : <Building2 size={18} strokeWidth={1.4} />}
+            title={type === 'HOUSE' ? 'Nova Casa' : 'Novo Apartamento'}
+            subtitle="Cadastre uma unidade do condomínio"
+            size="md"
+        >
+            <form onSubmit={handleSubmit} style={{ padding: '24px 28px 28px', display: 'flex', flexDirection: 'column', gap: 20 }}>
+                {/* Type toggle */}
+                <Field label="Tipo de unidade">
+                    <div role="radiogroup" aria-label="Tipo de unidade" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                        <TypeOption
+                            active={type === 'APARTMENT'}
+                            icon={<Building2 size={16} />}
+                            label="Apartamento"
+                            helper="Bloco · Número"
+                            onClick={() => setType('APARTMENT')}
+                        />
+                        <TypeOption
+                            active={type === 'HOUSE'}
+                            icon={<Home size={16} />}
+                            label="Casa"
+                            helper="Quadra · Lote"
+                            onClick={() => setType('HOUSE')}
+                        />
+                    </div>
+                </Field>
 
-                            <button
-                                onClick={onClose}
-                                disabled={isSubmitting}
-                                className="p-2 rounded-lg text-text-muted hover:text-text-primary hover:bg-bg-hover transition-colors"
-                            >
-                                <X className="w-5 h-5" />
-                            </button>
-                        </div>
+                <Field label={`${labels.block}`} optional>
+                    <input
+                        type="text"
+                        value={block}
+                        onChange={(e) => setBlock(e.target.value)}
+                        placeholder={type === 'HOUSE' ? 'Ex: Quadra 1' : 'Ex: A'}
+                        maxLength={24}
+                        className="luxe-input"
+                    />
+                </Field>
 
-                        <form onSubmit={handleSubmit} className="p-6 space-y-5">
-                            {/* Type toggle */}
-                            <div>
-                                <label className="block text-sm font-medium text-text-secondary mb-2">
-                                    Tipo de unidade
-                                </label>
-                                <div
-                                    role="radiogroup"
-                                    aria-label="Tipo de unidade"
-                                    style={{
-                                        display: 'grid',
-                                        gridTemplateColumns: '1fr 1fr',
-                                        gap: 8,
-                                    }}
-                                >
-                                    <TypeOption
-                                        active={type === 'APARTMENT'}
-                                        icon={<Building2 size={16} />}
-                                        label="Apartamento"
-                                        helper="Bloco · Número"
-                                        onClick={() => setType('APARTMENT')}
-                                    />
-                                    <TypeOption
-                                        active={type === 'HOUSE'}
-                                        icon={<Home size={16} />}
-                                        label="Casa"
-                                        helper="Quadra · Lote"
-                                        onClick={() => setType('HOUSE')}
-                                    />
-                                </div>
-                            </div>
+                <Field label={labels.number}>
+                    <input
+                        type="text"
+                        value={number}
+                        onChange={(e) => setNumber(e.target.value)}
+                        placeholder={type === 'HOUSE' ? 'Ex: 12' : 'Ex: 101'}
+                        maxLength={12}
+                        className="luxe-input"
+                    />
+                </Field>
 
-                            <div>
-                                <label className="block text-sm font-medium text-text-secondary mb-2">
-                                    {labels.block}{' '}
-                                    <span className="text-text-muted text-xs font-normal">(opcional)</span>
-                                </label>
-                                <input
-                                    type="text"
-                                    value={block}
-                                    onChange={(e) => setBlock(e.target.value)}
-                                    placeholder={type === 'HOUSE' ? 'Ex: Quadra 1' : 'Ex: A'}
-                                    maxLength={24}
-                                    className="w-full px-4 py-3 bg-bg-input border border-border-primary rounded-xl text-text-primary placeholder-text-muted focus:border-accent-primary focus:outline-none transition-colors"
-                                />
-                            </div>
+                <LuxuryModalFooter
+                    onCancel={onClose}
+                    submitLabel="Cadastrar"
+                    loadingLabel="Salvando…"
+                    isSubmitting={isSubmitting}
+                />
+            </form>
+        </LuxuryModal>
+    );
+}
 
-                            <div>
-                                <label className="block text-sm font-medium text-text-secondary mb-2">
-                                    {labels.number}
-                                </label>
-                                <input
-                                    type="text"
-                                    value={number}
-                                    onChange={(e) => setNumber(e.target.value)}
-                                    placeholder={type === 'HOUSE' ? 'Ex: 12' : 'Ex: 101'}
-                                    maxLength={12}
-                                    className="w-full px-4 py-3 bg-bg-input border border-border-primary rounded-xl text-text-primary placeholder-text-muted focus:border-accent-primary focus:outline-none transition-colors"
-                                />
-                            </div>
-
-                            <div className="flex items-center justify-end gap-3 pt-2">
-                                <button
-                                    type="button"
-                                    onClick={onClose}
-                                    disabled={isSubmitting}
-                                    className="btn-ghost"
-                                >
-                                    Cancelar
-                                </button>
-
-                                <button
-                                    type="submit"
-                                    disabled={isSubmitting}
-                                    className="btn-gold"
-                                >
-                                    {isSubmitting ? (
-                                        <>
-                                            <Loader2 className="w-4 h-4 animate-spin" />
-                                            Salvando…
-                                        </>
-                                    ) : (
-                                        'Cadastrar'
-                                    )}
-                                </button>
-                            </div>
-                        </form>
-                    </motion.div>
-                </motion.div>
-            )}
-        </AnimatePresence>
+function Field({ label, optional, children }: { label: string; optional?: boolean; children: React.ReactNode }) {
+    return (
+        <div>
+            <label
+                className="tracking-luxe"
+                style={{
+                    display: 'block',
+                    fontSize: 9,
+                    color: 'var(--color-bone-dim)',
+                    marginBottom: 8,
+                }}
+            >
+                {label}
+                {optional && (
+                    <span style={{ marginLeft: 8, color: 'var(--color-bone-muted)', letterSpacing: 0, textTransform: 'none' }}>
+                        (opcional)
+                    </span>
+                )}
+            </label>
+            {children}
+        </div>
     );
 }
 
@@ -242,10 +194,7 @@ function TypeOption({
                 {icon}
                 {label}
             </div>
-            <div
-                className="tracking-luxe"
-                style={{ fontSize: 8, color: 'var(--color-bone-muted)' }}
-            >
+            <div className="tracking-luxe" style={{ fontSize: 8, color: 'var(--color-bone-muted)' }}>
                 {helper}
             </div>
         </button>

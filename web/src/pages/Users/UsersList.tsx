@@ -375,11 +375,12 @@ export default function UsersList() {
                                                     justifyContent: 'flex-end',
                                                 }}
                                             >
-                                                <IconBtn icon={<Edit3 size={14} />} onClick={() => handleEdit(u)} />
+                                                <IconBtn icon={<Edit3 size={14} />} onClick={() => handleEdit(u)} title="Editar residente" />
                                                 <IconBtn
                                                     icon={<Trash2 size={14} />}
                                                     danger
                                                     onClick={() => setDeletingUser(u)}
+                                                    title="Excluir residente"
                                                 />
                                             </div>
                                         </td>

@@ -56,6 +56,23 @@ export function getInitials(name: string | null | undefined): string {
 }
 
 /**
+ * Rótulo único do papel de um usuário no condomínio.
+ * Regra: a função honorífica (isSyndic) tem precedência sobre o papel de
+ * sistema. Síndico > Administração > Equipe > Residente.
+ * Centralizado aqui pra Sidebar e Header não divergirem nos rótulos.
+ */
+export function roleLabel(user: {
+    role?: string | null;
+    isSyndic?: boolean | null;
+} | null | undefined): string {
+    if (!user) return 'Residente';
+    if (user.isSyndic) return 'Síndico';
+    if (user.role === 'ADMIN') return 'Administração';
+    if (user.role === 'FUNCIONARIO') return 'Equipe';
+    return 'Residente';
+}
+
+/**
  * Validate a Brazilian CPF using the official 2-digit checksum algorithm.
  * Accepts any input (masked or unmasked); strips non-digits before checking.
  */
