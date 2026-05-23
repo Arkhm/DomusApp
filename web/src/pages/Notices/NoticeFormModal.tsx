@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react';
-import { Megaphone, Users as UsersIcon, Send } from 'lucide-react';
+import { Megaphone, Users as UsersIcon, Send, FileText, CheckCircle2, Bell, AlertTriangle } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { noticeService } from '../../services/noticeService';
 import { unitService } from '../../services/unitService';
@@ -18,6 +18,8 @@ const emptyForm: NoticeFormData = {
     title: '',
     content: '',
     targetType: 'ALL',
+    status: 'PUBLISHED',
+    priority: 'NORMAL',
 };
 
 export default function NoticeFormModal({ isOpen, onClose, onSuccess }: NoticeFormModalProps) {
@@ -103,6 +105,44 @@ export default function NoticeFormModal({ isOpen, onClose, onSuccess }: NoticeFo
                         className="luxe-input"
                         style={{ minHeight: 200, resize: 'vertical', lineHeight: 1.6, padding: '12px 14px' }}
                     />
+                </Field>
+
+                <Field label="Status" required>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                        <TargetOption
+                            active={form.status === 'PUBLISHED'}
+                            icon={<CheckCircle2 size={16} />}
+                            label="Publicar agora"
+                            helper="Visível aos residentes"
+                            onClick={() => setForm((p) => ({ ...p, status: 'PUBLISHED' }))}
+                        />
+                        <TargetOption
+                            active={form.status === 'DRAFT'}
+                            icon={<FileText size={16} />}
+                            label="Salvar como rascunho"
+                            helper="Apenas administradores veem"
+                            onClick={() => setForm((p) => ({ ...p, status: 'DRAFT' }))}
+                        />
+                    </div>
+                </Field>
+
+                <Field label="Prioridade" required>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                        <TargetOption
+                            active={form.priority === 'NORMAL'}
+                            icon={<Bell size={16} />}
+                            label="Normal"
+                            helper="Comunicado padrão"
+                            onClick={() => setForm((p) => ({ ...p, priority: 'NORMAL' }))}
+                        />
+                        <TargetOption
+                            active={form.priority === 'URGENT'}
+                            icon={<AlertTriangle size={16} />}
+                            label="Urgente"
+                            helper="Destaque vermelho no card"
+                            onClick={() => setForm((p) => ({ ...p, priority: 'URGENT' }))}
+                        />
+                    </div>
                 </Field>
 
                 <Field label="Destinatário" required>

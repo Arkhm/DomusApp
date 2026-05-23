@@ -113,6 +113,8 @@ let mockNotices: Notice[] = [
         author: { name: 'Administrador DomusApp', role: 'ADMIN' },
         createdAt: '2026-04-10T14:30:00.000Z',
         updatedAt: '2026-04-10T14:30:00.000Z',
+        status: 'PUBLISHED',
+        priority: 'NORMAL',
     },
     {
         id: 'n2',
@@ -125,6 +127,8 @@ let mockNotices: Notice[] = [
         author: { name: 'Administrador DomusApp', role: 'ADMIN' },
         createdAt: '2026-04-08T09:00:00.000Z',
         updatedAt: '2026-04-08T09:00:00.000Z',
+        status: 'PUBLISHED',
+        priority: 'URGENT',
     },
     {
         id: 'n3',
@@ -137,6 +141,8 @@ let mockNotices: Notice[] = [
         author: { name: 'Administrador DomusApp', role: 'ADMIN' },
         createdAt: '2026-04-05T16:45:00.000Z',
         updatedAt: '2026-04-05T16:45:00.000Z',
+        status: 'PUBLISHED',
+        priority: 'NORMAL',
     },
     {
         id: 'n4',
@@ -149,6 +155,8 @@ let mockNotices: Notice[] = [
         author: { name: 'Administrador DomusApp', role: 'ADMIN' },
         createdAt: '2026-04-01T11:20:00.000Z',
         updatedAt: '2026-04-01T11:20:00.000Z',
+        status: 'PUBLISHED',
+        priority: 'NORMAL',
     },
 ];
 
@@ -302,6 +310,8 @@ export const mockNoticeService = {
             author: { name: 'Administrador DomusApp', role: 'ADMIN' },
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString(),
+            status: data.status || 'PUBLISHED',
+            priority: data.priority || 'NORMAL',
         };
 
         mockNotices = [newNotice, ...mockNotices];
@@ -313,5 +323,9 @@ export const mockNoticeService = {
         const index = mockNotices.findIndex((n) => n.id === id);
         if (index === -1) throw { response: { data: { error: 'Aviso não encontrado.' } } };
         mockNotices.splice(index, 1);
+    },
+
+    async markAsRead(_id: string): Promise<void> {
+        await delay(200);
     },
 };

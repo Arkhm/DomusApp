@@ -18,6 +18,10 @@ const realNoticeService = {
     async delete(id: string): Promise<void> {
         await api.delete(`/notices/${id}`);
     },
+
+    async markAsRead(id: string): Promise<void> {
+        await api.post(`/notices/${id}/read`);
+    },
 };
 
 export const noticeService = isMockMode ? mockNoticeService : realNoticeService;

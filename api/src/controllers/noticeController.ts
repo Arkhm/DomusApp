@@ -44,5 +44,16 @@ export const noticeController = {
     } catch (error: any) {
       res.status(400).json({ error: error.message });
     }
+  },
+
+  async markRead(req: AuthRequest, res: Response) {
+    try {
+      const id = req.params.id as string;
+      const userId = req.user?.id as string;
+      const result = await noticeService.markAsRead(id, userId);
+      res.status(200).json(result);
+    } catch (error: any) {
+      res.status(400).json({ error: error.message });
+    }
   }
 };

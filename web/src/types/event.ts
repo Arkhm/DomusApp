@@ -1,3 +1,11 @@
+export type EventStatus = 'DRAFT' | 'PUBLISHED' | 'CANCELLED';
+export type EventCategory =
+    | 'ASSEMBLEIA'
+    | 'CONFRATERNIZACAO'
+    | 'MANUTENCAO'
+    | 'REUNIAO'
+    | 'OUTRO';
+
 export interface Event {
     id: string;
     title: string;
@@ -11,6 +19,10 @@ export interface Event {
     author: { name: string; role: string };
     createdAt: string;
     updatedAt: string;
+
+    status: EventStatus;
+    category: EventCategory;
+    capacity: number | null;
 }
 
 export interface EventFormData {
@@ -20,4 +32,21 @@ export interface EventFormData {
     location?: string;
     targetType: 'ALL' | 'UNIT';
     targetUnitId?: string;
+    status?: EventStatus;
+    category?: EventCategory;
+    capacity?: number | null;
 }
+
+export const EVENT_STATUS_LABEL: Record<EventStatus, string> = {
+    DRAFT: 'Rascunho',
+    PUBLISHED: 'Publicado',
+    CANCELLED: 'Cancelado',
+};
+
+export const EVENT_CATEGORY_LABEL: Record<EventCategory, string> = {
+    ASSEMBLEIA: 'Assembleia',
+    CONFRATERNIZACAO: 'Confraternização',
+    MANUTENCAO: 'Manutenção',
+    REUNIAO: 'Reunião',
+    OUTRO: 'Outro',
+};

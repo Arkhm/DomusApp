@@ -17,6 +17,7 @@ export const eventRepository = {
 
   findForUser: async (unitId: string | null) => {
     const whereClause: any = {
+      status: { in: ['PUBLISHED', 'CANCELLED'] }, // morador não vê DRAFT
       OR: [
         { targetType: 'ALL' }
       ]

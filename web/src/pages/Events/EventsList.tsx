@@ -1,20 +1,38 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { motion } from 'motion/react';
-import { Plus, Trash2, Loader2, MapPin } from 'lucide-react';
+import { Plus, Trash2, Loader2, MapPin, Users } from 'lucide-react';
 import toast from 'react-hot-toast';
 import Header from '../../components/layout/Header';
 import PageBody from '../../components/luxury/PageBody';
 import Tag from '../../components/luxury/Tag';
 import { getInitials } from '../../components/luxury/formatters';
 import { eventService } from '../../services/eventService';
-import type { Event as EventItem } from '../../types/event';
+import { useAuth } from '../../contexts/AuthContext';
+import {
+    EVENT_CATEGORY_LABEL,
+    type Event as EventItem,
+    type EventCategory,
+    type EventStatus,
+} from '../../types/event';
 import EventFormModal from './EventFormModal';
-import { ListMeta, IconBtn, EmptyTable, DeleteModal } from '../../components/luxury/ListHelpers';
+import {
+    ListMeta,
+    IconBtn,
+    EmptyTable,
+    DeleteModal,
+    FilterSelect,
+} from '../../components/luxury/ListHelpers';
 
 export default function EventsList() {
+    const { user } = useAuth();
+    const isAdmin = user?.role === 'ADMIN';
+
     const [events, setEvents] = useState<EventItem[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [isModalOpen, setIsModalOpen] = useState(false);
+
+    const [filterStatus, setFilterStatus] = useState<EventStatus | ''>('');
+    const [filterCategory, setFilterCategory] = useState<EventCategory | ''>('');
 
     const [deletingEvent, setDeletingEvent] = useState<EventItem | null>(null);
     const [isDeleting, setIsDeleting] = useState(false);
@@ -35,11 +53,30 @@ export default function EventsList() {
         load();
     }, [load]);
 
+    const filtered = useMemo(() => {
+        return events.filter((e) => {
+            if (filterStatus && e.status !== filterStatus) return false;
+            if (filterCategory && e.category !== filterCategory) return false;
+            return true;
+        });
+    }, [events, filterStatus, filterCategory]);
+
     const sorted = useMemo(
-        () => events.slice().sort((a, b) => new Date(a.eventDate).getTime() - new Date(b.eventDate).getTime()),
-        [events],
+        () =>
+            filtered
+                .slice()
+                .sort((a, b) => new Date(a.eventDate).getTime() - new Date(b.eventDate).getTime()),
+        [filtered],
     );
-    const upcoming = useMemo(() => sorted.filter((e) => new Date(e.eventDate) > new Date()), [sorted]);
+
+    // "Próximo" só conta eventos publicados e futuros
+    const upcoming = useMemo(
+        () =>
+            sorted.filter(
+                (e) => e.status === 'PUBLISHED' && new Date(e.eventDate) > new Date(),
+            ),
+        [sorted],
+    );
 
     const handleDelete = async () => {
         if (!deletingEvent) return;
@@ -58,6 +95,7 @@ export default function EventsList() {
 
     const featured = upcoming[0];
     const rest = featured ? sorted.filter((e) => e.id !== featured.id) : sorted;
+    const isFiltering = !!filterStatus || !!filterCategory;
 
     return (
         <div>
@@ -111,15 +149,68 @@ export default function EventsList() {
                             Recitais, assembleias, soirées e encontros privativos curados para a comunidade Domus.
                         </p>
                     </div>
-                    <button onClick={() => setIsModalOpen(true)} className="btn-gold">
-                        <Plus size={12} />
-                        Novo evento
-                    </button>
+                    {isAdmin && (
+                        <button onClick={() => setIsModalOpen(true)} className="btn-gold">
+                            <Plus size={12} />
+                            Novo evento
+                        </button>
+                    )}
                 </div>
 
-                <ListMeta count={upcoming.length} singular="evento próximo" plural="eventos próximos" />
+                {/* Filtros */}
+                <div
+                    style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 12,
+                        marginBottom: 16,
+                        flexWrap: 'wrap',
+                    }}
+                >
+                    {isAdmin && (
+                        <FilterSelect
+                            value={filterStatus}
+                            onChange={(v) => setFilterStatus(v as EventStatus | '')}
+                            placeholder="Todos os status"
+                            options={[
+                                { value: 'PUBLISHED', label: 'Publicado' },
+                                { value: 'DRAFT', label: 'Rascunho' },
+                                { value: 'CANCELLED', label: 'Cancelado' },
+                            ]}
+                        />
+                    )}
+                    <FilterSelect
+                        value={filterCategory}
+                        onChange={(v) => setFilterCategory(v as EventCategory | '')}
+                        placeholder="Todas as categorias"
+                        options={(Object.keys(EVENT_CATEGORY_LABEL) as EventCategory[]).map((c) => ({
+                            value: c,
+                            label: EVENT_CATEGORY_LABEL[c],
+                        }))}
+                    />
+                    {isFiltering && (
+                        <button
+                            type="button"
+                            onClick={() => {
+                                setFilterStatus('');
+                                setFilterCategory('');
+                            }}
+                            className="btn-ghost"
+                            style={{ padding: '8px 14px' }}
+                        >
+                            Limpar filtros
+                        </button>
+                    )}
+                </div>
 
-                {/* Featured */}
+                <ListMeta
+                    count={isFiltering ? sorted.length : upcoming.length}
+                    singular={isFiltering ? 'evento' : 'evento próximo'}
+                    plural={isFiltering ? 'eventos' : 'eventos próximos'}
+                    filtered={isFiltering}
+                />
+
+                {/* Content */}
                 {isLoading ? (
                     <div
                         className="luxe-card"
@@ -135,16 +226,30 @@ export default function EventsList() {
                         <Loader2 size={18} className="animate-spin" />
                         <span>Carregando programação…</span>
                     </div>
-                ) : events.length === 0 ? (
+                ) : sorted.length === 0 ? (
                     <div className="luxe-card">
                         <EmptyTable
-                            title="Nenhum evento registrado"
-                            hint='Clique em "Novo evento" para criar o primeiro.'
+                            title={
+                                isFiltering ? 'Nenhum evento encontrado' : 'Nenhum evento registrado'
+                            }
+                            hint={
+                                isFiltering
+                                    ? 'Ajuste os filtros para ver mais resultados.'
+                                    : isAdmin
+                                      ? 'Clique em "Novo evento" para criar o primeiro.'
+                                      : 'Quando a administração publicar eventos, eles aparecerão aqui.'
+                            }
                         />
                     </div>
                 ) : (
                     <>
-                        {featured && <FeaturedEvent event={featured} onDelete={() => setDeletingEvent(featured)} />}
+                        {featured && (
+                            <FeaturedEvent
+                                event={featured}
+                                onDelete={() => setDeletingEvent(featured)}
+                                isAdmin={isAdmin}
+                            />
+                        )}
 
                         {rest.length > 0 && (
                             <>
@@ -171,6 +276,7 @@ export default function EventsList() {
                                             event={e}
                                             delay={i * 0.05}
                                             onDelete={() => setDeletingEvent(e)}
+                                            isAdmin={isAdmin}
                                         />
                                     ))}
                                 </div>
@@ -208,7 +314,36 @@ export default function EventsList() {
     );
 }
 
-function FeaturedEvent({ event, onDelete }: { event: EventItem; onDelete: () => void }) {
+function StatusTags({ event, isAdmin }: { event: EventItem; isAdmin: boolean }) {
+    const d = new Date(event.eventDate);
+    const upcoming = d > new Date();
+
+    if (event.status === 'CANCELLED') {
+        return (
+            <Tag tone="err" dot>
+                Cancelado
+            </Tag>
+        );
+    }
+    if (event.status === 'DRAFT' && isAdmin) {
+        return <Tag tone="neutral">Rascunho</Tag>;
+    }
+    return (
+        <Tag tone={upcoming ? 'ok' : 'neutral'} dot>
+            {upcoming ? 'Próximo' : 'Realizado'}
+        </Tag>
+    );
+}
+
+function FeaturedEvent({
+    event,
+    onDelete,
+    isAdmin,
+}: {
+    event: EventItem;
+    onDelete: () => void;
+    isAdmin: boolean;
+}) {
     const d = new Date(event.eventDate);
     return (
         <motion.article
@@ -285,12 +420,26 @@ function FeaturedEvent({ event, onDelete }: { event: EventItem; onDelete: () => 
                 </div>
 
                 <div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
+                    <div
+                        style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 8,
+                            marginBottom: 16,
+                            flexWrap: 'wrap',
+                        }}
+                    >
                         <Tag tone="gold" dot>
                             Em destaque
                         </Tag>
-                        {/* "Próximo evento" Tag removida — redundante: o card já é
-                            visualmente o evento em destaque, não precisa rotular duas vezes. */}
+                        <Tag tone="purple">{EVENT_CATEGORY_LABEL[event.category]}</Tag>
+                        {typeof event.capacity === 'number' && event.capacity > 0 && (
+                            <Tag tone="neutral">
+                                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                                    <Users size={10} /> {event.capacity} vagas
+                                </span>
+                            </Tag>
+                        )}
                     </div>
 
                     <h3
@@ -335,12 +484,6 @@ function FeaturedEvent({ event, onDelete }: { event: EventItem; onDelete: () => 
                     </p>
 
                     <div style={{ display: 'flex', alignItems: 'center', gap: 20, flexWrap: 'wrap' }}>
-                        {/*
-                          Botões "Editar evento" / "Ver confirmações" foram removidos:
-                          - Editar não tem endpoint PUT /events ainda (Sprint 3.5).
-                          - Confirmações de presença são feature do morador (Sprint 9+).
-                          Quando esses fluxos existirem, reintroduzir como botões com onClick real.
-                        */}
                         <div
                             style={{
                                 marginLeft: 'auto',
@@ -358,12 +501,14 @@ function FeaturedEvent({ event, onDelete }: { event: EventItem; onDelete: () => 
                             >
                                 Publicado por {event.author?.name?.split(' ')[0] || '—'}
                             </span>
-                            <IconBtn
-                                icon={<Trash2 size={14} />}
-                                danger
-                                onClick={onDelete}
-                                title="Excluir evento"
-                            />
+                            {isAdmin && (
+                                <IconBtn
+                                    icon={<Trash2 size={14} />}
+                                    danger
+                                    onClick={onDelete}
+                                    title="Excluir evento"
+                                />
+                            )}
                         </div>
                     </div>
                 </div>
@@ -376,13 +521,15 @@ function EventRow({
     event,
     delay,
     onDelete,
+    isAdmin,
 }: {
     event: EventItem;
     delay: number;
     onDelete: () => void;
+    isAdmin: boolean;
 }) {
     const d = new Date(event.eventDate);
-    const upcoming = d > new Date();
+    const dimmed = event.status !== 'PUBLISHED' || d <= new Date();
 
     return (
         <motion.article
@@ -390,12 +537,12 @@ function EventRow({
             initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay }}
-            style={{ padding: 28 }}
+            style={{ padding: 28, opacity: dimmed ? 0.78 : 1 }}
         >
             <div
                 style={{
                     display: 'grid',
-                    gridTemplateColumns: '72px 1fr 200px',
+                    gridTemplateColumns: '72px 1fr 240px',
                     gap: 28,
                     alignItems: 'center',
                 }}
@@ -407,7 +554,7 @@ function EventRow({
                         padding: '10px 6px',
                         textAlign: 'center',
                         background: 'color-mix(in srgb, var(--color-metal-1) 6%, transparent)',
-                        opacity: upcoming ? 1 : 0.6,
+                        opacity: dimmed ? 0.7 : 1,
                     }}
                 >
                     <div className="tracking-luxe" style={{ fontSize: 8, color: 'var(--color-metal-1)' }}>
@@ -497,20 +644,30 @@ function EventRow({
                 <div
                     style={{
                         display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'flex-end',
+                        flexDirection: 'column',
+                        alignItems: 'flex-end',
                         gap: 8,
                     }}
                 >
-                    <Tag tone={upcoming ? 'ok' : 'neutral'} dot>
-                        {upcoming ? 'Próximo' : 'Realizado'}
-                    </Tag>
-                    <IconBtn
-                        icon={<Trash2 size={14} />}
-                        danger
-                        onClick={onDelete}
-                        title="Excluir evento"
-                    />
+                    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                        <StatusTags event={event} isAdmin={isAdmin} />
+                        <Tag tone="purple">{EVENT_CATEGORY_LABEL[event.category]}</Tag>
+                    </div>
+                    {typeof event.capacity === 'number' && event.capacity > 0 && (
+                        <Tag tone="neutral">
+                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                                <Users size={10} /> {event.capacity} vagas
+                            </span>
+                        </Tag>
+                    )}
+                    {isAdmin && (
+                        <IconBtn
+                            icon={<Trash2 size={14} />}
+                            danger
+                            onClick={onDelete}
+                            title="Excluir evento"
+                        />
+                    )}
                 </div>
             </div>
         </motion.article>

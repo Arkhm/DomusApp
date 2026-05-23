@@ -1,15 +1,16 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { motion } from 'motion/react';
-import { Plus, Trash2, Loader2 } from 'lucide-react';
+import { Plus, Trash2, Loader2, CheckCheck } from 'lucide-react';
 import toast from 'react-hot-toast';
 import Header from '../../components/layout/Header';
 import PageBody from '../../components/luxury/PageBody';
 import Tag from '../../components/luxury/Tag';
 import { timeAgo, getInitials } from '../../components/luxury/formatters';
 import { noticeService } from '../../services/noticeService';
-import type { Notice } from '../../types/notice';
+import { useAuth } from '../../contexts/AuthContext';
+import type { Notice, NoticeStatus, NoticePriority } from '../../types/notice';
 import NoticeFormModal from './NoticeFormModal';
-import { ListMeta, IconBtn, EmptyTable, DeleteModal } from '../../components/luxury/ListHelpers';
+import { ListMeta, IconBtn, EmptyTable, DeleteModal, FilterSelect } from '../../components/luxury/ListHelpers';
 
 const ROLE_LABELS: Record<string, string> = {
     ADMIN: 'Administração',
@@ -18,12 +19,19 @@ const ROLE_LABELS: Record<string, string> = {
 };
 
 export default function NoticesList() {
+    const { user } = useAuth();
+    const isAdmin = user?.role === 'ADMIN';
+
     const [notices, setNotices] = useState<Notice[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [isModalOpen, setIsModalOpen] = useState(false);
 
+    const [filterStatus, setFilterStatus] = useState<NoticeStatus | ''>('');
+    const [filterPriority, setFilterPriority] = useState<NoticePriority | ''>('');
+
     const [deletingNotice, setDeletingNotice] = useState<Notice | null>(null);
     const [isDeleting, setIsDeleting] = useState(false);
+    const [markingId, setMarkingId] = useState<string | null>(null);
 
     const load = useCallback(async () => {
         setIsLoading(true);
@@ -41,6 +49,14 @@ export default function NoticesList() {
         load();
     }, [load]);
 
+    const filtered = useMemo(() => {
+        return notices.filter((n) => {
+            if (filterStatus && n.status !== filterStatus) return false;
+            if (filterPriority && n.priority !== filterPriority) return false;
+            return true;
+        });
+    }, [notices, filterStatus, filterPriority]);
+
     const handleDelete = async () => {
         if (!deletingNotice) return;
         setIsDeleting(true);
@@ -55,6 +71,23 @@ export default function NoticesList() {
             setIsDeleting(false);
         }
     };
+
+    const handleMarkRead = async (id: string) => {
+        setMarkingId(id);
+        // otimista: marca local imediatamente
+        setNotices((prev) => prev.map((n) => (n.id === id ? { ...n, isRead: true } : n)));
+        try {
+            await noticeService.markAsRead(id);
+        } catch (err: any) {
+            // reverte em caso de erro
+            setNotices((prev) => prev.map((n) => (n.id === id ? { ...n, isRead: false } : n)));
+            toast.error(err.response?.data?.error || 'Erro ao marcar como lido.');
+        } finally {
+            setMarkingId(null);
+        }
+    };
+
+    const isFiltering = !!filterStatus || !!filterPriority;
 
     return (
         <div>
@@ -109,16 +142,64 @@ export default function NoticesList() {
                             condomínio.
                         </p>
                     </div>
-                    <button onClick={() => setIsModalOpen(true)} className="btn-gold">
-                        <Plus size={12} />
-                        Novo comunicado
-                    </button>
+                    {isAdmin && (
+                        <button onClick={() => setIsModalOpen(true)} className="btn-gold">
+                            <Plus size={12} />
+                            Novo comunicado
+                        </button>
+                    )}
+                </div>
+
+                {/* Filtros */}
+                <div
+                    style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 12,
+                        marginBottom: 16,
+                        flexWrap: 'wrap',
+                    }}
+                >
+                    {isAdmin && (
+                        <FilterSelect
+                            value={filterStatus}
+                            onChange={(v) => setFilterStatus(v as NoticeStatus | '')}
+                            placeholder="Todos os status"
+                            options={[
+                                { value: 'PUBLISHED', label: 'Publicado' },
+                                { value: 'DRAFT', label: 'Rascunho' },
+                            ]}
+                        />
+                    )}
+                    <FilterSelect
+                        value={filterPriority}
+                        onChange={(v) => setFilterPriority(v as NoticePriority | '')}
+                        placeholder="Todas as prioridades"
+                        options={[
+                            { value: 'NORMAL', label: 'Normal' },
+                            { value: 'URGENT', label: 'Urgente' },
+                        ]}
+                    />
+                    {isFiltering && (
+                        <button
+                            type="button"
+                            onClick={() => {
+                                setFilterStatus('');
+                                setFilterPriority('');
+                            }}
+                            className="btn-ghost"
+                            style={{ padding: '8px 14px' }}
+                        >
+                            Limpar filtros
+                        </button>
+                    )}
                 </div>
 
                 <ListMeta
-                    count={notices.length}
-                    singular="comunicado publicado"
-                    plural="comunicados publicados"
+                    count={filtered.length}
+                    singular={isFiltering ? 'comunicado' : 'comunicado publicado'}
+                    plural={isFiltering ? 'comunicados' : 'comunicados publicados'}
+                    filtered={isFiltering}
                 />
 
                 {/* Content */}
@@ -137,17 +218,25 @@ export default function NoticesList() {
                         <Loader2 size={18} className="animate-spin" />
                         <span>Carregando comunicados…</span>
                     </div>
-                ) : notices.length === 0 ? (
+                ) : filtered.length === 0 ? (
                     <div className="luxe-card">
                         <EmptyTable
-                            title="Nenhum comunicado publicado"
-                            hint='Clique em "Novo comunicado" para enviar o primeiro aviso.'
+                            title={isFiltering ? 'Nenhum comunicado encontrado' : 'Nenhum comunicado publicado'}
+                            hint={
+                                isFiltering
+                                    ? 'Ajuste os filtros para ver mais resultados.'
+                                    : isAdmin
+                                      ? 'Clique em "Novo comunicado" para enviar o primeiro aviso.'
+                                      : 'Quando a administração publicar avisos, eles aparecerão aqui.'
+                            }
                         />
                     </div>
                 ) : (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-                        {notices.map((n, i) => {
+                        {filtered.map((n, i) => {
                             const d = new Date(n.createdAt);
+                            const isUrgent = n.priority === 'URGENT';
+                            const isDraft = n.status === 'DRAFT';
                             return (
                                 <motion.article
                                     key={n.id}
@@ -155,12 +244,16 @@ export default function NoticesList() {
                                     initial={{ opacity: 0, y: 12 }}
                                     animate={{ opacity: 1, y: 0 }}
                                     transition={{ delay: i * 0.05 }}
-                                    style={{ padding: 36 }}
+                                    style={{
+                                        padding: 36,
+                                        // Destaque visual sutil em rascunho (admin)
+                                        opacity: isDraft ? 0.78 : 1,
+                                    }}
                                 >
                                     <div
                                         style={{
                                             display: 'grid',
-                                            gridTemplateColumns: '92px 1fr 200px',
+                                            gridTemplateColumns: '92px 1fr 220px',
                                             gap: 32,
                                             alignItems: 'start',
                                         }}
@@ -183,9 +276,6 @@ export default function NoticesList() {
                                                 {d.toLocaleDateString('pt-BR', { month: 'short' }).replace('.', '')}
                                             </div>
                                             <div
-                                                // brand-mark: numeral 48px da data é o âncora editorial
-                                                // do "boletim". Sem serif, a grid 92px|1fr|200px perde
-                                                // o motivo de existir.
                                                 className="serif brand-mark"
                                                 style={{
                                                     fontSize: 48,
@@ -231,8 +321,6 @@ export default function NoticesList() {
                                                     fontSize: 14,
                                                     color: 'var(--color-bone-dim)',
                                                     lineHeight: 1.7,
-                                                    // Preserva quebras de linha digitadas no textarea.
-                                                    // Sem isso, todo o conteúdo virava parágrafo único.
                                                     whiteSpace: 'pre-wrap',
                                                 }}
                                             >
@@ -295,6 +383,24 @@ export default function NoticesList() {
                                                 >
                                                     {timeAgo(n.createdAt)}
                                                 </span>
+                                                {!isAdmin && !n.isRead && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => handleMarkRead(n.id)}
+                                                        disabled={markingId === n.id}
+                                                        className="btn-ghost"
+                                                        style={{
+                                                            padding: '6px 12px',
+                                                            display: 'inline-flex',
+                                                            alignItems: 'center',
+                                                            gap: 6,
+                                                            fontSize: 11,
+                                                        }}
+                                                    >
+                                                        <CheckCheck size={12} />
+                                                        {markingId === n.id ? 'Marcando…' : 'Marcar como lido'}
+                                                    </button>
+                                                )}
                                             </div>
                                         </div>
 
@@ -304,9 +410,20 @@ export default function NoticesList() {
                                                 display: 'flex',
                                                 flexDirection: 'column',
                                                 alignItems: 'flex-end',
-                                                gap: 16,
+                                                gap: 10,
                                             }}
                                         >
+                                            {!isAdmin && !n.isRead && (
+                                                <Tag tone="gold" dot>
+                                                    Novo
+                                                </Tag>
+                                            )}
+                                            {isDraft && isAdmin && <Tag tone="neutral">Rascunho</Tag>}
+                                            {isUrgent && (
+                                                <Tag tone="err" dot>
+                                                    Urgente
+                                                </Tag>
+                                            )}
                                             <Tag tone={n.targetType === 'ALL' ? 'gold' : 'purple'}>
                                                 {n.targetType === 'ALL'
                                                     ? 'Todos os residentes'
@@ -314,14 +431,28 @@ export default function NoticesList() {
                                                       ? `${n.targetUnit.block ? `${n.targetUnit.block} · ` : ''}${n.targetUnit.number}`
                                                       : 'Unidade específica'}
                                             </Tag>
-                                            <div style={{ display: 'flex', gap: 4 }}>
-                                                <IconBtn
-                                                    icon={<Trash2 size={14} />}
-                                                    danger
-                                                    onClick={() => setDeletingNotice(n)}
-                                                    title="Excluir comunicado"
-                                                />
-                                            </div>
+                                            {isAdmin && typeof n.readCount === 'number' && (
+                                                <div
+                                                    className="tracking-luxe"
+                                                    style={{
+                                                        fontSize: 9,
+                                                        color: 'var(--color-bone-muted)',
+                                                        textAlign: 'right',
+                                                    }}
+                                                >
+                                                    {n.readCount} de {n.totalAddressees ?? 0} leram
+                                                </div>
+                                            )}
+                                            {isAdmin && (
+                                                <div style={{ display: 'flex', gap: 4 }}>
+                                                    <IconBtn
+                                                        icon={<Trash2 size={14} />}
+                                                        danger
+                                                        onClick={() => setDeletingNotice(n)}
+                                                        title="Excluir comunicado"
+                                                    />
+                                                </div>
+                                            )}
                                         </div>
                                     </div>
                                 </motion.article>

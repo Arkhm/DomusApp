@@ -4,7 +4,13 @@ import { CalendarDays } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { eventService } from '../../services/eventService';
 import { unitService } from '../../services/unitService';
-import type { EventFormData } from '../../types/event';
+import {
+    EVENT_CATEGORY_LABEL,
+    EVENT_STATUS_LABEL,
+    type EventCategory,
+    type EventFormData,
+    type EventStatus,
+} from '../../types/event';
 import type { Unit } from '../../types/user';
 import { formatUnitDisplay } from '../../types/user';
 import LuxuryModal, { LuxuryModalFooter } from '../../components/luxury/LuxuryModal';
@@ -116,6 +122,9 @@ export default function EventFormModal({ isOpen, onClose, onSuccess }: Props) {
         location: '',
         targetType: 'ALL',
         targetUnitId: undefined,
+        category: 'OUTRO',
+        capacity: null,
+        status: 'PUBLISHED',
     });
 
     useEffect(() => {
@@ -127,6 +136,9 @@ export default function EventFormModal({ isOpen, onClose, onSuccess }: Props) {
                 location: '',
                 targetType: 'ALL',
                 targetUnitId: undefined,
+                category: 'OUTRO',
+                capacity: null,
+                status: 'PUBLISHED',
             });
             setDay('');
             setMonth('');
@@ -236,6 +248,9 @@ export default function EventFormModal({ isOpen, onClose, onSuccess }: Props) {
                 content: form.content.trim(),
                 eventDate: form.eventDate,
                 targetType: form.targetType,
+                category: form.category || 'OUTRO',
+                status: form.status || 'PUBLISHED',
+                capacity: form.capacity ?? null,
             };
 
             if (form.location?.trim()) {
@@ -413,6 +428,89 @@ export default function EventFormModal({ isOpen, onClose, onSuccess }: Props) {
                                     placeholder="Ex: Salão de festas"
                                     className="w-full px-4 py-2.5 rounded-xl bg-bg-secondary border border-border-primary text-text-primary placeholder-text-muted focus:outline-none focus:border-accent-primary focus:ring-1 focus:ring-accent-primary/30 text-sm transition-colors"
                                 />
+                            </div>
+
+                            {/* Categoria + Capacidade */}
+                            <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label className="block text-sm font-medium text-text-secondary mb-1.5">
+                                        Categoria
+                                    </label>
+                                    <select
+                                        name="category"
+                                        value={form.category || 'OUTRO'}
+                                        onChange={(e) =>
+                                            setForm((p) => ({ ...p, category: e.target.value as EventCategory }))
+                                        }
+                                        className="w-full px-4 py-2.5 rounded-xl bg-bg-secondary border border-border-primary text-text-primary focus:outline-none focus:border-accent-primary focus:ring-1 focus:ring-accent-primary/30 text-sm transition-colors"
+                                    >
+                                        {(Object.keys(EVENT_CATEGORY_LABEL) as EventCategory[]).map((c) => (
+                                            <option key={c} value={c}>
+                                                {EVENT_CATEGORY_LABEL[c]}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-text-secondary mb-1.5">
+                                        Capacidade <span className="text-text-muted">(opcional)</span>
+                                    </label>
+                                    <input
+                                        type="number"
+                                        name="capacity"
+                                        min={1}
+                                        value={form.capacity ?? ''}
+                                        onChange={(e) => {
+                                            const v = e.target.value;
+                                            setForm((p) => ({
+                                                ...p,
+                                                capacity: v === '' ? null : Math.max(1, Number(v)),
+                                            }));
+                                        }}
+                                        placeholder="Sem limite"
+                                        className="w-full px-4 py-2.5 rounded-xl bg-bg-secondary border border-border-primary text-text-primary placeholder-text-muted focus:outline-none focus:border-accent-primary focus:ring-1 focus:ring-accent-primary/30 text-sm transition-colors"
+                                    />
+                                </div>
+                            </div>
+
+                            {/* Status */}
+                            <div>
+                                <label className="block text-sm font-medium text-text-secondary mb-1.5">
+                                    Status
+                                </label>
+                                <div className="grid grid-cols-3 gap-2">
+                                    {(Object.keys(EVENT_STATUS_LABEL) as EventStatus[]).map((s) => {
+                                        const active = (form.status || 'PUBLISHED') === s;
+                                        return (
+                                            <button
+                                                key={s}
+                                                type="button"
+                                                onClick={() => setForm((p) => ({ ...p, status: s }))}
+                                                style={{
+                                                    padding: '10px 12px',
+                                                    fontSize: 12,
+                                                    background: active
+                                                        ? 'color-mix(in srgb, var(--color-metal-1) 8%, transparent)'
+                                                        : 'var(--color-ink-1)',
+                                                    border: `1px solid ${
+                                                        active
+                                                            ? 'var(--color-metal-1)'
+                                                            : 'var(--color-line-strong)'
+                                                    }`,
+                                                    color: active
+                                                        ? 'var(--color-metal-1)'
+                                                        : 'var(--color-bone)',
+                                                    borderRadius: 3,
+                                                    cursor: 'pointer',
+                                                    transition: 'all 0.2s ease',
+                                                    fontFamily: 'var(--font-sans)',
+                                                }}
+                                            >
+                                                {EVENT_STATUS_LABEL[s]}
+                                            </button>
+                                        );
+                                    })}
+                                </div>
                             </div>
 
                             {/* Público-alvo */}
