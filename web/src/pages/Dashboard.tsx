@@ -1,471 +1,870 @@
 import { useEffect, useMemo, useState } from 'react';
-import { motion } from 'motion/react';
-import {
-  Activity,
-  ArrowRight,
-  BellRing,
-  Building2,
-  CalendarDays,
-  CheckCircle2,
-  Clock3,
-  FileText,
-  Megaphone,
-  Shield,
-  TrendingUp,
-  UserCheck,
-  Users,
-  Vote,
-  TreePalm,
-} from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { Megaphone, CalendarDays, ArrowRight, MapPin } from 'lucide-react';
 import toast from 'react-hot-toast';
 import Header from '../components/layout/Header';
+import PageBody from '../components/luxury/PageBody';
+import SectionHeader from '../components/luxury/SectionHeader';
+import Tag from '../components/luxury/Tag';
 import { useAuth } from '../contexts/AuthContext';
 import { userService } from '../services/userService';
 import { noticeService } from '../services/noticeService';
 import { unitService } from '../services/unitService';
+import { eventService } from '../services/eventService';
 import type { Notice } from '../types/notice';
+import type { Event as EventItem } from '../types/event';
 import type { User } from '../types/user';
+import { timeAgo } from '../components/luxury/formatters';
 
 interface DashboardStats {
-  totalUsers: number;
-  activeUsers: number;
-  adminUsers: number;
-  residents: number;
-  employees: number;
-  units: number;
-  notices: number;
+    totalUsers: number;
+    activeUsers: number;
+    adminUsers: number;
+    residents: number;
+    employees: number;
+    units: number;
+    notices: number;
 }
 
 const initialStats: DashboardStats = {
-  totalUsers: 0,
-  activeUsers: 0,
-  adminUsers: 0,
-  residents: 0,
-  employees: 0,
-  units: 0,
-  notices: 0,
+    totalUsers: 0,
+    activeUsers: 0,
+    adminUsers: 0,
+    residents: 0,
+    employees: 0,
+    units: 0,
+    notices: 0,
 };
 
-const moduleItems = [
-  { label: 'Usuários', icon: Users, status: 'active' as const },
-  { label: 'Comunicados', icon: Megaphone, status: 'active' as const },
-  { label: 'Unidades', icon: Building2, status: 'active' as const },
-  { label: 'Eventos', icon: CalendarDays, status: 'active' as const },
-  { label: 'Votações', icon: Vote, status: 'planned' as const },
-  { label: 'Áreas Comuns', icon: TreePalm, status: 'planned' as const },
-];
-
 export default function Dashboard() {
-  const { user } = useAuth();
-  const [isLoading, setIsLoading] = useState(true);
-  const [stats, setStats] = useState<DashboardStats>(initialStats);
-  const [recentNotices, setRecentNotices] = useState<Notice[]>([]);
+    const { user } = useAuth();
+    const [isLoading, setIsLoading] = useState(true);
+    const [stats, setStats] = useState<DashboardStats>(initialStats);
+    const [recentNotices, setRecentNotices] = useState<Notice[]>([]);
+    const [upcomingEvents, setUpcomingEvents] = useState<EventItem[]>([]);
 
-  useEffect(() => {
-    const loadDashboard = async () => {
-      setIsLoading(true);
+    useEffect(() => {
+        const load = async () => {
+            setIsLoading(true);
+            const [usersR, noticesR, unitsR, eventsR] = await Promise.allSettled([
+                userService.getAll(),
+                noticeService.getAll(),
+                unitService.getAll(),
+                eventService.getAll(),
+            ]);
 
-      const [usersResult, noticesResult, unitsResult] = await Promise.allSettled([
-        userService.getAll(),
-        noticeService.getAll(),
-        unitService.getAll(),
-      ]);
+            const users: User[] = usersR.status === 'fulfilled' ? usersR.value : [];
+            const notices: Notice[] = noticesR.status === 'fulfilled' ? noticesR.value : [];
+            const unitsCount = unitsR.status === 'fulfilled' ? unitsR.value.length : 0;
+            const events: EventItem[] = eventsR.status === 'fulfilled' ? eventsR.value : [];
 
-      let users: User[] = [];
-      let notices: Notice[] = [];
-      let unitsCount = 0;
-
-      if (usersResult.status === 'fulfilled') {
-        users = usersResult.value;
-      }
-
-      if (noticesResult.status === 'fulfilled') {
-        notices = noticesResult.value;
-      }
-
-      if (unitsResult.status === 'fulfilled') {
-        unitsCount = unitsResult.value.length;
-      }
-
-      const nextStats: DashboardStats = {
-        totalUsers: users.length,
-        activeUsers: users.filter((u) => u.status === 'ACTIVE').length,
-        adminUsers: users.filter((u) => u.role === 'ADMIN').length,
-        residents: users.filter((u) => u.role === 'MORADOR').length,
-        employees: users.filter((u) => u.role === 'FUNCIONARIO').length,
-        units: unitsCount,
-        notices: notices.length,
-      };
-
-      setStats(nextStats);
-      setRecentNotices(notices.slice(0, 4));
-      setIsLoading(false);
-
-      const failedCalls = [usersResult, noticesResult, unitsResult].filter((r) => r.status === 'rejected').length;
-
-      if (failedCalls > 0) {
-        toast('Alguns indicadores não puderam ser carregados com o seu perfil atual.', {
-          icon: 'ℹ️',
-          duration: 3000,
-          position: 'top-right',
-          style: { background: '#16161f', color: '#f0f0f5', border: '1px solid #2a2a3d' },
-        });
-      }
-    };
-
-    loadDashboard();
-  }, []);
-
-  const occupancyRate = useMemo(() => {
-    if (!stats.units) return 0;
-    return Math.min(100, Math.round((stats.residents / stats.units) * 100));
-  }, [stats.residents, stats.units]);
-
-  const userDistribution = useMemo(
-    () => [
-      { label: 'Moradores', value: stats.residents },
-      { label: 'Funcionários', value: stats.employees },
-      { label: 'Admins', value: stats.adminUsers },
-    ],
-    [stats.residents, stats.employees, stats.adminUsers]
-  );
-
-  const maxDistribution = Math.max(...userDistribution.map((item) => item.value), 1);
-
-  const statCards = [
-    {
-      label: 'Usuários cadastrados',
-      value: stats.totalUsers,
-      helper: `${stats.activeUsers} ativos`,
-      icon: Users,
-    },
-    {
-      label: 'Comunicados',
-      value: stats.notices,
-      helper: 'Publicações registradas',
-      icon: Megaphone,
-    },
-    {
-      label: 'Unidades',
-      value: stats.units,
-      helper: 'Base condominial',
-      icon: Building2,
-    },
-    {
-      label: 'Taxa de ocupação',
-      value: `${occupancyRate}%`,
-      helper: `${stats.residents} moradores vinculados`,
-      icon: TrendingUp,
-    },
-  ];
-
-  const getNoticeAudience = (notice: Notice) => {
-    if (notice.targetType === 'ALL') return 'Todos os moradores';
-    if (!notice.targetUnit) return 'Unidade específica';
-    return notice.targetUnit.block
-      ? `Bloco ${notice.targetUnit.block} • Unidade ${notice.targetUnit.number}`
-      : `Unidade ${notice.targetUnit.number}`;
-  };
-
-  const formatDate = (value: string) => {
-    const date = new Date(value);
-    return new Intl.DateTimeFormat('pt-BR', {
-      day: '2-digit',
-      month: 'short',
-      hour: '2-digit',
-      minute: '2-digit',
-    }).format(date);
-  };
-
-  return (
-    <div className="bg-bg-primary min-h-screen">
-      <Header title="Dashboard" />
-
-      <div className="p-8 space-y-8">
-        <motion.section
-          initial={{ opacity: 0, y: 16 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="relative overflow-hidden rounded-3xl border border-border-primary bg-gradient-to-br from-bg-card via-bg-secondary to-bg-tertiary p-7"
-        >
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(108,99,255,0.18),transparent_30%),radial-gradient(circle_at_bottom_left,rgba(168,85,247,0.12),transparent_25%)]" />
-
-          <div className="relative flex flex-col lg:flex-row lg:items-center lg:justify-between gap-8">
-            <div className="max-w-2xl">
-              <div className="inline-flex items-center gap-2 rounded-full border border-accent-primary/20 bg-accent-primary/10 px-3 py-1 text-xs font-medium text-accent-primary mb-4">
-                <Shield className="w-3.5 h-3.5" />
-                Painel administrativo DomusApp
-              </div>
-
-              <h2 className="text-3xl font-bold text-text-primary leading-tight">
-                Olá, {user?.name?.split(' ')[0] || 'usuário'}.
-              </h2>
-
-              <p className="mt-3 text-sm md:text-base text-text-secondary leading-relaxed">
-                Acompanhe os principais números do sistema, visualize os comunicados mais recentes e acesse rapidamente os módulos já disponíveis.
-              </p>
-
-              <div className="mt-6 flex flex-wrap gap-3">
-                <Link
-                  to="/usuarios"
-                  className="inline-flex items-center gap-2 rounded-xl bg-accent-primary px-4 py-2.5 text-sm font-semibold text-white hover:bg-accent-primary-hover transition-colors"
-                >
-                  Gerenciar usuários
-                  <ArrowRight className="w-4 h-4" />
-                </Link>
-
-                <Link
-                  to="/comunicados"
-                  className="inline-flex items-center gap-2 rounded-xl border border-border-primary bg-bg-card/60 px-4 py-2.5 text-sm font-semibold text-text-primary hover:bg-bg-hover transition-colors"
-                >
-                  Ver comunicados
-                </Link>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4 min-w-[280px]">
-              <div className="rounded-2xl border border-border-primary bg-bg-card/70 p-4">
-                <div className="flex items-center justify-between mb-3">
-                  <span className="text-xs text-text-muted">Saúde do sistema</span>
-                  <Activity className="w-4 h-4 text-success" />
-                </div>
-                <div className="text-2xl font-bold text-text-primary">Online</div>
-                <p className="text-xs text-text-secondary mt-1">Base visual do painel carregada</p>
-              </div>
-
-              <div className="rounded-2xl border border-border-primary bg-bg-card/70 p-4">
-                <div className="flex items-center justify-between mb-3">
-                  <span className="text-xs text-text-muted">Avisos recentes</span>
-                  <BellRing className="w-4 h-4 text-accent-primary" />
-                </div>
-                <div className="text-2xl font-bold text-text-primary">{stats.notices}</div>
-                <p className="text-xs text-text-secondary mt-1">Comunicados disponíveis</p>
-              </div>
-
-              <div className="rounded-2xl border border-border-primary bg-bg-card/70 p-4 col-span-2">
-                <div className="flex items-center justify-between mb-3">
-                  <span className="text-xs text-text-muted">Moradores x unidades</span>
-                  <Building2 className="w-4 h-4 text-warning" />
-                </div>
-
-                <div className="w-full h-2 rounded-full bg-bg-hover overflow-hidden">
-                  <div
-                    className="h-full rounded-full bg-gradient-to-r from-accent-gradient-start to-accent-gradient-end"
-                    style={{ width: `${occupancyRate}%` }}
-                  />
-                </div>
-
-                <div className="mt-3 flex items-center justify-between text-xs text-text-secondary">
-                  <span>{stats.residents} moradores vinculados</span>
-                  <span>{stats.units} unidades cadastradas</span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </motion.section>
-
-        <section className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
-          {statCards.map((card, index) => {
-            const Icon = card.icon;
-
-            return (
-              <motion.div
-                key={card.label}
-                initial={{ opacity: 0, y: 12 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: index * 0.05 }}
-                className="rounded-2xl border border-border-primary bg-bg-card p-5 hover:border-border-secondary transition-colors"
-              >
-                <div className="flex items-start justify-between gap-4">
-                  <div>
-                    <p className="text-sm text-text-secondary">{card.label}</p>
-                    <div className="mt-3 text-3xl font-bold text-text-primary">
-                      {isLoading ? '—' : card.value}
-                    </div>
-                    <p className="mt-2 text-xs text-text-muted">{card.helper}</p>
-                  </div>
-
-                  <div className="w-11 h-11 rounded-xl bg-accent-primary/10 text-accent-primary flex items-center justify-center">
-                    <Icon className="w-5 h-5" />
-                  </div>
-                </div>
-              </motion.div>
+            setStats({
+                totalUsers: users.length,
+                activeUsers: users.filter((u) => u.status === 'ACTIVE').length,
+                adminUsers: users.filter((u) => u.role === 'ADMIN').length,
+                residents: users.filter((u) => u.role === 'MORADOR').length,
+                employees: users.filter((u) => u.role === 'FUNCIONARIO').length,
+                units: unitsCount,
+                notices: notices.length,
+            });
+            setRecentNotices(notices.slice(0, 4));
+            setUpcomingEvents(
+                events
+                    .filter((e) => new Date(e.eventDate) > new Date())
+                    .sort((a, b) => new Date(a.eventDate).getTime() - new Date(b.eventDate).getTime())
+                    .slice(0, 3),
             );
-          })}
-        </section>
+            setIsLoading(false);
 
-        <section className="grid grid-cols-1 xl:grid-cols-[1.2fr_0.8fr] gap-6">
-          <motion.div
-            initial={{ opacity: 0, y: 14 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.12 }}
-            className="rounded-2xl border border-border-primary bg-bg-card p-6"
-          >
-            <div className="flex items-center justify-between gap-4 mb-6">
-              <div>
-                <h3 className="text-lg font-semibold text-text-primary">Comunicados recentes</h3>
-                <p className="text-sm text-text-secondary mt-1">Últimas publicações disponíveis no sistema</p>
-              </div>
+            const failedCalls = [usersR, noticesR, unitsR, eventsR].filter((r) => r.status === 'rejected').length;
+            if (failedCalls > 0) {
+                toast('Alguns indicadores não puderam ser carregados com o seu perfil atual.', {
+                    icon: 'ℹ️',
+                    duration: 3000,
+                });
+            }
+        };
+        load();
+    }, []);
 
-              <Link
-                to="/comunicados"
-                className="text-sm text-accent-primary hover:text-accent-primary-hover font-medium"
-              >
-                Ver todos
-              </Link>
-            </div>
+    const occupancy = useMemo(() => {
+        if (!stats.units) return 0;
+        return Math.min(100, Math.round((stats.residents / stats.units) * 100));
+    }, [stats.residents, stats.units]);
 
-            <div className="space-y-4">
-              {isLoading ? (
-                Array.from({ length: 3 }).map((_, index) => (
-                  <div
-                    key={index}
-                    className="rounded-2xl border border-border-primary bg-bg-secondary/60 p-4 animate-pulse"
-                  >
-                    <div className="h-4 w-40 rounded bg-bg-hover mb-3" />
-                    <div className="h-3 w-full rounded bg-bg-hover mb-2" />
-                    <div className="h-3 w-3/4 rounded bg-bg-hover" />
-                  </div>
-                ))
-              ) : recentNotices.length === 0 ? (
-                <div className="rounded-2xl border border-dashed border-border-primary bg-bg-secondary/40 p-8 text-center text-text-muted">
-                  <Megaphone className="w-10 h-10 mx-auto mb-3 opacity-40" />
-                  Nenhum comunicado encontrado.
-                </div>
-              ) : (
-                recentNotices.map((notice) => (
-                  <div
-                    key={notice.id}
-                    className="rounded-2xl border border-border-primary bg-bg-secondary/60 p-4 hover:border-border-secondary transition-colors"
-                  >
-                    <div className="flex items-start justify-between gap-4">
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-2 mb-2 flex-wrap">
-                          <span className="inline-flex items-center gap-1 rounded-full bg-accent-primary/10 px-2.5 py-1 text-[11px] font-medium text-accent-primary">
-                            <Megaphone className="w-3 h-3" />
-                            {getNoticeAudience(notice)}
-                          </span>
-                        </div>
+    const firstName = user?.name?.split(' ')[0] || 'Administração';
+    const greeting = useMemo(() => {
+        const h = new Date().getHours();
+        if (h < 12) return 'Bom dia';
+        if (h < 19) return 'Boa tarde';
+        return 'Boa noite';
+    }, []);
 
-                        <h4 className="text-sm font-semibold text-text-primary truncate">
-                          {notice.title}
-                        </h4>
+    return (
+        <div>
+            <Header title="Painel" eyebrow={`Visão geral · ${new Date().toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })}`} />
 
-                        <p className="mt-1 text-sm text-text-secondary line-clamp-2">
-                          {notice.content}
-                        </p>
+            <PageBody>
+                {/* ============ HERO ============ */}
+                <section
+                    className="fade-up"
+                    style={{
+                        position: 'relative',
+                        overflow: 'hidden',
+                        borderRadius: 6,
+                        border: '1px solid var(--metal-line)',
+                        background:
+                            'linear-gradient(135deg, var(--color-ink-1) 0%, var(--color-ink-2) 60%, color-mix(in srgb, var(--color-purple) 18%, transparent) 130%)',
+                        padding: '56px 56px 48px',
+                        marginBottom: 56,
+                    }}
+                >
+                    <div className="aurora" />
 
-                        <div className="mt-3 flex items-center gap-4 text-xs text-text-muted flex-wrap">
-                          <span className="inline-flex items-center gap-1">
-                            <UserCheck className="w-3.5 h-3.5" />
-                            {notice.author.name}
-                          </span>
-
-                          <span className="inline-flex items-center gap-1">
-                            <Clock3 className="w-3.5 h-3.5" />
-                            {formatDate(notice.createdAt)}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-          </motion.div>
-
-          <div className="space-y-6">
-            <motion.div
-              initial={{ opacity: 0, y: 14 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.18 }}
-              className="rounded-2xl border border-border-primary bg-bg-card p-6"
-            >
-              <div className="flex items-center justify-between gap-4 mb-5">
-                <div>
-                  <h3 className="text-lg font-semibold text-text-primary">Distribuição de usuários</h3>
-                  <p className="text-sm text-text-secondary mt-1">Resumo por perfil cadastrado</p>
-                </div>
-                <FileText className="w-4 h-4 text-text-muted" />
-              </div>
-
-              <div className="space-y-4">
-                {userDistribution.map((item) => (
-                  <div key={item.label}>
-                    <div className="flex items-center justify-between mb-2 text-sm">
-                      <span className="text-text-secondary">{item.label}</span>
-                      <span className="text-text-primary font-semibold">
-                        {isLoading ? '—' : item.value}
-                      </span>
-                    </div>
-
-                    <div className="h-2 rounded-full bg-bg-hover overflow-hidden">
-                      <div
-                        className="h-full rounded-full bg-gradient-to-r from-accent-gradient-start to-accent-gradient-end"
-                        style={{ width: `${(item.value / maxDistribution) * 100}%` }}
-                      />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </motion.div>
-
-            <motion.div
-              initial={{ opacity: 0, y: 14 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.24 }}
-              className="rounded-2xl border border-border-primary bg-bg-card p-6"
-            >
-              <div className="flex items-center justify-between gap-4 mb-5">
-                <div>
-                  <h3 className="text-lg font-semibold text-text-primary">Status dos módulos</h3>
-                  <p className="text-sm text-text-secondary mt-1">Visão geral do desenvolvimento</p>
-                </div>
-                <CheckCircle2 className="w-4 h-4 text-success" />
-              </div>
-
-              <div className="space-y-3">
-                {moduleItems.map((item) => {
-                  const Icon = item.icon;
-                  const active = item.status === 'active';
-
-                  return (
+                    {/* Watermark D */}
                     <div
-                      key={item.label}
-                      className="flex items-center justify-between rounded-xl border border-border-primary bg-bg-secondary/50 px-4 py-3"
+                        aria-hidden
+                        className="serif"
+                        style={{
+                            position: 'absolute',
+                            right: -40,
+                            top: -120,
+                            fontSize: 460,
+                            lineHeight: 1,
+                            color: 'transparent',
+                            WebkitTextStroke: '1px var(--watermark-stroke)',
+                            pointerEvents: 'none',
+                            userSelect: 'none',
+                        }}
                     >
-                      <div className="flex items-center gap-3">
-                        <div
-                          className={`w-9 h-9 rounded-lg flex items-center justify-center ${
-                            active ? 'bg-success-bg text-success' : 'bg-warning-bg text-warning'
-                          }`}
-                        >
-                          <Icon className="w-4 h-4" />
-                        </div>
-
-                        <div>
-                          <p className="text-sm font-medium text-text-primary">{item.label}</p>
-                          <p className="text-xs text-text-muted">
-                            {active ? 'Disponível no painel' : 'Planejado para próxima etapa'}
-                          </p>
-                        </div>
-                      </div>
-
-                      <span
-                        className={`inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-medium ${
-                          active ? 'bg-success-bg text-success' : 'bg-warning-bg text-warning'
-                        }`}
-                      >
-                        {active ? 'Ativo' : 'Em breve'}
-                      </span>
+                        D
                     </div>
-                  );
-                })}
-              </div>
-            </motion.div>
-          </div>
-        </section>
-      </div>
-    </div>
-  );
+
+                    <div
+                        style={{
+                            position: 'relative',
+                            display: 'grid',
+                            gridTemplateColumns: '1.4fr 1fr',
+                            gap: 64,
+                            alignItems: 'end',
+                        }}
+                    >
+                        <div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 28 }}>
+                                <div className="gold-rule short" style={{ width: 60 }} />
+                                <div className="tracking-luxe" style={{ fontSize: 10, color: 'var(--color-metal-1)' }}>
+                                    {new Date().toLocaleDateString('pt-BR', {
+                                        weekday: 'long',
+                                        day: '2-digit',
+                                        month: 'long',
+                                        year: 'numeric',
+                                    })}
+                                </div>
+                            </div>
+
+                            <h2
+                                className="serif"
+                                style={{
+                                    fontSize: 64,
+                                    fontWeight: 300,
+                                    lineHeight: 1,
+                                    letterSpacing: '-0.02em',
+                                    color: 'var(--color-bone)',
+                                    marginBottom: 12,
+                                }}
+                            >
+                                {greeting}, {firstName}.
+                            </h2>
+                            <p
+                                className="serif-it"
+                                style={{
+                                    fontSize: 22,
+                                    color: 'var(--color-metal-1)',
+                                    fontWeight: 400,
+                                    marginBottom: 32,
+                                }}
+                            >
+                                Tudo em ordem no edifício esta manhã.
+                            </p>
+
+                            <p
+                                style={{
+                                    fontSize: 15,
+                                    color: 'var(--color-bone-dim)',
+                                    lineHeight: 1.7,
+                                    maxWidth: 540,
+                                }}
+                            >
+                                {stats.residents} residentes ativos em {stats.units} unidades.{' '}
+                                {upcomingEvents.length} eventos próximos na programação e {stats.notices} comunicados
+                                publicados.
+                            </p>
+
+                            <div style={{ display: 'flex', gap: 16, marginTop: 36, flexWrap: 'wrap' }}>
+                                <Link to="/comunicados" className="btn-gold" style={{ textDecoration: 'none' }}>
+                                    <Megaphone size={13} />
+                                    Publicar comunicado
+                                </Link>
+                                <Link to="/eventos" className="btn-ghost" style={{ textDecoration: 'none' }}>
+                                    <CalendarDays size={13} />
+                                    Programação
+                                </Link>
+                            </div>
+                        </div>
+
+                        {/* Health card */}
+                        <HealthCard occupancy={occupancy} stats={stats} />
+                    </div>
+                </section>
+
+                {/* ============ STATS ============ */}
+                <SectionHeader
+                    eyebrow="Indicadores"
+                    title="Visão geral"
+                    subtitle="Painel atualizado em tempo real"
+                />
+
+                <section
+                    style={{
+                        display: 'grid',
+                        gridTemplateColumns: 'repeat(4, 1fr)',
+                        gap: 20,
+                        marginBottom: 64,
+                    }}
+                >
+                    <StatCard
+                        eyebrow="Residentes"
+                        value={isLoading ? '—' : stats.residents}
+                        footnote={`${stats.activeUsers} contas ativas`}
+                    />
+                    <StatCard
+                        eyebrow="Unidades"
+                        value={isLoading ? '—' : stats.units}
+                        footnote="No empreendimento"
+                    />
+                    <StatCard
+                        eyebrow="Ocupação"
+                        value={isLoading ? '—' : `${occupancy}%`}
+                        footnote="Residentes vinculados"
+                    />
+                    <StatCard
+                        eyebrow="Comunicados"
+                        value={isLoading ? '—' : stats.notices}
+                        footnote="Publicações registradas"
+                    />
+                </section>
+
+                {/* ============ BULLETIN + EVENTS ============ */}
+                <section
+                    style={{
+                        display: 'grid',
+                        gridTemplateColumns: '1.3fr 1fr',
+                        gap: 24,
+                        marginBottom: 64,
+                    }}
+                >
+                    <div className="luxe-card" style={{ padding: 40 }}>
+                        <SectionHeader
+                            inset
+                            eyebrow="Boletim"
+                            title="Comunicados recentes"
+                            action={
+                                <Link
+                                    to="/comunicados"
+                                    className="btn-ghost"
+                                    style={{ padding: '6px 14px', fontSize: 10, textDecoration: 'none' }}
+                                >
+                                    Ver todos <ArrowRight size={12} />
+                                </Link>
+                            }
+                        />
+
+                        <div style={{ display: 'flex', flexDirection: 'column' }}>
+                            {isLoading ? (
+                                Array.from({ length: 3 }).map((_, i) => <NoticeSkeleton key={i} />)
+                            ) : recentNotices.length === 0 ? (
+                                <EmptyState
+                                    icon={<Megaphone size={28} strokeWidth={1.2} />}
+                                    text="Nenhum comunicado publicado."
+                                />
+                            ) : (
+                                recentNotices.map((n, i) => (
+                                    <NoticeRow key={n.id} notice={n} last={i === recentNotices.length - 1} />
+                                ))
+                            )}
+                        </div>
+                    </div>
+
+                    <div className="luxe-card" style={{ padding: 40 }}>
+                        <SectionHeader
+                            inset
+                            eyebrow="Programação"
+                            title="Próximos eventos"
+                            action={
+                                <Link
+                                    to="/eventos"
+                                    className="btn-ghost"
+                                    style={{ padding: '6px 14px', fontSize: 10, textDecoration: 'none' }}
+                                >
+                                    Ver todos <ArrowRight size={12} />
+                                </Link>
+                            }
+                        />
+
+                        <div style={{ display: 'flex', flexDirection: 'column' }}>
+                            {isLoading ? (
+                                Array.from({ length: 2 }).map((_, i) => <EventSkeleton key={i} />)
+                            ) : upcomingEvents.length === 0 ? (
+                                <EmptyState
+                                    icon={<CalendarDays size={28} strokeWidth={1.2} />}
+                                    text="Nenhum evento próximo."
+                                />
+                            ) : (
+                                upcomingEvents.map((e, i) => (
+                                    <EventTile key={e.id} event={e} last={i === upcomingEvents.length - 1} />
+                                ))
+                            )}
+                        </div>
+                    </div>
+                </section>
+
+                {/* ============ DISTRIBUTION + MODULE STATUS ============ */}
+                <SectionHeader eyebrow="Demografia" title="Distribuição da comunidade" />
+
+                <section
+                    style={{
+                        display: 'grid',
+                        gridTemplateColumns: '1fr 1fr',
+                        gap: 24,
+                        marginBottom: 32,
+                    }}
+                >
+                    <DistributionCard stats={stats} />
+                    <ModuleStatusCard />
+                </section>
+            </PageBody>
+        </div>
+    );
+}
+
+// ============================================================
+// Sub-components
+// ============================================================
+
+function HealthCard({ occupancy, stats }: { occupancy: number; stats: DashboardStats }) {
+    return (
+        <div
+            style={{
+                position: 'relative',
+                background: 'var(--color-ink-1)',
+                border: '1px solid var(--metal-line)',
+                borderRadius: 4,
+                padding: 32,
+            }}
+        >
+            <div
+                style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    marginBottom: 24,
+                }}
+            >
+                <div className="tracking-luxe" style={{ fontSize: 9, color: 'var(--color-metal-1)' }}>
+                    Saúde do sistema
+                </div>
+                <Tag tone="ok" dot>Operacional</Tag>
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: 12 }}>
+                <div
+                    className="serif"
+                    style={{
+                        fontSize: 72,
+                        fontWeight: 300,
+                        lineHeight: 1,
+                        color: 'var(--color-bone)',
+                        letterSpacing: '-0.02em',
+                    }}
+                >
+                    {occupancy}
+                </div>
+                <div className="serif" style={{ fontSize: 28, color: 'var(--color-metal-1)', fontWeight: 300 }}>
+                    %
+                </div>
+                <div
+                    className="tracking-luxe"
+                    style={{ fontSize: 9, color: 'var(--color-bone-muted)', marginLeft: 12 }}
+                >
+                    Ocupação
+                </div>
+            </div>
+
+            {/* Gauge */}
+            <div style={{ marginTop: 28 }}>
+                <div
+                    style={{
+                        height: 2,
+                        background: 'var(--color-ink-3)',
+                        borderRadius: 1,
+                        overflow: 'hidden',
+                    }}
+                >
+                    <div
+                        style={{
+                            height: '100%',
+                            width: `${occupancy}%`,
+                            background:
+                                'linear-gradient(90deg, var(--color-purple) 0%, var(--color-metal-1) 100%)',
+                            boxShadow: '0 0 12px color-mix(in srgb, var(--color-metal-1) 40%, transparent)',
+                            transition: 'width 0.8s cubic-bezier(0.22, 1, 0.36, 1)',
+                        }}
+                    />
+                </div>
+            </div>
+
+            <div className="gold-rule" style={{ margin: '28px 0 20px' }} />
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
+                <Stat value={stats.residents} label="Residentes" />
+                <Stat value={stats.units} label="Unidades" />
+                <Stat value={stats.employees} label="Equipe" />
+                <Stat value="24/7" label="Concierge" accent />
+            </div>
+        </div>
+    );
+}
+
+function Stat({ value, label, accent }: { value: number | string; label: string; accent?: boolean }) {
+    return (
+        <div>
+            <div
+                className="serif"
+                style={{
+                    fontSize: 28,
+                    color: accent ? 'var(--color-metal-1)' : 'var(--color-bone)',
+                    fontWeight: 400,
+                }}
+            >
+                {value}
+            </div>
+            <div
+                className="tracking-luxe"
+                style={{ fontSize: 8, color: 'var(--color-bone-muted)', marginTop: 4 }}
+            >
+                {label}
+            </div>
+        </div>
+    );
+}
+
+function StatCard({
+    eyebrow,
+    value,
+    footnote,
+}: {
+    eyebrow: string;
+    value: number | string;
+    footnote: string;
+}) {
+    return (
+        <div className="luxe-card fade-up" style={{ padding: 28, position: 'relative', overflow: 'hidden' }}>
+            <div
+                className="tracking-luxe"
+                style={{ fontSize: 9, color: 'var(--color-bone-muted)', marginBottom: 16 }}
+            >
+                {eyebrow}
+            </div>
+            <div
+                className="serif"
+                style={{
+                    fontSize: 56,
+                    fontWeight: 400,
+                    lineHeight: 1,
+                    color: 'var(--color-bone)',
+                    letterSpacing: '-0.02em',
+                }}
+            >
+                {value}
+            </div>
+            <div
+                style={{
+                    marginTop: 16,
+                    fontSize: 12,
+                    color: 'var(--color-bone-dim)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 8,
+                }}
+            >
+                <span style={{ width: 16, height: 1, background: 'var(--metal-line-strong)' }} />
+                {footnote}
+            </div>
+        </div>
+    );
+}
+
+function NoticeRow({ notice, last }: { notice: Notice; last: boolean }) {
+    const d = new Date(notice.createdAt);
+    return (
+        <div
+            style={{
+                display: 'grid',
+                gridTemplateColumns: '64px 1fr auto',
+                gap: 20,
+                padding: '20px 0',
+                borderBottom: last ? 'none' : '1px solid var(--color-line)',
+                alignItems: 'start',
+            }}
+        >
+            <div style={{ textAlign: 'right' }}>
+                <div
+                    className="serif"
+                    style={{
+                        fontSize: 28,
+                        color: 'var(--color-metal-1)',
+                        lineHeight: 1,
+                        fontWeight: 400,
+                    }}
+                >
+                    {d.toLocaleDateString('pt-BR', { day: '2-digit' })}
+                </div>
+                <div
+                    className="tracking-luxe"
+                    style={{ fontSize: 8, color: 'var(--color-bone-muted)', marginTop: 4 }}
+                >
+                    {d.toLocaleDateString('pt-BR', { month: 'short' }).replace('.', '')}
+                </div>
+            </div>
+
+            <div style={{ minWidth: 0 }}>
+                <h4
+                    className="serif"
+                    style={{
+                        fontSize: 17,
+                        fontWeight: 500,
+                        color: 'var(--color-bone)',
+                        marginBottom: 6,
+                        lineHeight: 1.25,
+                    }}
+                >
+                    {notice.title}
+                </h4>
+                <p
+                    style={{
+                        fontSize: 13,
+                        color: 'var(--color-bone-dim)',
+                        lineHeight: 1.55,
+                        display: '-webkit-box',
+                        WebkitLineClamp: 2,
+                        WebkitBoxOrient: 'vertical',
+                        overflow: 'hidden',
+                    }}
+                >
+                    {notice.content}
+                </p>
+                <div style={{ display: 'flex', gap: 14, marginTop: 10, alignItems: 'center' }}>
+                    <span
+                        className="tracking-luxe"
+                        style={{ fontSize: 9, color: 'var(--color-bone-muted)' }}
+                    >
+                        {notice.author.name.split(' ').slice(0, 2).join(' ')}
+                    </span>
+                    <span
+                        style={{
+                            width: 3,
+                            height: 3,
+                            borderRadius: '50%',
+                            background: 'var(--color-bone-muted)',
+                        }}
+                    />
+                    <span
+                        className="tracking-luxe"
+                        style={{ fontSize: 9, color: 'var(--color-bone-muted)' }}
+                    >
+                        {timeAgo(notice.createdAt)}
+                    </span>
+                </div>
+            </div>
+
+            <Tag tone={notice.targetType === 'ALL' ? 'gold' : 'purple'}>
+                {notice.targetType === 'ALL' ? 'Geral' : 'Direcionado'}
+            </Tag>
+        </div>
+    );
+}
+
+function EventTile({ event, last }: { event: EventItem; last: boolean }) {
+    const d = new Date(event.eventDate);
+    return (
+        <div
+            style={{
+                display: 'grid',
+                gridTemplateColumns: '76px 1fr',
+                gap: 20,
+                padding: '20px 0',
+                borderBottom: last ? 'none' : '1px solid var(--color-line)',
+                alignItems: 'start',
+            }}
+        >
+            <div
+                style={{
+                    border: '1px solid var(--metal-line)',
+                    borderRadius: 3,
+                    padding: '10px 6px',
+                    textAlign: 'center',
+                    background: 'color-mix(in srgb, var(--color-metal-1) 6%, transparent)',
+                }}
+            >
+                <div className="tracking-luxe" style={{ fontSize: 8, color: 'var(--color-metal-1)' }}>
+                    {d.toLocaleDateString('pt-BR', { month: 'short' }).replace('.', '')}
+                </div>
+                <div
+                    className="serif"
+                    style={{
+                        fontSize: 28,
+                        color: 'var(--color-bone)',
+                        lineHeight: 1.1,
+                        fontWeight: 400,
+                    }}
+                >
+                    {d.toLocaleDateString('pt-BR', { day: '2-digit' })}
+                </div>
+                <div className="mono" style={{ fontSize: 10, color: 'var(--color-bone-dim)', marginTop: 2 }}>
+                    {d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                </div>
+            </div>
+
+            <div style={{ minWidth: 0 }}>
+                <h4
+                    className="serif"
+                    style={{
+                        fontSize: 17,
+                        fontWeight: 500,
+                        color: 'var(--color-bone)',
+                        marginBottom: 6,
+                        lineHeight: 1.25,
+                    }}
+                >
+                    {event.title}
+                </h4>
+                {event.location && (
+                    <div
+                        style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 8,
+                            color: 'var(--color-bone-dim)',
+                            fontSize: 12,
+                            marginBottom: 8,
+                        }}
+                    >
+                        <MapPin size={12} color="var(--color-metal-1)" />
+                        {event.location}
+                    </div>
+                )}
+                <p
+                    style={{
+                        fontSize: 12,
+                        color: 'var(--color-bone-muted)',
+                        lineHeight: 1.55,
+                        display: '-webkit-box',
+                        WebkitLineClamp: 2,
+                        WebkitBoxOrient: 'vertical',
+                        overflow: 'hidden',
+                    }}
+                >
+                    {event.content}
+                </p>
+            </div>
+        </div>
+    );
+}
+
+function DistributionCard({ stats }: { stats: DashboardStats }) {
+    const rows = [
+        { label: 'Residentes', value: stats.residents, color: 'var(--color-purple)' },
+        { label: 'Equipe', value: stats.employees, color: 'var(--color-metal-1)' },
+        { label: 'Administração', value: stats.adminUsers, color: 'var(--color-purple-bright)' },
+    ];
+    const max = Math.max(...rows.map((r) => r.value), 1);
+
+    return (
+        <div className="luxe-card" style={{ padding: 40 }}>
+            <SectionHeader inset eyebrow="Perfis" title="Por categoria" />
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 28 }}>
+                {rows.map((r) => (
+                    <div key={r.label}>
+                        <div
+                            style={{
+                                display: 'flex',
+                                justifyContent: 'space-between',
+                                alignItems: 'baseline',
+                                marginBottom: 8,
+                            }}
+                        >
+                            <span
+                                className="tracking-luxe"
+                                style={{ fontSize: 9, color: 'var(--color-bone-dim)' }}
+                            >
+                                {r.label}
+                            </span>
+                            <span
+                                className="serif"
+                                style={{ fontSize: 24, color: 'var(--color-bone)', fontWeight: 400 }}
+                            >
+                                {r.value}
+                            </span>
+                        </div>
+                        <div
+                            style={{
+                                height: 1,
+                                background: 'var(--color-ink-3)',
+                                position: 'relative',
+                                overflow: 'hidden',
+                            }}
+                        >
+                            <div
+                                style={{
+                                    position: 'absolute',
+                                    left: 0,
+                                    top: 0,
+                                    height: '100%',
+                                    width: `${(r.value / max) * 100}%`,
+                                    background: r.color,
+                                    boxShadow: `0 0 8px ${r.color}`,
+                                    transition: 'width 0.8s cubic-bezier(0.22, 1, 0.36, 1)',
+                                }}
+                            />
+                        </div>
+                    </div>
+                ))}
+            </div>
+
+            <div className="gold-rule" style={{ margin: '32px 0 20px' }} />
+
+            <div
+                className="serif-it"
+                style={{ fontSize: 14, color: 'var(--color-bone-dim)', lineHeight: 1.5 }}
+            >
+                “Em uma residência refinada, cada vínculo conta — e cada detalhe é registrado.”
+            </div>
+        </div>
+    );
+}
+
+function ModuleStatusCard() {
+    const mods = [
+        { label: 'Residentes', status: 'ok' as const, note: 'Operacional' },
+        { label: 'Unidades', status: 'ok' as const, note: 'Operacional' },
+        { label: 'Comunicados', status: 'ok' as const, note: 'Operacional' },
+        { label: 'Programação', status: 'ok' as const, note: 'Operacional' },
+        { label: 'Deliberações', status: 'soon' as const, note: 'Em desenvolvimento' },
+        { label: 'Áreas Comuns', status: 'soon' as const, note: 'Em desenvolvimento' },
+    ];
+
+    return (
+        <div className="luxe-card" style={{ padding: 40 }}>
+            <SectionHeader inset eyebrow="Módulos" title="Status do painel" />
+
+            <div style={{ display: 'flex', flexDirection: 'column' }}>
+                {mods.map((m, i) => (
+                    <div
+                        key={m.label}
+                        style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            padding: '14px 0',
+                            borderBottom: i === mods.length - 1 ? 'none' : '1px solid var(--color-line)',
+                        }}
+                    >
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+                            <span
+                                className="status-dot"
+                                style={{
+                                    background: m.status === 'ok' ? 'var(--color-ok)' : 'var(--color-metal-3)',
+                                }}
+                            />
+                            <span style={{ fontSize: 14, color: 'var(--color-bone)', fontWeight: 400 }}>
+                                {m.label}
+                            </span>
+                        </div>
+                        <span
+                            className="tracking-luxe"
+                            style={{
+                                fontSize: 9,
+                                color: m.status === 'ok' ? 'var(--color-ok)' : 'var(--color-bone-muted)',
+                            }}
+                        >
+                            {m.note}
+                        </span>
+                    </div>
+                ))}
+            </div>
+        </div>
+    );
+}
+
+function NoticeSkeleton() {
+    return (
+        <div
+            style={{
+                padding: '20px 0',
+                borderBottom: '1px solid var(--color-line)',
+                display: 'grid',
+                gridTemplateColumns: '64px 1fr auto',
+                gap: 20,
+            }}
+        >
+            <div style={{ height: 36, background: 'var(--color-ink-2)' }} />
+            <div>
+                <div style={{ height: 16, width: '70%', background: 'var(--color-ink-2)', marginBottom: 8 }} />
+                <div style={{ height: 12, width: '100%', background: 'var(--color-ink-2)' }} />
+            </div>
+            <div style={{ width: 60, height: 18, background: 'var(--color-ink-2)' }} />
+        </div>
+    );
+}
+
+function EventSkeleton() {
+    return (
+        <div
+            style={{
+                padding: '20px 0',
+                borderBottom: '1px solid var(--color-line)',
+                display: 'grid',
+                gridTemplateColumns: '76px 1fr',
+                gap: 20,
+            }}
+        >
+            <div style={{ height: 70, background: 'var(--color-ink-2)' }} />
+            <div>
+                <div style={{ height: 16, width: '60%', background: 'var(--color-ink-2)', marginBottom: 8 }} />
+                <div style={{ height: 12, width: '40%', background: 'var(--color-ink-2)' }} />
+            </div>
+        </div>
+    );
+}
+
+function EmptyState({ icon, text }: { icon: React.ReactNode; text: string }) {
+    return (
+        <div
+            style={{
+                padding: '40px 0',
+                textAlign: 'center',
+                color: 'var(--color-bone-muted)',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                gap: 12,
+            }}
+        >
+            <span style={{ opacity: 0.4 }}>{icon}</span>
+            <span className="serif-it" style={{ fontSize: 14 }}>
+                {text}
+            </span>
+        </div>
+    );
 }

@@ -1,15 +1,19 @@
 import { useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { motion } from 'motion/react';
-import { Eye, EyeOff, Shield, Loader2, Lock, Mail } from 'lucide-react';
+import { Eye, EyeOff, ArrowRight, Loader2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useAuth } from '../contexts/AuthContext';
+import Monogram from '../components/luxury/Monogram';
+import aerial from '../assets/aerial-residence.webp';
 
 export default function Login() {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
+    const [condominium, setCondominium] = useState('');
     const [showPassword, setShowPassword] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
+    const [emailFocus, setEmailFocus] = useState(false);
+    const [pwFocus, setPwFocus] = useState(false);
     const { login } = useAuth();
     const navigate = useNavigate();
 
@@ -17,7 +21,7 @@ export default function Login() {
         e.preventDefault();
 
         if (!email || !password) {
-            toast.error('Preencha todos os campos.');
+            toast.error('Preencha e-mail e senha.');
             return;
         }
 
@@ -25,146 +29,458 @@ export default function Login() {
 
         try {
             await login({ email, password });
-            toast.success('Login realizado com sucesso!', {
-                duration: 3000,
-                position: 'top-right',
-                style: {
-                    background: '#16161f',
-                    color: '#f0f0f5',
-                    border: '1px solid #22c55e',
-                },
-                iconTheme: {
-                    primary: '#22c55e',
-                    secondary: '#16161f',
-                },
-            });
+            toast.success('Acesso liberado.');
             navigate('/dashboard');
         } catch (error: any) {
-            const message = error.response?.data?.error || 'Erro ao fazer login. Tente novamente.';
-            toast.error(message, {
-                position: 'top-right',
-                style: {
-                    background: '#16161f',
-                    color: '#f0f0f5',
-                    border: '1px solid #ef4444',
-                },
-                iconTheme: {
-                    primary: '#ef4444',
-                    secondary: '#16161f',
-                },
-            });
+            const message = error.response?.data?.error || 'Não foi possível autenticar. Tente novamente.';
+            toast.error(message);
         } finally {
             setIsLoading(false);
         }
     };
 
     return (
-        <div className="min-h-screen bg-bg-primary flex flex-col items-center justify-center p-4 relative overflow-hidden">
-            {/* Ambient background effects */}
-            <div className="absolute inset-0 pointer-events-none">
-                <div className="absolute top-1/3 left-1/3 w-[500px] h-[500px] bg-accent-primary/[0.04] rounded-full blur-[150px]" />
-                <div className="absolute bottom-1/3 right-1/3 w-[400px] h-[400px] bg-accent-secondary/[0.03] rounded-full blur-[130px]" />
+        <div
+            style={{
+                minHeight: '100vh',
+                width: '100%',
+                background: '#FFFFFF',
+                color: 'var(--color-bone)',
+                display: 'grid',
+                gridTemplateColumns: 'minmax(0, 1fr) 460px',
+                position: 'relative',
+                overflow: 'hidden',
+            }}
+        >
+            {/* LEFT — aerial photo with white vignette to the right edge */}
+            <div
+                style={{
+                    position: 'relative',
+                    minHeight: '100vh',
+                    overflow: 'hidden',
+                    background: '#0E2235',
+                }}
+            >
+                {/* Photo */}
+                <img
+                    src={aerial}
+                    alt="Vista aérea do empreendimento Domus Residence"
+                    style={{
+                        position: 'absolute',
+                        inset: 0,
+                        width: '100%',
+                        height: '100%',
+                        objectFit: 'cover',
+                        objectPosition: 'center center',
+                        zIndex: 0,
+                    }}
+                />
+
+                {/* Right-edge vignette fading to white for a seamless seam */}
+                <div
+                    aria-hidden
+                    style={{
+                        position: 'absolute',
+                        inset: 0,
+                        background:
+                            'linear-gradient(90deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0) 70%, rgba(255,255,255,0.45) 90%, rgba(255,255,255,0.92) 100%)',
+                        pointerEvents: 'none',
+                        zIndex: 1,
+                    }}
+                />
+
+                {/* Warm overlay to bind the photo to the Domus palette */}
+                <div
+                    aria-hidden
+                    style={{
+                        position: 'absolute',
+                        inset: 0,
+                        background:
+                            'linear-gradient(180deg, rgba(24, 16, 32, 0.08) 0%, rgba(24, 16, 32, 0.18) 100%)',
+                        pointerEvents: 'none',
+                        zIndex: 1,
+                    }}
+                />
+
+                {/* Editorial pull-quote bottom-left */}
+                <div
+                    style={{
+                        position: 'absolute',
+                        left: 56,
+                        bottom: 56,
+                        maxWidth: 460,
+                        zIndex: 2,
+                    }}
+                >
+                    <div
+                        className="tracking-luxe"
+                        style={{
+                            fontSize: 10,
+                            color: '#D4AF37',
+                            marginBottom: 16,
+                            textShadow: '0 1px 4px rgba(0,0,0,0.4)',
+                        }}
+                    >
+                        Domus · Residence
+                    </div>
+                    <p
+                        className="serif-it"
+                        style={{
+                            fontSize: 26,
+                            lineHeight: 1.35,
+                            color: '#F4EFE0',
+                            fontWeight: 300,
+                            textShadow: '0 2px 8px rgba(0,0,0,0.45)',
+                        }}
+                    >
+                        “Cada detalhe registrado, cada vínculo cuidado — assim se conduz uma residência refinada.”
+                    </p>
+                </div>
             </div>
 
-            <motion.div
-                initial={{ opacity: 0, y: 24 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
-                className="w-full max-w-[420px] relative z-10"
+            {/* RIGHT — minimal form */}
+            <div
+                style={{
+                    position: 'relative',
+                    background: '#FFFFFF',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    justifyContent: 'center',
+                    padding: '64px 64px',
+                    boxShadow: '-20px 0 60px rgba(0, 0, 0, 0.04)',
+                    zIndex: 2,
+                }}
             >
-                {/* Card */}
-                <div className="bg-bg-card/80 backdrop-blur-xl border border-border-primary/60 rounded-xl p-10 shadow-[0_8px_40px_rgba(0,0,0,0.4),0_0_0_1px_rgba(108,99,255,0.04)]">
-                    {/* Logo + Title */}
-                    <div className="text-center mb-10">
-                        <motion.div
-                            initial={{ scale: 0.85, opacity: 0 }}
-                            animate={{ scale: 1, opacity: 1 }}
-                            transition={{ delay: 0.15, duration: 0.5 }}
-                            className="w-14 h-14 mx-auto mb-5 rounded-xl bg-gradient-to-br from-accent-gradient-start to-accent-gradient-end flex items-center justify-center shadow-[0_4px_20px_rgba(108,99,255,0.3)]"
-                        >
-                            <Shield className="w-7 h-7 text-white" />
-                        </motion.div>
-                        <h1 className="text-[22px] font-bold text-text-primary tracking-tight">DomusApp</h1>
-                        <p className="text-text-muted text-[13px] mt-1.5 font-medium">Painel Administrativo</p>
+                {/* Logo + wordmark */}
+                <div
+                    style={{
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'flex-start',
+                        gap: 16,
+                        marginBottom: 56,
+                    }}
+                >
+                    <Monogram size={56} />
+                    <div
+                        className="serif"
+                        style={{
+                            fontSize: 28,
+                            fontWeight: 500,
+                            letterSpacing: '0.04em',
+                            color: '#181020',
+                            lineHeight: 1,
+                        }}
+                    >
+                        Domus
                     </div>
+                </div>
 
-                    {/* Form */}
-                    <form onSubmit={handleSubmit} className="space-y-5">
-                        {/* Email field */}
-                        <div className="space-y-2">
-                            <label htmlFor="email" className="block text-[13px] font-medium text-text-secondary">
-                                Email
-                            </label>
-                            <div className="relative">
-                                <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-[16px] h-[16px] text-text-muted" />
-                                <input
-                                    id="email"
-                                    type="email"
-                                    value={email}
-                                    onChange={(e) => setEmail(e.target.value)}
-                                    placeholder="Digite seu email"
-                                    autoComplete="email"
-                                    className="w-full pl-11 pr-4 py-3.5 bg-bg-input/60 border border-border-primary rounded-lg text-text-primary placeholder-text-muted text-sm focus:border-accent-primary focus:outline-none focus:ring-1 focus:ring-accent-primary/30 focus:bg-bg-input transition-all duration-200"
-                                />
-                            </div>
-                        </div>
+                {/* Greeting */}
+                <div className="fade-up">
+                    <h1
+                        className="serif"
+                        style={{
+                            fontSize: 38,
+                            fontWeight: 400,
+                            color: '#181020',
+                            letterSpacing: '-0.01em',
+                            lineHeight: 1.1,
+                            marginBottom: 12,
+                        }}
+                    >
+                        Bem-vindo{' '}
+                        <span className="serif-it" style={{ color: '#B8941F' }}>
+                            de volta.
+                        </span>
+                    </h1>
+                    <p style={{ fontSize: 14, color: '#5A5160', lineHeight: 1.6 }}>
+                        Acesse sua conta para gerir o condomínio.
+                    </p>
 
-                        {/* Password field */}
-                        <div className="space-y-2">
-                            <label htmlFor="password" className="block text-[13px] font-medium text-text-secondary">
-                                Senha
-                            </label>
-                            <div className="relative">
-                                <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-[16px] h-[16px] text-text-muted" />
-                                <input
-                                    id="password"
-                                    type={showPassword ? 'text' : 'password'}
-                                    value={password}
-                                    onChange={(e) => setPassword(e.target.value)}
-                                    placeholder="Digite sua senha"
-                                    autoComplete="current-password"
-                                    className="w-full pl-11 pr-12 py-3.5 bg-bg-input/60 border border-border-primary rounded-lg text-text-primary placeholder-text-muted text-sm focus:border-accent-primary focus:outline-none focus:ring-1 focus:ring-accent-primary/30 focus:bg-bg-input transition-all duration-200"
-                                />
+                    {/* Gold hairline */}
+                    <div
+                        style={{
+                            width: 40,
+                            height: 1,
+                            background: 'linear-gradient(90deg, #B8941F 0%, transparent 100%)',
+                            margin: '36px 0 32px',
+                        }}
+                    />
+
+                    <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 28 }}>
+                        <FloatingField
+                            id="email"
+                            label="E-mail"
+                            type="email"
+                            value={email}
+                            onChange={setEmail}
+                            focused={emailFocus}
+                            onFocus={() => setEmailFocus(true)}
+                            onBlur={() => setEmailFocus(false)}
+                            autoComplete="email"
+                        />
+
+                        <FloatingField
+                            id="pw"
+                            label="Senha"
+                            type={showPassword ? 'text' : 'password'}
+                            value={password}
+                            onChange={setPassword}
+                            focused={pwFocus}
+                            onFocus={() => setPwFocus(true)}
+                            onBlur={() => setPwFocus(false)}
+                            autoComplete="current-password"
+                            trailing={
                                 <button
                                     type="button"
                                     onClick={() => setShowPassword(!showPassword)}
-                                    className="absolute right-3.5 top-1/2 -translate-y-1/2 p-1 text-text-muted hover:text-text-secondary transition-colors"
+                                    aria-label={showPassword ? 'Ocultar senha' : 'Mostrar senha'}
+                                    style={{
+                                        position: 'absolute',
+                                        right: 0,
+                                        top: '50%',
+                                        transform: 'translateY(-50%)',
+                                        background: 'none',
+                                        border: 'none',
+                                        padding: 8,
+                                        color: '#8C8395',
+                                        cursor: 'pointer',
+                                    }}
                                 >
-                                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                                    {showPassword ? <EyeOff size={15} /> : <Eye size={15} />}
                                 </button>
-                            </div>
-                        </div>
+                            }
+                        />
 
-                        {/* Submit button */}
-                        <motion.button
+                        <CondominiumSelect value={condominium} onChange={setCondominium} />
+
+                        <button
                             type="submit"
                             disabled={isLoading}
-                            whileHover={{ scale: isLoading ? 1 : 1.015 }}
-                            whileTap={{ scale: isLoading ? 1 : 0.985 }}
-                            className="w-full py-3.5 px-4 mt-2 bg-gradient-to-r from-accent-gradient-start to-accent-gradient-end text-white font-semibold rounded-lg shadow-[0_4px_16px_rgba(108,99,255,0.3)] hover:shadow-[0_6px_24px_rgba(108,99,255,0.4)] transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 text-[15px]"
+                            style={{
+                                width: '100%',
+                                padding: '14px 22px',
+                                marginTop: 8,
+                                background: 'linear-gradient(180deg, #C8A532 0%, #B8941F 100%)',
+                                color: '#FFFFFF',
+                                fontFamily: 'var(--font-sans)',
+                                fontSize: 12,
+                                fontWeight: 600,
+                                letterSpacing: '0.18em',
+                                textTransform: 'uppercase',
+                                border: '1px solid #B8941F',
+                                borderRadius: 2,
+                                cursor: isLoading ? 'wait' : 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                gap: 12,
+                                boxShadow:
+                                    '0 2px 12px rgba(184, 148, 31, 0.20), inset 0 1px 0 rgba(255, 255, 255, 0.25)',
+                                transition: 'all 0.25s ease',
+                                opacity: isLoading ? 0.7 : 1,
+                            }}
                         >
                             {isLoading ? (
                                 <>
-                                    <Loader2 className="w-4 h-4 animate-spin" />
-                                    Entrando...
+                                    <Loader2 size={14} className="animate-spin" />
+                                    Autenticando…
                                 </>
                             ) : (
-                                'Entrar no Sistema'
+                                <>
+                                    Entrar
+                                    <ArrowRight size={14} />
+                                </>
                             )}
-                        </motion.button>
+                        </button>
+
+                        <a
+                            href="#"
+                            onClick={(e) => {
+                                e.preventDefault();
+                                toast('Esqueci minha senha — em breve!', { icon: '🚧' });
+                            }}
+                            style={{
+                                textAlign: 'center',
+                                fontFamily: 'var(--font-sans)',
+                                fontSize: 12,
+                                color: '#5A5160',
+                                textDecoration: 'none',
+                                marginTop: -8,
+                            }}
+                        >
+                            Esqueci minha senha
+                        </a>
                     </form>
                 </div>
-            </motion.div>
 
-            {/* Footer — pinned to bottom */}
-            <div className="absolute bottom-6 left-0 right-0 text-center z-10">
-                <p className="text-text-muted text-xs">
-                    Acesso restrito a administradores do condomínio
-                </p>
-                <p className="text-text-muted/50 text-[11px] mt-1">
-                    DomusApp v1.0.0 — Painel Web Admin
-                </p>
+                {/* Footer */}
+                <div
+                    style={{
+                        marginTop: 'auto',
+                        paddingTop: 48,
+                        fontSize: 11,
+                        color: '#8C8395',
+                        lineHeight: 1.6,
+                    }}
+                >
+                    Ao entrar, você concorda com os{' '}
+                    <a
+                        href="#"
+                        style={{
+                            color: '#B8941F',
+                            textDecoration: 'none',
+                            borderBottom: '1px solid rgba(184, 148, 31, 0.4)',
+                        }}
+                    >
+                        Termos de Uso
+                    </a>{' '}
+                    e a{' '}
+                    <a
+                        href="#"
+                        style={{
+                            color: '#B8941F',
+                            textDecoration: 'none',
+                            borderBottom: '1px solid rgba(184, 148, 31, 0.4)',
+                        }}
+                    >
+                        Política de Privacidade
+                    </a>
+                    .
+                </div>
             </div>
+        </div>
+    );
+}
+
+// ---- Floating-label material-style input -------------------------------
+
+interface FloatingFieldProps {
+    id: string;
+    label: string;
+    type: string;
+    value: string;
+    onChange: (v: string) => void;
+    focused: boolean;
+    onFocus: () => void;
+    onBlur: () => void;
+    autoComplete?: string;
+    trailing?: React.ReactNode;
+}
+
+function FloatingField({
+    id,
+    label,
+    type,
+    value,
+    onChange,
+    focused,
+    onFocus,
+    onBlur,
+    autoComplete,
+    trailing,
+}: FloatingFieldProps) {
+    const filled = value && value.length > 0;
+    const elevated = focused || filled;
+    return (
+        <div style={{ position: 'relative', paddingTop: 6 }}>
+            <label
+                htmlFor={id}
+                style={{
+                    position: 'absolute',
+                    left: 0,
+                    top: elevated ? 0 : 22,
+                    fontSize: elevated ? 10 : 14,
+                    fontFamily: 'var(--font-sans)',
+                    letterSpacing: elevated ? '0.16em' : '0',
+                    textTransform: elevated ? 'uppercase' : 'none',
+                    color: focused ? '#B8941F' : '#5A5160',
+                    fontWeight: 500,
+                    pointerEvents: 'none',
+                    transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+                }}
+            >
+                {label}
+            </label>
+            <input
+                id={id}
+                type={type}
+                value={value}
+                onChange={(e) => onChange(e.target.value)}
+                onFocus={onFocus}
+                onBlur={onBlur}
+                autoComplete={autoComplete}
+                style={{
+                    width: '100%',
+                    padding: '12px 0 10px',
+                    background: 'transparent',
+                    border: 'none',
+                    borderBottom: focused ? '1.5px solid #B8941F' : '1px solid #D8CDB6',
+                    outline: 'none',
+                    fontSize: 15,
+                    color: '#181020',
+                    fontFamily: 'var(--font-sans)',
+                    transition: 'border-color 0.2s ease',
+                }}
+            />
+            {trailing}
+        </div>
+    );
+}
+
+function CondominiumSelect({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+    const opts = [
+        { v: 'torreA', label: 'Domus Residence — Torre A' },
+        { v: 'torreB', label: 'Domus Residence — Torre B' },
+        { v: 'torreC', label: 'Domus Residence — Torre C' },
+    ];
+    const filled = !!value;
+    return (
+        <div style={{ position: 'relative', paddingTop: 6 }}>
+            <label
+                style={{
+                    position: 'absolute',
+                    left: 0,
+                    top: 0,
+                    fontSize: 10,
+                    fontFamily: 'var(--font-sans)',
+                    letterSpacing: '0.16em',
+                    textTransform: 'uppercase',
+                    color: filled ? '#B8941F' : '#5A5160',
+                    fontWeight: 500,
+                    pointerEvents: 'none',
+                }}
+            >
+                Condomínio
+            </label>
+            <select
+                value={value}
+                onChange={(e) => onChange(e.target.value)}
+                style={{
+                    width: '100%',
+                    padding: '12px 0 10px',
+                    background: 'transparent',
+                    border: 'none',
+                    borderBottom: '1px solid #D8CDB6',
+                    outline: 'none',
+                    fontSize: 15,
+                    color: filled ? '#181020' : '#8C8395',
+                    fontFamily: 'var(--font-sans)',
+                    appearance: 'none',
+                    backgroundImage: `url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%23B8941F' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'><polyline points='6 9 12 15 18 9'/></svg>")`,
+                    backgroundRepeat: 'no-repeat',
+                    backgroundPosition: 'right center',
+                    cursor: 'pointer',
+                }}
+            >
+                <option value="">Escolha um condomínio</option>
+                {opts.map((o) => (
+                    <option key={o.v} value={o.v}>
+                        {o.label}
+                    </option>
+                ))}
+            </select>
         </div>
     );
 }

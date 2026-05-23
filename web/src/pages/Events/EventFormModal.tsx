@@ -176,6 +176,10 @@ export default function EventFormModal({ isOpen, onClose, onSuccess }: Props) {
                                         name="eventDate"
                                         value={form.eventDate}
                                         onChange={handleChange}
+                                        min="2024-01-01T00:00"
+                                        max="2099-12-31T23:59"
+                                        step={60}
+                                        lang="pt-BR"
                                         className="w-full px-4 py-2.5 rounded-xl bg-bg-secondary border border-border-primary text-text-primary focus:outline-none focus:border-accent-primary focus:ring-1 focus:ring-accent-primary/30 text-sm transition-colors"
                                     />
                                 </div>
