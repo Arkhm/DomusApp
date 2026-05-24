@@ -14,7 +14,9 @@ O DomusApp é uma plataforma moderna para gestão de condomínios, facilitando a
 - JWT para autenticação e controle de permissões
 
 **Frontend**
-- React (Vite)
+- React 19 + Vite + TypeScript
+- Tailwind v4
+- motion/react
 - Axios
 
 **Infraestrutura**
@@ -26,8 +28,8 @@ O DomusApp é uma plataforma moderna para gestão de condomínios, facilitando a
 
 ```
 /api      → Backend da aplicação
-/web      → Frontend web
-/mobile   → App mobile
+/web      → Frontend web (painel administrativo)
+/mobile   → App mobile (em planejamento — destino dos moradores)
 ```
 
 ---
@@ -39,7 +41,7 @@ O DomusApp é uma plataforma moderna para gestão de condomínios, facilitando a
 - **Docker** e **Docker Compose** instalados
 - **Git** instalado
 
-### Passo a Passo
+### Setup inicial (primeira vez)
 
 **1. Clone o repositório:**
 
@@ -50,28 +52,28 @@ cd DomusApp
 
 **2. Configure as variáveis de ambiente:**
 
-Copie o arquivo de exemplo e crie o seu `.env`:
-
 ```bash
 cp .env.example .env
 ```
 
-Abra o arquivo `.env` gerado e preencha a variável `DATABASE_PASSWORD` com uma senha de sua escolha.
+Abra o `.env` e preencha `DATABASE_PASSWORD` com uma senha de sua escolha.
 
-**3. Inicie os contêineres:**
+**3. Suba os contêineres:**
 
 ```bash
 docker compose up -d
 ```
 
-**4. Prepare o banco de dados (migrações e seed):**
-
-Com os contêineres rodando, crie as tabelas e popule o banco com seeder:
+**4. Aplique as migrations versionadas e popule o banco:**
 
 ```bash
-docker compose exec api npx prisma db push
+docker compose exec api npx prisma migrate deploy
+docker compose exec api npx prisma generate
 docker compose exec api npx prisma db seed
+docker compose restart api
 ```
+
+> **Por que `migrate deploy` em vez de `db push`?** As migrations vivem em `api/prisma/migrations/` e documentam todo o histórico do schema. `db push` cria o schema direto e ignora isso — o time inteiro precisa usar `migrate deploy` pra ficar consistente.
 
 **5. Acesse a aplicação:**
 
@@ -79,15 +81,82 @@ docker compose exec api npx prisma db seed
 |---|---|
 | Frontend (Painel Web) | http://localhost:5173 |
 | API Backend | http://localhost:3333 |
+| MySQL | localhost:3307 |
 
 ---
 
-## 🔑 Credenciais de Acesso (geradas no seed)
+## 🔄 Após puxar mudanças (`git pull`)
 
-| Campo | Valor |
-|---|---|
-| E-mail | `admin@domusapp.com` |
-| Senha | `admin123` |
+Sempre que sincronizar com a `main`, rode este fluxo dentro da pasta do projeto:
+
+```bash
+git pull
+docker compose up -d
+docker compose exec api npx prisma migrate deploy   # aplica migrations novas (se houver)
+docker compose exec api npx prisma generate          # regenera o Prisma Client
+docker compose restart api                           # reinicia a API com o client novo
+```
+
+### ⚠️ Pegadinha do `docker compose down`
+
+O `docker compose down` **descarta o volume anônimo** `/usr/src/app/node_modules` do container da API (mesmo sem `-v`). Isso significa que o Prisma Client volta ao estado da imagem do build (provavelmente desatualizado).
+
+**Sintoma:** erro `Cannot read properties of undefined (reading 'findMany')` em qualquer endpoint.
+
+**Fix:** sempre rode `prisma generate` depois de um `down + up`:
+
+```bash
+docker compose down
+docker compose up -d
+docker compose exec api npx prisma generate          # ← obrigatório
+docker compose restart api
+```
+
+> Migrations não precisam ser reaplicadas — elas vivem no volume nomeado do MySQL, que persiste através de `down`.
+
+---
+
+## 🔑 Modelo de Acesso ao Painel
+
+O painel web é **administrativo** — só estas pessoas conseguem logar:
+
+- `role = ADMIN` — administração
+- `role = FUNCIONARIO` — equipe operacional (porteiro, zelador)
+- `role = MORADOR && isSyndic = true` — a síndica eleita
+
+**Morador comum (`MORADOR && !isSyndic`) é bloqueado no login** com 401 + "Sua conta não tem acesso ao painel administrativo." Ele será atendido pelo app mobile (em desenvolvimento).
+
+**Quem pode mutar (criar/excluir):** apenas `ADMIN`. Síndica e funcionário acessam em **modo leitura** — veem tudo (inclusive rascunhos e contadores de leitura), mas não têm botões de "Novo X" nem ícones de lixeira.
+
+---
+
+## 👤 Credenciais (geradas no seed)
+
+| Perfil | E-mail | Senha | Acessa o painel? |
+|---|---|---|---|
+| Administrador | `admin@domusapp.com` | `admin123` | ✅ acesso total |
+| Síndica (Maria, Bloco A 101) | `maria@email.com` | `123456` | ✅ leitura |
+| Funcionário (Carlos, porteiro) | `carlos@email.com` | `123456` | ✅ leitura |
+| Morador (João, Bloco B 202) | `joao@email.com` | `123456` | ❌ bloqueado (mobile) |
+
+---
+
+## 📚 Comandos Úteis
+
+```bash
+# Ver logs da API em tempo real
+docker compose logs api -f
+
+# Resetar o banco (apaga todos os dados e re-aplica migrations)
+docker compose exec api npx prisma migrate reset
+
+# Abrir um shell dentro do container da API
+docker compose exec api sh
+
+# Validar tipos e build de produção do front
+cd web && npm run build
+cd web && npm run lint
+```
 
 ---
 
