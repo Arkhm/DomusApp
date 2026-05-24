@@ -1,5 +1,6 @@
 import api from './api';
 import type { LoginRequest, LoginResponse } from '../types/auth';
+import type { User } from '../types/user';
 
 export const authService = {
     async login(data: LoginRequest): Promise<LoginResponse> {
@@ -7,7 +8,7 @@ export const authService = {
         return response.data;
     },
 
-    saveAuth(token: string, user: any): void {
+    saveAuth(token: string, user: User): void {
         localStorage.setItem('@domusapp:token', token);
         localStorage.setItem('@domusapp:user', JSON.stringify(user));
     },
@@ -21,8 +22,8 @@ export const authService = {
         return localStorage.getItem('@domusapp:token');
     },
 
-    getStoredUser(): any | null {
+    getStoredUser(): User | null {
         const user = localStorage.getItem('@domusapp:user');
-        return user ? JSON.parse(user) : null;
+        return user ? (JSON.parse(user) as User) : null;
     },
 };

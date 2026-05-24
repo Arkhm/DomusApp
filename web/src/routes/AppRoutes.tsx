@@ -1,5 +1,5 @@
 import { Routes, Route, Navigate } from 'react-router-dom';
-import { useAuth } from '../contexts/AuthContext';
+import { useAuth } from '../hooks/useAuth';
 import Login from '../pages/Login';
 import ProtectedLayout from '../components/layout/ProtectedLayout';
 import UsersList from '../pages/Users/UsersList';

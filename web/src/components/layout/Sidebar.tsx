@@ -11,7 +11,7 @@ import {
     ChevronLeft,
     ChevronRight,
 } from 'lucide-react';
-import { useAuth } from '../../contexts/AuthContext';
+import { useAuth } from '../../hooks/useAuth';
 import Monogram from '../luxury/Monogram';
 import { getInitials, roleLabel } from '../luxury/formatters';
 

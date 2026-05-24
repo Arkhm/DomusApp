@@ -6,7 +6,7 @@ import Header from '../components/layout/Header';
 import PageBody from '../components/luxury/PageBody';
 import SectionHeader from '../components/luxury/SectionHeader';
 import Tag from '../components/luxury/Tag';
-import { useAuth } from '../contexts/AuthContext';
+import { useAuth } from '../hooks/useAuth';
 import { userService } from '../services/userService';
 import { noticeService } from '../services/noticeService';
 import { unitService } from '../services/unitService';

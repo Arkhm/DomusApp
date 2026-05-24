@@ -2,9 +2,10 @@ import { useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Eye, EyeOff, ArrowRight, Loader2 } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { useAuth } from '../contexts/AuthContext';
+import { useAuth } from '../hooks/useAuth';
 import Monogram from '../components/luxury/Monogram';
 import aerial from '../assets/aerial-residence.webp';
+import { apiErrorMessage } from '../lib/apiError';
 
 export default function Login() {
     const [email, setEmail] = useState('');
@@ -30,9 +31,8 @@ export default function Login() {
             await login({ email, password });
             toast.success('Acesso liberado.');
             navigate('/dashboard');
-        } catch (error: any) {
-            const message = error.response?.data?.error || 'Não foi possível autenticar. Tente novamente.';
-            toast.error(message);
+        } catch (error) {
+            toast.error(apiErrorMessage(error, 'Não foi possível autenticar. Tente novamente.'));
         } finally {
             setIsLoading(false);
         }

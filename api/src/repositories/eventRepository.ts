@@ -2,7 +2,14 @@ import { prisma } from '../lib/prisma';
 
 export const eventRepository = {
   create: async (data: any) => {
-    return await prisma.event.create({ data });
+    // Inclui as relações pra response bater com o tipo `Event` consumido pelo front.
+    return await prisma.event.create({
+      data,
+      include: {
+        author: { select: { name: true, role: true } },
+        targetUnit: true,
+      },
+    });
   },
 
   findAll: async () => {
@@ -17,6 +24,7 @@ export const eventRepository = {
 
   findForUser: async (unitId: string | null) => {
     const whereClause: any = {
+      status: { in: ['PUBLISHED', 'CANCELLED'] }, // morador não vê DRAFT
       OR: [
         { targetType: 'ALL' }
       ]

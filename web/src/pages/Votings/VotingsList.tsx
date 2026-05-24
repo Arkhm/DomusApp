@@ -16,8 +16,14 @@ import {
 } from '../../types/voting';
 import VotingFormModal from './VotingFormModal';
 import { ListMeta, IconBtn, EmptyTable, DeleteModal, FilterSelect } from '../../components/luxury/ListHelpers';
+import { useAuth } from '../../hooks/useAuth';
+import { apiErrorMessage } from '../../lib/apiError';
 
 export default function VotingsList() {
+    const { user } = useAuth();
+    // Só ADMIN cria/exclui votações. Síndica e funcionário ficam em modo leitura.
+    const canMutate = user?.role === 'ADMIN';
+
     const [votings, setVotings] = useState<Voting[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -79,8 +85,8 @@ export default function VotingsList() {
             toast.success('Votação removida.');
             setDeletingVoting(null);
             load();
-        } catch (err: any) {
-            toast.error(err.response?.data?.error || 'Erro ao remover votação.');
+        } catch (err) {
+            toast.error(apiErrorMessage(err, 'Erro ao remover votação.'));
         } finally {
             setIsDeleting(false);
         }
@@ -138,10 +144,12 @@ export default function VotingsList() {
                             Decisões coletivas, transparência de votos e acompanhamento ao vivo dos resultados.
                         </p>
                     </div>
-                    <button onClick={() => setIsModalOpen(true)} className="btn-gold">
-                        <Plus size={12} />
-                        Nova votação
-                    </button>
+                    {canMutate && (
+                        <button onClick={() => setIsModalOpen(true)} className="btn-gold">
+                            <Plus size={12} />
+                            Nova votação
+                        </button>
+                    )}
                 </div>
 
                 {/* Metric cards */}
@@ -271,6 +279,7 @@ export default function VotingsList() {
                                 total={total}
                                 delay={i * 0.05}
                                 onDelete={() => setDeletingVoting(voting)}
+                                canMutate={canMutate}
                             />
                         ))}
                     </div>
@@ -387,12 +396,14 @@ function VotingCard({
     total,
     delay,
     onDelete,
+    canMutate,
 }: {
     voting: Voting;
     status: VotingStatus;
     total: number;
     delay: number;
     onDelete: () => void;
+    canMutate: boolean;
 }) {
     const winnerId = useMemo(() => {
         if (total === 0) return null;
@@ -430,12 +441,14 @@ function VotingCard({
                         {total} {total === 1 ? 'voto' : 'votos'}
                     </span>
                 </div>
-                <IconBtn
-                    icon={<Trash2 size={14} />}
-                    danger
-                    onClick={onDelete}
-                    title="Excluir votação"
-                />
+                {canMutate && (
+                    <IconBtn
+                        icon={<Trash2 size={14} />}
+                        danger
+                        onClick={onDelete}
+                        title="Excluir votação"
+                    />
+                )}
             </div>
 
             {/* Title + description */}

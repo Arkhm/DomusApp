@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Bell, ChevronDown, LogOut, Lock, User as UserIcon } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import toast from 'react-hot-toast';
-import { useAuth } from '../../contexts/AuthContext';
+import { useAuth } from '../../hooks/useAuth';
 import LiveClock from '../luxury/LiveClock';
 import { getInitials, roleLabel } from '../luxury/formatters';
 import { useGeoCity } from '../../hooks/useGeoCity';

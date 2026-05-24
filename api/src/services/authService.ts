@@ -1,6 +1,7 @@
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { userRepository } from '../repositories/userRepository';
+import { hasPanelAccess } from '../lib/access';
 
 const JWT_SECRET = process.env.JWT_SECRET;
 if (!JWT_SECRET) {
@@ -62,6 +63,10 @@ export const authService = {
     const isPasswordValid = await bcrypt.compare(password, user.password);
     if (!isPasswordValid) {
       throw new Error('Credenciais inválidas.');
+    }
+
+    if (!hasPanelAccess(user)) {
+      throw new Error('Sua conta não tem acesso ao painel administrativo.');
     }
 
     const token = jwt.sign(

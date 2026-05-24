@@ -1,11 +1,18 @@
 import { Navigate, Outlet } from 'react-router-dom';
-import { useAuth } from '../../contexts/AuthContext';
+import { useAuth } from '../../hooks/useAuth';
+import { hasPanelAccess } from '../../lib/access';
 import Sidebar from './Sidebar';
 
 export default function ProtectedLayout() {
-    const { isAuthenticated } = useAuth();
+    const { isAuthenticated, user } = useAuth();
 
     if (!isAuthenticated) {
+        return <Navigate to="/login" replace />;
+    }
+
+    // Defesa em profundidade: backend já recusa o login de quem não tem acesso,
+    // mas se um token antigo (pré-gate) ainda estiver no localStorage, redireciona.
+    if (!hasPanelAccess(user)) {
         return <Navigate to="/login" replace />;
     }
 

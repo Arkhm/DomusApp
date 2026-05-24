@@ -1,42 +1,21 @@
-import { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from 'react';
+import { useState, useCallback, type ReactNode } from 'react';
+import { AuthContext } from './authStore';
 import { authService } from '../services/authService';
 import type { User } from '../types/user';
 import type { LoginRequest } from '../types/auth';
 
-interface AuthContextData {
-    user: User | null;
-    token: string | null;
-    isAuthenticated: boolean;
-    isLoading: boolean;
-    login: (data: LoginRequest) => Promise<void>;
-    logout: () => void;
-}
-
-const AuthContext = createContext<AuthContextData>({} as AuthContextData);
-
 export function AuthProvider({ children }: { children: ReactNode }) {
-    const [user, setUser] = useState<User | null>(null);
-    const [token, setToken] = useState<string | null>(null);
-    const [isLoading, setIsLoading] = useState(true);
-
-    useEffect(() => {
-        const storedToken = authService.getStoredToken();
-        const storedUser = authService.getStoredUser();
-
-        if (storedToken && storedUser) {
-            setToken(storedToken);
-            setUser(storedUser);
-        }
-
-        setIsLoading(false);
-    }, []);
+    // Lazy initializer: lê localStorage **uma vez** durante o primeiro render,
+    // sem disparar setState dentro de useEffect (que o React 19 marca como
+    // cascading render). Resultado: zero hidratação assíncrona, gate de
+    // `ProtectedLayout` já avalia o token correto no primeiro frame.
+    const [token, setToken] = useState<string | null>(() => authService.getStoredToken());
+    const [user, setUser] = useState<User | null>(() => authService.getStoredUser());
 
     const login = useCallback(async (data: LoginRequest) => {
         const response = await authService.login(data);
-
         setUser(response.user);
         setToken(response.token);
-
         authService.saveAuth(response.token, response.user);
     }, []);
 
@@ -52,7 +31,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 user,
                 token,
                 isAuthenticated: !!token,
-                isLoading,
+                isLoading: false,
                 login,
                 logout,
             }}
@@ -60,14 +39,4 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             {children}
         </AuthContext.Provider>
     );
-}
-
-export function useAuth(): AuthContextData {
-    const context = useContext(AuthContext);
-
-    if (!context) {
-        throw new Error('useAuth must be used within an AuthProvider');
-    }
-
-    return context;
 }

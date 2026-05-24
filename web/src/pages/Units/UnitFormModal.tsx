@@ -4,6 +4,7 @@ import toast from 'react-hot-toast';
 import { unitService } from '../../services/unitService';
 import { UNIT_FIELD_LABELS, type UnitType } from '../../types/user';
 import LuxuryModal, { LuxuryModalFooter } from '../../components/luxury/LuxuryModal';
+import { apiErrorMessage } from '../../lib/apiError';
 
 interface UnitFormModalProps {
     isOpen: boolean;
@@ -50,8 +51,8 @@ export default function UnitFormModal({ isOpen, onClose, onSuccess }: UnitFormMo
             );
 
             onSuccess();
-        } catch (error: any) {
-            toast.error(error.response?.data?.error || 'Erro ao cadastrar unidade.');
+        } catch (error) {
+            toast.error(apiErrorMessage(error, 'Erro ao cadastrar unidade.'));
         } finally {
             setIsSubmitting(false);
         }

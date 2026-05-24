@@ -26,6 +26,7 @@ model User {
   notices         Notice[] @relation("NoticeAuthor")
   events          Event[]  @relation("EventAuthor")
   votings         Voting[] @relation("VotingAuthor")
+  noticeReads     NoticeRead[]
 }
 
 model Unit {
@@ -45,18 +46,35 @@ model Unit {
 model Notice {
   id           String   @id @default(uuid())
   title        String
-  content      String   @db.Text 
-  targetType   String   @default("ALL") 
-  
+  content      String   @db.Text
+  targetType   String   @default("ALL")
+
+  status       String   @default("PUBLISHED") // "DRAFT" | "PUBLISHED"
+  priority     String   @default("NORMAL")    // "NORMAL" | "URGENT"
+
   targetUnitId String?
   targetUnit   Unit?    @relation("NoticeTargetUnit", fields: [targetUnitId], references: [id])
-  
+
   // Autor do aviso
   authorId     String
   author       User     @relation("NoticeAuthor", fields: [authorId], references: [id])
 
+  readBy       NoticeRead[]
+
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
+}
+
+model NoticeRead {
+  id       String   @id @default(uuid())
+  noticeId String
+  notice   Notice   @relation(fields: [noticeId], references: [id], onDelete: Cascade)
+  userId   String
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  readAt   DateTime @default(now())
+
+  @@unique([noticeId, userId])
+  @@index([userId])
 }
 
 model Event {
@@ -66,6 +84,10 @@ model Event {
   eventDate    DateTime
   location     String?
   targetType   String   @default("ALL")
+
+  category     String   @default("OUTRO")     // ASSEMBLEIA | CONFRATERNIZACAO | MANUTENCAO | REUNIAO | OUTRO
+  capacity     Int?
+  status       String   @default("PUBLISHED") // DRAFT | PUBLISHED | CANCELLED
 
   targetUnitId String?
   targetUnit   Unit?    @relation("EventTargetUnit", fields: [targetUnitId], references: [id])

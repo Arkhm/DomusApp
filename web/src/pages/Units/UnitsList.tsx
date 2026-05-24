@@ -9,6 +9,7 @@ import { userService } from '../../services/userService';
 import type { Unit, User, UnitType } from '../../types/user';
 import { UNIT_FIELD_LABELS } from '../../types/user';
 import UnitFormModal from './UnitFormModal';
+import { apiErrorMessage } from '../../lib/apiError';
 import {
     FilterSelect,
     ListMeta,
@@ -87,8 +88,8 @@ export default function UnitsList() {
             toast.success('Unidade removida.');
             setDeletingUnit(null);
             load();
-        } catch (err: any) {
-            toast.error(err.response?.data?.error || 'Erro ao remover unidade.');
+        } catch (err) {
+            toast.error(apiErrorMessage(err, 'Erro ao remover unidade.'));
         } finally {
             setIsDeleting(false);
         }

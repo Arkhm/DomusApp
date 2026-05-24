@@ -113,18 +113,6 @@ export default function VotingFormModal({ isOpen, onClose, onSuccess }: Props) {
     const [start, setStart] = useState<DateState>({ day: '', month: '', year: '', hour: '', minute: '' });
     const [end, setEnd] = useState<DateState>({ day: '', month: '', year: '', hour: '', minute: '' });
 
-    const startDayRef = useRef<HTMLInputElement>(null);
-    const startMonthRef = useRef<HTMLInputElement>(null);
-    const startYearRef = useRef<HTMLInputElement>(null);
-    const startHourRef = useRef<HTMLInputElement>(null);
-    const startMinuteRef = useRef<HTMLInputElement>(null);
-
-    const endDayRef = useRef<HTMLInputElement>(null);
-    const endMonthRef = useRef<HTMLInputElement>(null);
-    const endYearRef = useRef<HTMLInputElement>(null);
-    const endHourRef = useRef<HTMLInputElement>(null);
-    const endMinuteRef = useRef<HTMLInputElement>(null);
-
     useEffect(() => {
         if (isOpen) {
             setTitle('');
@@ -135,22 +123,6 @@ export default function VotingFormModal({ isOpen, onClose, onSuccess }: Props) {
             setShowErrors(false);
         }
     }, [isOpen]);
-
-    const advanceIfFull = (value: string, max: number, next: RefObject<HTMLInputElement | null>) => {
-        if (value.length === max) next.current?.focus();
-    };
-
-    const backspaceToPrev = (
-        value: string,
-        prev: RefObject<HTMLInputElement | null>,
-    ) => (e: KeyboardEvent<HTMLInputElement>) => {
-        if (e.key === 'Backspace' && value === '' && prev.current) {
-            e.preventDefault();
-            prev.current.focus();
-            const v = prev.current.value;
-            prev.current.setSelectionRange(v.length, v.length);
-        }
-    };
 
     const startDateComplete = start.day.length === 2 && start.month.length === 2 && start.year.length === 4;
     const endDateComplete = end.day.length === 2 && end.month.length === 2 && end.year.length === 4;
@@ -237,8 +209,11 @@ export default function VotingFormModal({ isOpen, onClose, onSuccess }: Props) {
             await votingService.create(payload);
             toast.success('Votação criada com sucesso!');
             onSuccess();
-        } catch (error: any) {
-            toast.error(error.response?.data?.error || 'Erro ao criar votação.');
+        } catch (error: unknown) {
+            const msg =
+                (error as { response?: { data?: { error?: string } } })?.response?.data?.error ??
+                'Erro ao criar votação.';
+            toast.error(msg);
         } finally {
             setIsSubmitting(false);
         }
@@ -355,15 +330,6 @@ export default function VotingFormModal({ isOpen, onClose, onSuccess }: Props) {
                                     label="Data de Início"
                                     state={start}
                                     setState={setStart}
-                                    refs={{
-                                        day: startDayRef,
-                                        month: startMonthRef,
-                                        year: startYearRef,
-                                        hour: startHourRef,
-                                        minute: startMinuteRef,
-                                    }}
-                                    advanceIfFull={advanceIfFull}
-                                    backspaceToPrev={backspaceToPrev}
                                     dateError={startDateError}
                                     showTodayShortcut
                                 />
@@ -371,15 +337,6 @@ export default function VotingFormModal({ isOpen, onClose, onSuccess }: Props) {
                                     label="Data de Término"
                                     state={end}
                                     setState={setEnd}
-                                    refs={{
-                                        day: endDayRef,
-                                        month: endMonthRef,
-                                        year: endYearRef,
-                                        hour: endHourRef,
-                                        minute: endMinuteRef,
-                                    }}
-                                    advanceIfFull={advanceIfFull}
-                                    backspaceToPrev={backspaceToPrev}
                                     dateError={endDateError}
                                 />
                             </div>
@@ -404,18 +361,6 @@ interface DateTimePickerProps {
     label: string;
     state: DateState;
     setState: React.Dispatch<React.SetStateAction<DateState>>;
-    refs: {
-        day: RefObject<HTMLInputElement | null>;
-        month: RefObject<HTMLInputElement | null>;
-        year: RefObject<HTMLInputElement | null>;
-        hour: RefObject<HTMLInputElement | null>;
-        minute: RefObject<HTMLInputElement | null>;
-    };
-    advanceIfFull: (v: string, max: number, next: RefObject<HTMLInputElement | null>) => void;
-    backspaceToPrev: (
-        v: string,
-        prev: RefObject<HTMLInputElement | null>,
-    ) => (e: KeyboardEvent<HTMLInputElement>) => void;
     dateError: string;
     /** Mostra um atalho "Hoje" inline ao lado do label que preenche só os 3 segmentos de data (dia/mês/ano). */
     showTodayShortcut?: boolean;
@@ -425,15 +370,39 @@ function DateTimePicker({
     label,
     state,
     setState,
-    refs,
-    advanceIfFull,
-    backspaceToPrev,
     dateError,
     showTodayShortcut,
 }: DateTimePickerProps) {
+    // Refs vivem aqui dentro (escopo léxico) — em vez de virem como prop. Isso
+    // evita os warnings `react-hooks/refs` do React 19 que reclamam de
+    // ref passado entre componentes / como argumento de função durante render.
+    // Handlers de avanço/backspace capturam os refs do closure.
+    const dayRef = useRef<HTMLInputElement>(null);
+    const monthRef = useRef<HTMLInputElement>(null);
+    const yearRef = useRef<HTMLInputElement>(null);
+    const hourRef = useRef<HTMLInputElement>(null);
+    const minuteRef = useRef<HTMLInputElement>(null);
+
     const update = (field: keyof DateState, value: string) => {
         setState((prev) => ({ ...prev, [field]: value }));
     };
+
+    const advance = (next: RefObject<HTMLInputElement | null>) => (value: string, max: number) => {
+        if (value.length === max) next.current?.focus();
+    };
+
+    /**
+     * Backspace em segmento vazio devolve o foco ao anterior. Aceita o ref
+     * direto (em vez de receber via factory chamada no render) — assim o lint
+     * `react-hooks/refs` não acusa "passar ref como argumento durante render".
+     */
+    function focusPrev(prev: RefObject<HTMLInputElement | null>) {
+        const el = prev.current;
+        if (!el) return;
+        el.focus();
+        const v = el.value;
+        el.setSelectionRange(v.length, v.length);
+    }
 
     /** Preenche só dia/mês/ano com hoje — preserva hora/minuto se o admin já digitou. */
     const fillToday = () => {
@@ -485,12 +454,12 @@ function DateTimePicker({
                     }`}
                 >
                     <Segment
-                        ref={refs.day}
+                        ref={dayRef}
                         value={state.day}
                         onChange={(v) => {
                             const m = maskDay(v);
                             update('day', m);
-                            advanceIfFull(m, 2, refs.month);
+                            advance(monthRef)(m, 2);
                         }}
                         placeholder="DD"
                         width={28}
@@ -499,14 +468,19 @@ function DateTimePicker({
                     />
                     <Sep>/</Sep>
                     <Segment
-                        ref={refs.month}
+                        ref={monthRef}
                         value={state.month}
                         onChange={(v) => {
                             const m = maskMonth(v);
                             update('month', m);
-                            advanceIfFull(m, 2, refs.year);
+                            advance(yearRef)(m, 2);
                         }}
-                        onKeyDown={backspaceToPrev(state.month, refs.day)}
+                        onKeyDown={(e) => {
+                            if (e.key === 'Backspace' && state.month === '') {
+                                e.preventDefault();
+                                focusPrev(dayRef);
+                            }
+                        }}
                         placeholder="MM"
                         width={28}
                         ariaLabel="Mês"
@@ -514,14 +488,19 @@ function DateTimePicker({
                     />
                     <Sep>/</Sep>
                     <Segment
-                        ref={refs.year}
+                        ref={yearRef}
                         value={state.year}
                         onChange={(v) => {
                             const m = maskYear(v);
                             update('year', m);
-                            advanceIfFull(m, 4, refs.hour);
+                            advance(hourRef)(m, 4);
                         }}
-                        onKeyDown={backspaceToPrev(state.year, refs.month)}
+                        onKeyDown={(e) => {
+                            if (e.key === 'Backspace' && state.year === '') {
+                                e.preventDefault();
+                                focusPrev(monthRef);
+                            }
+                        }}
                         placeholder="AAAA"
                         width={52}
                         ariaLabel="Ano"
@@ -530,24 +509,34 @@ function DateTimePicker({
                 </div>
                 <div className="flex items-center bg-bg-secondary border border-border-primary rounded-xl px-2 py-1 transition-colors focus-within:border-accent-primary focus-within:ring-1 focus-within:ring-accent-primary/30">
                     <Segment
-                        ref={refs.hour}
+                        ref={hourRef}
                         value={state.hour}
                         onChange={(v) => {
                             const m = maskHour(v);
                             update('hour', m);
-                            advanceIfFull(m, 2, refs.minute);
+                            advance(minuteRef)(m, 2);
                         }}
-                        onKeyDown={backspaceToPrev(state.hour, refs.year)}
+                        onKeyDown={(e) => {
+                            if (e.key === 'Backspace' && state.hour === '') {
+                                e.preventDefault();
+                                focusPrev(yearRef);
+                            }
+                        }}
                         placeholder="HH"
                         width={28}
                         ariaLabel="Hora"
                     />
                     <Sep>:</Sep>
                     <Segment
-                        ref={refs.minute}
+                        ref={minuteRef}
                         value={state.minute}
                         onChange={(v) => update('minute', maskMinute(v))}
-                        onKeyDown={backspaceToPrev(state.minute, refs.hour)}
+                        onKeyDown={(e) => {
+                            if (e.key === 'Backspace' && state.minute === '') {
+                                e.preventDefault();
+                                focusPrev(hourRef);
+                            }
+                        }}
                         placeholder="MM"
                         width={28}
                         ariaLabel="Minuto"
