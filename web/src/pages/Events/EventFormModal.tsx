@@ -14,6 +14,7 @@ import {
 import type { Unit } from '../../types/user';
 import { formatUnitDisplay } from '../../types/user';
 import LuxuryModal, { LuxuryModalFooter } from '../../components/luxury/LuxuryModal';
+import { apiErrorMessage } from '../../lib/apiError';
 
 // ---- Date/time helpers (24h, DD/MM/AAAA, per-field) ------------------------
 // We split the date/time into 5 independent inputs (DD / MM / AAAA — HH : MM)
@@ -264,8 +265,8 @@ export default function EventFormModal({ isOpen, onClose, onSuccess }: Props) {
             await eventService.create(payload);
             toast.success('Evento criado com sucesso!');
             onSuccess();
-        } catch (error: any) {
-            toast.error(error.response?.data?.error || 'Erro ao criar evento.');
+        } catch (error) {
+            toast.error(apiErrorMessage(error, 'Erro ao criar evento.'));
         } finally {
             setIsSubmitting(false);
         }

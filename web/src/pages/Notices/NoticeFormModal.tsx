@@ -7,6 +7,7 @@ import type { NoticeFormData } from '../../types/notice';
 import type { Unit } from '../../types/user';
 import { formatUnitDisplay } from '../../types/user';
 import LuxuryModal, { LuxuryModalFooter } from '../../components/luxury/LuxuryModal';
+import { apiErrorMessage } from '../../lib/apiError';
 
 interface NoticeFormModalProps {
     isOpen: boolean;
@@ -56,8 +57,8 @@ export default function NoticeFormModal({ isOpen, onClose, onSuccess }: NoticeFo
             await noticeService.create(form);
             toast.success('Comunicado enviado.');
             onSuccess();
-        } catch (error: any) {
-            toast.error(error.response?.data?.error || 'Erro ao enviar comunicado.');
+        } catch (error) {
+            toast.error(apiErrorMessage(error, 'Erro ao enviar comunicado.'));
         } finally {
             setIsSubmitting(false);
         }

@@ -7,7 +7,7 @@ import PageBody from '../../components/luxury/PageBody';
 import Tag from '../../components/luxury/Tag';
 import { getInitials } from '../../components/luxury/formatters';
 import { eventService } from '../../services/eventService';
-import { useAuth } from '../../contexts/AuthContext';
+import { useAuth } from '../../hooks/useAuth';
 import {
     EVENT_CATEGORY_LABEL,
     type Event as EventItem,
@@ -22,6 +22,7 @@ import {
     DeleteModal,
     FilterSelect,
 } from '../../components/luxury/ListHelpers';
+import { apiErrorMessage } from '../../lib/apiError';
 
 export default function EventsList() {
     const { user } = useAuth();
@@ -88,8 +89,8 @@ export default function EventsList() {
             toast.success('Evento removido.');
             setDeletingEvent(null);
             load();
-        } catch (err: any) {
-            toast.error(err.response?.data?.error || 'Erro ao remover evento.');
+        } catch (err) {
+            toast.error(apiErrorMessage(err, 'Erro ao remover evento.'));
         } finally {
             setIsDeleting(false);
         }

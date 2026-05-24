@@ -7,10 +7,11 @@ import PageBody from '../../components/luxury/PageBody';
 import Tag from '../../components/luxury/Tag';
 import { timeAgo, getInitials } from '../../components/luxury/formatters';
 import { noticeService } from '../../services/noticeService';
-import { useAuth } from '../../contexts/AuthContext';
+import { useAuth } from '../../hooks/useAuth';
 import type { Notice, NoticeStatus, NoticePriority } from '../../types/notice';
 import NoticeFormModal from './NoticeFormModal';
 import { ListMeta, IconBtn, EmptyTable, DeleteModal, FilterSelect } from '../../components/luxury/ListHelpers';
+import { apiErrorMessage } from '../../lib/apiError';
 
 const ROLE_LABELS: Record<string, string> = {
     ADMIN: 'Administração',
@@ -66,8 +67,8 @@ export default function NoticesList() {
             toast.success('Comunicado removido.');
             setDeletingNotice(null);
             load();
-        } catch (err: any) {
-            toast.error(err.response?.data?.error || 'Erro ao remover comunicado.');
+        } catch (err) {
+            toast.error(apiErrorMessage(err, 'Erro ao remover comunicado.'));
         } finally {
             setIsDeleting(false);
         }

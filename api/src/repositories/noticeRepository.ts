@@ -2,7 +2,16 @@ import { prisma } from '../lib/prisma';
 
 export const noticeRepository = {
   create: async (data: any) => {
-    return await prisma.notice.create({ data });
+    // Inclui as relações pra response bater com o tipo `Notice` que o front consome.
+    // Sem `include`, a API devolvia o registro cru do Prisma (sem author/targetUnit),
+    // mentindo sobre o tipo `Promise<Notice>` declarado no service.
+    return await prisma.notice.create({
+      data,
+      include: {
+        author: { select: { name: true, role: true } },
+        targetUnit: true,
+      },
+    });
   },
 
   // findAll para os Admins — inclui contagem de leituras

@@ -8,6 +8,7 @@ import type { User, UserFormData, UserRole, UserStatus, Unit } from '../../types
 import { formatUnitDisplay } from '../../types/user';
 import { isValidCpf } from '../../components/luxury/formatters';
 import LuxuryModal, { LuxuryModalFooter } from '../../components/luxury/LuxuryModal';
+import { apiErrorMessage } from '../../lib/apiError';
 
 interface UserFormModalProps {
     isOpen: boolean;
@@ -87,7 +88,7 @@ export default function UserFormModal({ isOpen, user, onClose, onSuccess }: User
         }
     }, [user, isOpen]);
 
-    const handleChange = (field: keyof UserFormData, value: any) => {
+    const handleChange = <K extends keyof UserFormData>(field: K, value: UserFormData[K]) => {
         setForm((prev) => {
             const updated = { ...prev, [field]: value };
             if (field === 'role' && value !== 'MORADOR') {
@@ -143,38 +144,34 @@ export default function UserFormModal({ isOpen, user, onClose, onSuccess }: User
 
         setIsSubmitting(true);
         try {
-            const submitData: any = {
+            const isMorador = form.role === 'MORADOR';
+            const submitData: Partial<UserFormData> = {
                 name: form.name,
                 email: form.email,
                 cpf: form.cpf.replace(/\D/g, ''),
-                phone: form.phone?.replace(/\D/g, '') || null,
-                password: form.password || undefined,
+                phone: form.phone?.replace(/\D/g, '') || '',
                 role: form.role,
                 status: form.status,
-                isSyndic: form.isSyndic,
-                isCouncilMember: form.isCouncilMember,
+                isSyndic: isMorador ? form.isSyndic : false,
+                isCouncilMember: isMorador ? form.isCouncilMember : false,
+                unitId: isMorador ? form.unitId || undefined : undefined,
             };
 
-            if (form.role === 'MORADOR') {
-                submitData.unitId = form.unitId || null;
-            } else {
-                submitData.unitId = null;
-                submitData.isSyndic = false;
-                submitData.isCouncilMember = false;
+            // Password só vai no payload se preenchida (e sempre em create).
+            if (form.password) {
+                submitData.password = form.password;
             }
-
-            if (isEditing && !submitData.password) delete submitData.password;
 
             if (isEditing && user) {
                 await userService.update(user.id, submitData);
                 toast.success('Residente atualizado.');
             } else {
-                await userService.create(submitData);
+                await userService.create(submitData as UserFormData);
                 toast.success('Residente criado.');
             }
             onSuccess();
-        } catch (error: any) {
-            toast.error(error.response?.data?.error || 'Erro ao salvar residente.');
+        } catch (error) {
+            toast.error(apiErrorMessage(error, 'Erro ao salvar residente.'));
         } finally {
             setIsSubmitting(false);
         }

@@ -1,8 +1,50 @@
-import type { User } from '../types/user';
+import type { User, Unit, UserFormData } from '../types/user';
 import type { Notice, NoticeFormData } from '../types/notice';
 
 // Simulated delay to mimic API calls
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+// ──────────────────────────────────────
+// Mock Units (necessário para hidratar a relação Unit em User)
+// ──────────────────────────────────────
+
+const mockUnits: Unit[] = [
+    {
+        id: 'u-a-101',
+        type: 'APARTMENT',
+        block: 'Bloco A',
+        number: '101',
+        createdAt: '2026-01-01T00:00:00.000Z',
+        updatedAt: '2026-01-01T00:00:00.000Z',
+    },
+    {
+        id: 'u-b-202',
+        type: 'APARTMENT',
+        block: 'Bloco B',
+        number: '202',
+        createdAt: '2026-01-01T00:00:00.000Z',
+        updatedAt: '2026-01-01T00:00:00.000Z',
+    },
+    {
+        id: 'u-a-302',
+        type: 'APARTMENT',
+        block: 'Bloco A',
+        number: '302',
+        createdAt: '2026-01-01T00:00:00.000Z',
+        updatedAt: '2026-01-01T00:00:00.000Z',
+    },
+    {
+        id: 'u-c-401',
+        type: 'APARTMENT',
+        block: 'Bloco C',
+        number: '401',
+        createdAt: '2026-01-01T00:00:00.000Z',
+        updatedAt: '2026-01-01T00:00:00.000Z',
+    },
+];
+
+const findUnit = (id: string | null): Unit | null =>
+    id ? mockUnits.find((u) => u.id === id) ?? null : null;
 
 // ──────────────────────────────────────
 // Mock Users
@@ -14,12 +56,13 @@ let mockUsers: User[] = [
         name: 'Administrador DomusApp',
         email: 'admin@domusapp.com',
         cpf: '00000000000',
-        telefone: '6299990000',
-        perfil: 'administrador',
-        unidade: null,
-        status: 'ativo',
-        is_sindico: false,
-        is_conselheiro: false,
+        phone: '6299990000',
+        role: 'ADMIN',
+        unitId: null,
+        unit: null,
+        status: 'ACTIVE',
+        isSyndic: false,
+        isCouncilMember: false,
         createdAt: '2026-01-01T00:00:00.000Z',
         updatedAt: '2026-01-01T00:00:00.000Z',
     },
@@ -28,12 +71,13 @@ let mockUsers: User[] = [
         name: 'Maria Silva',
         email: 'maria@email.com',
         cpf: '11111111111',
-        telefone: '6298881111',
-        perfil: 'morador',
-        unidade: 'Bloco A - 101',
-        status: 'ativo',
-        is_sindico: true,
-        is_conselheiro: false,
+        phone: '6298881111',
+        role: 'MORADOR',
+        unitId: 'u-a-101',
+        unit: findUnit('u-a-101'),
+        status: 'ACTIVE',
+        isSyndic: true,
+        isCouncilMember: false,
         createdAt: '2026-01-15T10:00:00.000Z',
         updatedAt: '2026-02-20T14:30:00.000Z',
     },
@@ -42,12 +86,13 @@ let mockUsers: User[] = [
         name: 'João Pereira',
         email: 'joao@email.com',
         cpf: '22222222222',
-        telefone: '6298882222',
-        perfil: 'morador',
-        unidade: 'Bloco B - 202',
-        status: 'ativo',
-        is_sindico: false,
-        is_conselheiro: true,
+        phone: '6298882222',
+        role: 'MORADOR',
+        unitId: 'u-b-202',
+        unit: findUnit('u-b-202'),
+        status: 'ACTIVE',
+        isSyndic: false,
+        isCouncilMember: true,
         createdAt: '2026-02-01T08:00:00.000Z',
         updatedAt: '2026-02-01T08:00:00.000Z',
     },
@@ -56,12 +101,13 @@ let mockUsers: User[] = [
         name: 'Carlos Porteiro',
         email: 'carlos@email.com',
         cpf: '33333333333',
-        telefone: '6298883333',
-        perfil: 'funcionario',
-        unidade: null,
-        status: 'ativo',
-        is_sindico: false,
-        is_conselheiro: false,
+        phone: '6298883333',
+        role: 'FUNCIONARIO',
+        unitId: null,
+        unit: null,
+        status: 'ACTIVE',
+        isSyndic: false,
+        isCouncilMember: false,
         createdAt: '2026-02-10T09:00:00.000Z',
         updatedAt: '2026-02-10T09:00:00.000Z',
     },
@@ -70,12 +116,13 @@ let mockUsers: User[] = [
         name: 'Ana Costa',
         email: 'ana@email.com',
         cpf: '44444444444',
-        telefone: '6298884444',
-        perfil: 'morador',
-        unidade: 'Bloco A - 302',
-        status: 'inativo',
-        is_sindico: false,
-        is_conselheiro: false,
+        phone: '6298884444',
+        role: 'MORADOR',
+        unitId: 'u-a-302',
+        unit: findUnit('u-a-302'),
+        status: 'INACTIVE',
+        isSyndic: false,
+        isCouncilMember: false,
         createdAt: '2026-03-01T12:00:00.000Z',
         updatedAt: '2026-03-05T16:00:00.000Z',
     },
@@ -84,12 +131,13 @@ let mockUsers: User[] = [
         name: 'Roberto Mendes',
         email: 'roberto@email.com',
         cpf: '55555555555',
-        telefone: '6298885555',
-        perfil: 'morador',
-        unidade: 'Bloco C - 401',
-        status: 'ativo',
-        is_sindico: false,
-        is_conselheiro: false,
+        phone: '6298885555',
+        role: 'MORADOR',
+        unitId: 'u-c-401',
+        unit: findUnit('u-c-401'),
+        status: 'ACTIVE',
+        isSyndic: false,
+        isCouncilMember: false,
         createdAt: '2026-03-02T11:00:00.000Z',
         updatedAt: '2026-03-02T11:00:00.000Z',
     },
@@ -214,7 +262,7 @@ export const mockUserService = {
         );
     },
 
-    async create(data: any): Promise<User> {
+    async create(data: UserFormData): Promise<User> {
         await delay(600);
 
         if (!data.name || !data.email || !data.cpf) {
@@ -227,17 +275,21 @@ export const mockUserService = {
             throw { response: { data: { error: 'CPF já cadastrado.' } } };
         }
 
+        const isMorador = data.role === 'MORADOR';
+        const unitId = isMorador ? data.unitId ?? null : null;
+
         const newUser: User = {
             id: String(nextUserId++),
             name: data.name,
             email: data.email,
             cpf: data.cpf,
-            telefone: data.telefone || null,
-            perfil: data.perfil || 'morador',
-            unidade: data.perfil === 'morador' ? data.unidade || null : null,
-            status: data.status || 'ativo',
-            is_sindico: data.perfil === 'morador' ? data.is_sindico || false : false,
-            is_conselheiro: data.perfil === 'morador' ? data.is_conselheiro || false : false,
+            phone: data.phone || null,
+            role: data.role,
+            unitId,
+            unit: findUnit(unitId),
+            status: data.status || 'ACTIVE',
+            isSyndic: isMorador ? !!data.isSyndic : false,
+            isCouncilMember: isMorador ? !!data.isCouncilMember : false,
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString(),
         };
@@ -246,7 +298,7 @@ export const mockUserService = {
         return { ...newUser };
     },
 
-    async update(id: string, data: any): Promise<User> {
+    async update(id: string, data: Partial<UserFormData>): Promise<User> {
         await delay(600);
 
         const index = mockUsers.findIndex((u) => u.id === id);
@@ -258,20 +310,23 @@ export const mockUserService = {
             }
         }
 
-        const updated: User = {
+        const merged: User = {
             ...mockUsers[index],
             ...data,
+            // Garante que `unit` reflita `unitId` após o merge.
+            unit: data.unitId !== undefined ? findUnit(data.unitId ?? null) : mockUsers[index].unit,
             updatedAt: new Date().toISOString(),
-        };
+        } as User;
 
-        if (updated.perfil !== 'morador') {
-            updated.unidade = null;
-            updated.is_sindico = false;
-            updated.is_conselheiro = false;
+        if (merged.role !== 'MORADOR') {
+            merged.unitId = null;
+            merged.unit = null;
+            merged.isSyndic = false;
+            merged.isCouncilMember = false;
         }
 
-        mockUsers[index] = updated;
-        return { ...updated };
+        mockUsers[index] = merged;
+        return { ...merged };
     },
 
     async delete(id: string): Promise<void> {

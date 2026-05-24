@@ -11,6 +11,7 @@ import PageBody from '../../components/luxury/PageBody';
 import Tag from '../../components/luxury/Tag';
 import { formatCpf, formatPhone, getInitials } from '../../components/luxury/formatters';
 import { FilterSelect, ListMeta, IconBtn, EmptyTable, DeleteModal } from '../../components/luxury/ListHelpers';
+import { apiErrorMessage } from '../../lib/apiError';
 
 export default function UsersList() {
     const [users, setUsers] = useState<User[]>([]);
@@ -76,8 +77,8 @@ export default function UsersList() {
             toast.success('Residente removido.');
             setDeletingUser(null);
             loadUsers();
-        } catch (err: any) {
-            toast.error(err.response?.data?.error || 'Erro ao remover residente.');
+        } catch (err) {
+            toast.error(apiErrorMessage(err, 'Erro ao remover residente.'));
         } finally {
             setIsDeleting(false);
         }
