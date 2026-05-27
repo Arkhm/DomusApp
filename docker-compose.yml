@@ -9,6 +9,11 @@ services:
       - MYSQL_DATABASE=${DATABASE_NAME}
     volumes:
       - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-p${DATABASE_PASSWORD}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
 
   api:
     build: ./api
@@ -26,9 +31,10 @@ services:
       - DATABASE_PASSWORD=${DATABASE_PASSWORD}
       - DATABASE_NAME=${DATABASE_NAME}
       - JWT_SECRET=${JWT_SECRET}
-    command: npm run dev
+    command: sh -c "npx prisma migrate deploy && npx prisma generate && npm run dev"
     depends_on:
-      - db
+      db:
+        condition: service_healthy
 
   web:
     build: ./web
