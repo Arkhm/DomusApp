@@ -20,9 +20,18 @@ export const unitController = {
     }
   },
 
+  async update(req: Request, res: Response) {
+    try {
+      const id = req.params.id as string;
+      const unit = await unitService.update(id, req.body);
+      res.status(200).json(unit);
+    } catch (error: any) {
+      res.status(400).json({ error: error.message });
+    }
+  },
+
   async delete(req: Request, res: Response) {
     try {
-      // as string para resolver erro de tipagem do TypeScript
       const id = req.params.id as string; 
       
       const result = await unitService.delete(id);

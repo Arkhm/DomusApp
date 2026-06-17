@@ -21,9 +21,6 @@ export const unitRepository = {
     });
   },
 
-  // Tipagem estrita: aceita apenas os valores válidos do enum, não string solta.
-  // Antes "house" minúsculo passaria silenciosamente no TS — agora dá erro de
-  // compilação no chamador, forçando uppercase consistente.
   findByBlockAndNumber: async (
     block: string | null,
     number: string,
@@ -31,6 +28,13 @@ export const unitRepository = {
   ) => {
     return await prisma.unit.findFirst({
       where: { block, number, ...(type ? { type } : {}) }
+    });
+  },
+
+  update: async (id: string, data: any) => {
+    return await prisma.unit.update({
+      where: { id },
+      data
     });
   },
 

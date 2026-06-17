@@ -19,8 +19,6 @@ export const unitService = {
     }
     const type: UnitType = upper;
 
-    // Duplicata é escopada por tipo: um apartamento "A · 101" não conflita com
-    // uma casa "A · 101" — são tipologias distintas em condomínios mistos.
     const existingUnit = await unitRepository.findByBlockAndNumber(
       data.block || null,
       data.number,
@@ -40,6 +38,45 @@ export const unitService = {
 
   async listAll() {
     return await unitRepository.findAll();
+  },
+
+  async update(id: string, data: { type?: string; block?: string; number?: string }) {
+    const unit = await unitRepository.findById(id);
+
+    if (!unit) {
+      throw new Error('Unidade não encontrada.');
+    }
+
+    let typeToUpdate = unit.type as UnitType;
+    if (data.type) {
+      const upper = data.type.toUpperCase();
+      if (!isValidType(upper)) {
+        throw new Error('Tipo de unidade inválido. Use APARTMENT ou HOUSE.');
+      }
+      typeToUpdate = upper;
+    }
+
+    const blockToUpdate = data.block !== undefined ? (data.block || null) : unit.block;
+    const numberToUpdate = data.number !== undefined ? data.number : unit.number;
+
+    if (typeToUpdate !== unit.type || blockToUpdate !== unit.block || numberToUpdate !== unit.number) {
+      const existingUnit = await unitRepository.findByBlockAndNumber(
+        blockToUpdate,
+        numberToUpdate,
+        typeToUpdate
+      );
+
+      if (existingUnit && existingUnit.id !== id) {
+        const label = typeToUpdate === 'HOUSE' ? 'casa' : 'apartamento';
+        throw new Error(`Já existe um(a) ${label} com este bloco/quadra e número.`);
+      }
+    }
+
+    return await unitRepository.update(id, {
+      type: typeToUpdate,
+      block: blockToUpdate,
+      number: numberToUpdate,
+    });
   },
 
   async delete(id: string) {
