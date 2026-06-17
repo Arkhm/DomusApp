@@ -118,11 +118,17 @@ export default function UserFormModal({ isOpen, user, onClose, onSuccess }: User
             toast.error('E-mail inválido. Use o formato usuario@dominio.com.');
             return;
         }
-        if (!form.cpf.trim() || form.cpf.replace(/\D/g, '').length !== 11) {
+        const cpfDigits = form.cpf.replace(/\D/g, '');
+        if (!form.cpf.trim() || cpfDigits.length !== 11) {
             toast.error('CPF inválido. Deve conter 11 dígitos.');
             return;
         }
-        if (!isValidCpf(form.cpf)) {
+        // Ao editar, não rebloqueia um CPF pré-existente que não foi alterado.
+        // Registros antigos/seed podem ter CPF sem dígito verificador válido —
+        // exigir revalidação travaria a edição de qualquer outro campo (nome,
+        // status, etc.). A checagem de dígito só vale para CPF novo ou alterado.
+        const cpfUnchanged = isEditing && !!user && cpfDigits === user.cpf.replace(/\D/g, '');
+        if (!cpfUnchanged && !isValidCpf(cpfDigits)) {
             toast.error('CPF inválido. Verifique os dígitos verificadores.');
             return;
         }
