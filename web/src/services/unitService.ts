@@ -18,6 +18,11 @@ export const unitService = {
         return response.data;
     },
 
+    async update(id: string, data: Partial<UnitFormData>): Promise<Unit> {
+        const response = await api.put<Unit>(`/units/${id}`, data);
+        return response.data;
+    },
+
     async delete(id: string): Promise<void> {
         await api.delete(`/units/${id}`);
     },

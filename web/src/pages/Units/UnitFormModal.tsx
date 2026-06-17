@@ -2,30 +2,32 @@ import { useEffect, useState } from 'react';
 import { Building2, Home } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { unitService } from '../../services/unitService';
-import { UNIT_FIELD_LABELS, type UnitType } from '../../types/user';
+import { UNIT_FIELD_LABELS, type Unit, type UnitType } from '../../types/user';
 import LuxuryModal, { LuxuryModalFooter } from '../../components/luxury/LuxuryModal';
 import { apiErrorMessage } from '../../lib/apiError';
 
 interface UnitFormModalProps {
     isOpen: boolean;
+    unit?: Unit | null; // null/undefined = criando, Unit = editando
     onClose: () => void;
     onSuccess: () => void;
 }
 
-export default function UnitFormModal({ isOpen, onClose, onSuccess }: UnitFormModalProps) {
+export default function UnitFormModal({ isOpen, unit, onClose, onSuccess }: UnitFormModalProps) {
     const [type, setType] = useState<UnitType>('APARTMENT');
     const [block, setBlock] = useState('');
     const [number, setNumber] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const isEditing = !!unit;
 
     useEffect(() => {
         if (isOpen) {
-            setType('APARTMENT');
-            setBlock('');
-            setNumber('');
+            setType(unit?.type || 'APARTMENT');
+            setBlock(unit?.block || '');
+            setNumber(unit?.number || '');
             setIsSubmitting(false);
         }
-    }, [isOpen]);
+    }, [isOpen, unit]);
 
     const labels = UNIT_FIELD_LABELS[type];
 
@@ -40,19 +42,29 @@ export default function UnitFormModal({ isOpen, onClose, onSuccess }: UnitFormMo
         setIsSubmitting(true);
 
         try {
-            await unitService.create({
+            const payload = {
                 type,
                 block: block.trim() || undefined,
                 number: number.trim(),
-            });
+            };
 
-            toast.success(
-                type === 'HOUSE' ? 'Casa cadastrada com sucesso!' : 'Apartamento cadastrado com sucesso!',
-            );
+            if (isEditing && unit) {
+                await unitService.update(unit.id, payload);
+                toast.success(
+                    type === 'HOUSE' ? 'Casa atualizada com sucesso!' : 'Apartamento atualizado com sucesso!',
+                );
+            } else {
+                await unitService.create(payload);
+                toast.success(
+                    type === 'HOUSE' ? 'Casa cadastrada com sucesso!' : 'Apartamento cadastrado com sucesso!',
+                );
+            }
 
             onSuccess();
         } catch (error) {
-            toast.error(apiErrorMessage(error, 'Erro ao cadastrar unidade.'));
+            toast.error(
+                apiErrorMessage(error, isEditing ? 'Erro ao atualizar unidade.' : 'Erro ao cadastrar unidade.'),
+            );
         } finally {
             setIsSubmitting(false);
         }
@@ -64,8 +76,16 @@ export default function UnitFormModal({ isOpen, onClose, onSuccess }: UnitFormMo
             onClose={onClose}
             busy={isSubmitting}
             icon={type === 'HOUSE' ? <Home size={18} strokeWidth={1.4} /> : <Building2 size={18} strokeWidth={1.4} />}
-            title={type === 'HOUSE' ? 'Nova Casa' : 'Novo Apartamento'}
-            subtitle="Cadastre uma unidade do condomínio"
+            title={
+                isEditing
+                    ? type === 'HOUSE'
+                        ? 'Editar Casa'
+                        : 'Editar Apartamento'
+                    : type === 'HOUSE'
+                      ? 'Nova Casa'
+                      : 'Novo Apartamento'
+            }
+            subtitle={isEditing ? 'Atualize os dados da unidade' : 'Cadastre uma unidade do condomínio'}
             size="md"
         >
             <form onSubmit={handleSubmit} style={{ padding: '24px 28px 28px', display: 'flex', flexDirection: 'column', gap: 20 }}>
@@ -113,7 +133,7 @@ export default function UnitFormModal({ isOpen, onClose, onSuccess }: UnitFormMo
 
                 <LuxuryModalFooter
                     onCancel={onClose}
-                    submitLabel="Cadastrar"
+                    submitLabel={isEditing ? 'Salvar alterações' : 'Cadastrar'}
                     loadingLabel="Salvando…"
                     isSubmitting={isSubmitting}
                 />

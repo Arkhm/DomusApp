@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { motion } from 'motion/react';
-import { Plus, Search, Filter, Loader2, Trash2, Home } from 'lucide-react';
+import { Plus, Search, Filter, Loader2, Edit3, Trash2, Home } from 'lucide-react';
 import toast from 'react-hot-toast';
 import Header from '../../components/layout/Header';
 import PageBody from '../../components/luxury/PageBody';
@@ -27,6 +27,7 @@ export default function UnitsList() {
     const [showFilters, setShowFilters] = useState(false);
 
     const [isModalOpen, setIsModalOpen] = useState(false);
+    const [editingUnit, setEditingUnit] = useState<Unit | null>(null);
 
     const [deletingUnit, setDeletingUnit] = useState<Unit | null>(null);
     const [isDeleting, setIsDeleting] = useState(false);
@@ -79,6 +80,15 @@ export default function UnitsList() {
             houses,
         };
     }, [units, blocks, users]);
+
+    const handleCreate = () => {
+        setEditingUnit(null);
+        setIsModalOpen(true);
+    };
+    const handleEdit = (u: Unit) => {
+        setEditingUnit(u);
+        setIsModalOpen(true);
+    };
 
     const handleDelete = async () => {
         if (!deletingUnit) return;
@@ -180,7 +190,7 @@ export default function UnitsList() {
                             </button>
                         </div>
 
-                        <button onClick={() => setIsModalOpen(true)} className="btn-gold">
+                        <button onClick={handleCreate} className="btn-gold">
                             <Plus size={12} />
                             Nova unidade
                         </button>
@@ -434,12 +444,19 @@ export default function UnitsList() {
                                                 Aguardando ocupação
                                             </div>
                                         )}
-                                        <IconBtn
-                                            icon={<Trash2 size={14} />}
-                                            danger
-                                            onClick={() => setDeletingUnit(u)}
-                                            title="Excluir unidade"
-                                        />
+                                        <div style={{ display: 'flex', gap: 4 }}>
+                                            <IconBtn
+                                                icon={<Edit3 size={14} />}
+                                                onClick={() => handleEdit(u)}
+                                                title="Editar unidade"
+                                            />
+                                            <IconBtn
+                                                icon={<Trash2 size={14} />}
+                                                danger
+                                                onClick={() => setDeletingUnit(u)}
+                                                title="Excluir unidade"
+                                            />
+                                        </div>
                                     </div>
                                 </motion.div>
                             );
@@ -471,9 +488,14 @@ export default function UnitsList() {
 
             <UnitFormModal
                 isOpen={isModalOpen}
-                onClose={() => setIsModalOpen(false)}
+                unit={editingUnit}
+                onClose={() => {
+                    setIsModalOpen(false);
+                    setEditingUnit(null);
+                }}
                 onSuccess={() => {
                     setIsModalOpen(false);
+                    setEditingUnit(null);
                     load();
                 }}
             />
