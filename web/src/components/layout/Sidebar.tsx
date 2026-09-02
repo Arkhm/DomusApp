@@ -33,8 +33,9 @@ export default function Sidebar() {
     const { user, logout } = useAuth();
     const navigate = useNavigate();
 
-    const handleLogout = () => {
-        logout();
+    // `logout` é async agora: só a API consegue apagar o cookie httpOnly.
+    const handleLogout = async () => {
+        await logout();
         navigate('/login');
     };
 

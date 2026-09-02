@@ -77,5 +77,22 @@ export const authService = {
 
     const { password: _, ...userWithoutPassword } = user;
     return { user: userWithoutPassword, token };
+  },
+
+  // Reidrata a sessão a partir do id que veio no token do cookie. Revalida o
+  // acesso no banco: um usuário revogado ou rebaixado depois da emissão do
+  // token deixa de ser aceito antes de o cookie expirar.
+  async getAuthenticatedUser(userId: string) {
+    const user = await userRepository.findById(userId);
+    if (!user) {
+      throw new Error('Sessão inválida.');
+    }
+
+    if (!hasPanelAccess(user)) {
+      throw new Error('Sua conta não tem acesso ao painel administrativo.');
+    }
+
+    const { password: _, ...userWithoutPassword } = user;
+    return userWithoutPassword;
   }
 };

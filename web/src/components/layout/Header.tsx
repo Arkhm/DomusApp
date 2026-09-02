@@ -31,9 +31,10 @@ export default function Header({ title, eyebrow }: HeaderProps) {
         return () => document.removeEventListener('mousedown', onClick);
     }, [menuOpen]);
 
-    const handleLogout = () => {
+    // `logout` é async agora: só a API consegue apagar o cookie httpOnly.
+    const handleLogout = async () => {
         setMenuOpen(false);
-        logout();
+        await logout();
         navigate('/login');
     };
 
