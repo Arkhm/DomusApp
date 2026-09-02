@@ -58,6 +58,16 @@ cp .env.example .env
 
 Abra o `.env` e preencha `DATABASE_PASSWORD` com uma senha de sua escolha.
 
+O `.env.example` também traz as variáveis de segurança. Em desenvolvimento os padrões já servem; em produção, ajuste:
+
+| Variável | Para que serve |
+|---|---|
+| `JWT_SECRET` | Assina o token de sessão. **Use um segredo próprio**, nunca o do `.env.example`. |
+| `ALLOWED_ORIGIN` | Origens autorizadas a chamar a API (separadas por vírgula). Qualquer outra recebe `403`. |
+| `NODE_ENV` | Em `production`, o cookie de sessão passa a exigir HTTPS (`secure`). |
+| `COOKIE_SAMESITE` | `strict` por padrão. Só mude para `none` se API e front ficarem em domínios diferentes — e aí `COOKIE_SECURE=true` é obrigatório. |
+| `TRUST_PROXY` | Quantos proxies confiar no `X-Forwarded-For`. Necessário atrás de Railway/Render/nginx para o rate limiter enxergar o IP real. |
+
 **3. Suba os contêineres:**
 
 ```bash
@@ -156,7 +166,13 @@ docker compose exec api sh
 # Validar tipos e build de produção do front
 cd web && npm run build
 cd web && npm run lint
+
+# Verificar as proteções de segurança contra a API rodando
+# (cookie httpOnly, rate limiting, headers do Helmet e CORS restritivo)
+cd api && npm run check:security
 ```
+
+> O `check:security` consome a cota de login do seu IP (10 tentativas/15min por design). Para rodar duas vezes seguidas, reinicie a API entre as execuções: `docker compose restart api`.
 
 ---
 
