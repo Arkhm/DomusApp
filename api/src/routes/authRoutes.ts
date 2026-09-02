@@ -10,8 +10,13 @@ const router = Router();
 router.post('/register', authController.register);
 // `loginLimiter` corta força bruta: 10 tentativas falhas por IP a cada 15min
 router.post('/login', loginLimiter, authController.login);
+// Logout é público de propósito: derrubar o cookie precisa funcionar mesmo com
+// token já expirado, senão a sessão morta ficaria presa no browser.
+router.post('/logout', authController.logout);
 
 // Rotas Protegidas
+router.get('/me', authMiddleware, authController.me);
+
 // Criar novo Administrador
 // 1. O authMiddleware verifica o token JWT e injeta o req.user
 // 2. O authorizeRole verifica se o req.user.role é "ADMIN"
