@@ -65,12 +65,17 @@ export const authService = {
       throw new Error('Credenciais inválidas.');
     }
 
-    if (!hasPanelAccess(user)) {
-      throw new Error('Sua conta não tem acesso ao painel administrativo.');
-    }
+    // Essa condição bloqueia o login com usuário MORADOR sem ter isSyndic, vou deixar o lib/access ocioso pelo menos por agora, não precisamos dele.
+    // if (!hasPanelAccess(user)) {
+    //   throw new Error('Sua conta não tem acesso ao painel administrativo.');
+    // }
 
     const token = jwt.sign(
-      { id: user.id, role: user.role },
+      {
+        id: user.id,
+        role: user.role,
+        isSyndic: user.isSyndic
+      },
       JWT_SECRET,
       { expiresIn: '1d' }
     );

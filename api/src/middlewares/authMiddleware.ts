@@ -5,6 +5,7 @@ export interface AuthRequest extends Request {
   user?: {
     id: string;
     role: string;
+    isSyndic?: boolean;
   };
 }
 
@@ -23,7 +24,7 @@ export const authMiddleware = (req: AuthRequest, res: Response, next: NextFuncti
   try {
     // Descriptografa e valida a assinatura usando o segredo do seu .env
     const secret = process.env.JWT_SECRET as string;
-    const decoded = jwt.verify(token, secret) as { id: string; role: string };
+    const decoded = jwt.verify(token, secret) as { id: string; role: string; isSyndic?: boolean };
 
     // Acopla os dados do usuário (id e role) na requisição.
     req.user = decoded;
