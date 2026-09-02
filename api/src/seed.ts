@@ -2,8 +2,28 @@ import "dotenv/config";
 import bcrypt from 'bcryptjs';
 import { prisma } from './lib/prisma';
 
+// Mesmo UUID usado na migration `add_condominium_multi_tenant` para o backfill
+// dos dados que existiam antes do multi-tenant.
+const DEFAULT_CONDOMINIUM_ID = '00000000-0000-0000-0000-000000000001';
+
 async function seed() {
     console.log('🌱 Iniciando seed do banco de dados para a apresentação...');
+
+    // 0. Condomínio: raiz do isolamento multi-tenant. Todo dado criado abaixo
+    // pertence a ele. O id é o mesmo constante da migration, para o seed e o
+    // backfill dos dados legados apontarem para o mesmo tenant.
+    console.log('🏢 Criando o condomínio (tenant) padrão...');
+
+    const condominium = await prisma.condominium.upsert({
+        where: { id: DEFAULT_CONDOMINIUM_ID },
+        update: {},
+        create: {
+            id: DEFAULT_CONDOMINIUM_ID,
+            name: 'Domus Residence',
+            city: 'Goiânia',
+            state: 'GO',
+        },
+    });
 
     // 1. Criar Unidades (Units) em lote para termos volume
     console.log('🏠 Criando dezenas de unidades (Apartamentos e Casas)...');
@@ -32,7 +52,7 @@ async function seed() {
 
     const createdUnits = [];
     for (const data of unitsData) {
-        const unit = await prisma.unit.create({ data });
+        const unit = await prisma.unit.create({ data: { ...data, condominiumId: condominium.id } });
         createdUnits.push(unit);
     }
 
@@ -58,6 +78,7 @@ async function seed() {
             name: 'Administrador DomusApp', email: 'admin@domusapp.com', cpf: '00000000000',
             phone: '(62) 99999-0000', password: adminPassword, role: 'ADMIN',
             status: 'ACTIVE', isSyndic: false, isCouncilMember: false,
+            condominiumId: condominium.id,
         },
     });
 
@@ -69,7 +90,7 @@ async function seed() {
     ];
 
     for (const staff of staffData) {
-        await prisma.user.create({ data: { ...staff, password: defaultPassword, status: 'ACTIVE', isSyndic: false, isCouncilMember: false } });
+        await prisma.user.create({ data: { ...staff, password: defaultPassword, status: 'ACTIVE', isSyndic: false, isCouncilMember: false, condominiumId: condominium.id } });
     }
 
     // 4. Criar Moradores Vinculados às Unidades
@@ -107,6 +128,7 @@ async function seed() {
                 status: 'ACTIVE',
                 isSyndic: resident.isSyndic || false,
                 isCouncilMember: resident.isCouncilMember || false,
+                condominiumId: condominium.id,
                 unitId: createdUnits[resident.unitIndex].id
             }
         });
@@ -128,7 +150,7 @@ async function seed() {
 
     for (const notice of noticesData) {
         await prisma.notice.create({
-            data: { ...notice, authorId: admin.id }
+            data: { ...notice, authorId: admin.id, condominiumId: condominium.id }
         });
     }
 
@@ -174,6 +196,7 @@ async function seed() {
                 startDate: voting.startDate,
                 endDate: voting.endDate,
                 authorId: admin.id,
+                condominiumId: condominium.id,
                 options: { create: voting.options }
             }
         });
