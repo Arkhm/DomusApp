@@ -67,6 +67,37 @@ O `.env.example` também traz as variáveis de segurança. Em desenvolvimento os
 | `NODE_ENV` | Em `production`, o cookie de sessão passa a exigir HTTPS (`secure`). |
 | `COOKIE_SAMESITE` | `strict` por padrão. Só mude para `none` se API e front ficarem em domínios diferentes — e aí `COOKIE_SECURE=true` é obrigatório. |
 | `TRUST_PROXY` | Quantos proxies confiar no `X-Forwarded-For`. Necessário atrás de Railway/Render/nginx para o rate limiter enxergar o IP real. |
+| `JWT_REFRESH_SECRET` | Assina o refresh token. Precisa ser **diferente** do `JWT_SECRET`; se ficar em branco, a API deriva um valor distinto automaticamente. |
+| `APP_URL` | Endereço do front. Monta o link enviado no email de recuperação de senha. |
+| `SMTP_*`, `MAIL_FROM` | Servidor de email do RF-007. **Sem `SMTP_HOST` nada é enviado pela rede: o link aparece no log da API** — é o modo esperado em desenvolvimento. |
+
+### Sessão: access token e refresh token
+
+O login emite dois cookies httpOnly, e nenhum token trafega no corpo da resposta:
+
+| Cookie | Validade | Path | Papel |
+|---|---|---|---|
+| `domusapp_token` | 15 min | `/` | Autentica cada requisição. Curto de propósito: vale pouco se vazar. |
+| `domusapp_refresh` | 7 dias | `/auth` | Renova o access token em `POST /auth/refresh`. O `Path` restrito o mantém fora das demais rotas. |
+
+Quando o access token vence, o front chama `/auth/refresh` e repete a requisição
+original sozinho — o usuário não é devolvido para a tela de login.
+
+Trocar a senha (RF-007) grava `passwordChangedAt` no usuário, e o `/auth/refresh`
+passa a recusar refresh tokens emitidos antes disso. Sem isso, uma sessão roubada
+sobreviveria 7 dias a uma recuperação de conta.
+
+### Recuperação de senha (RF-007)
+
+`POST /auth/forgot-password` → o link vai por email (ou para o log, sem SMTP) e
+vale 1 hora. `POST /auth/reset-password` consome o token, que é de uso único.
+
+No banco fica apenas o **SHA-256** do token, nunca o token em si: um vazamento da
+tabela `User` não permite redefinir a senha de ninguém. As respostas de
+`forgot-password` são idênticas para email cadastrado e não cadastrado, para a
+rota não virar um verificador de quem mora no condomínio.
+
+Telas: `/esqueci-senha` e `/redefinir-senha?token=...`.
 
 **3. Suba os contêineres:**
 
@@ -170,9 +201,16 @@ cd web && npm run lint
 # Verificar as proteções de segurança contra a API rodando
 # (cookie httpOnly, rate limiting, headers do Helmet e CORS restritivo)
 cd api && npm run check:security
+
+# Verificar validação com Zod, RF-007 e refresh token contra a API rodando
+cd api && npm run check:auth
 ```
 
-> O `check:security` consome a cota de login do seu IP (10 tentativas/15min por design). Para rodar duas vezes seguidas, reinicie a API entre as execuções: `docker compose restart api`.
+> Os dois `check:` consomem cota dos rate limiters do seu IP por design
+> (10 logins/15min; 20 chamadas de recuperação/15min). Para rodar de novo na
+> sequência, reinicie a API entre as execuções: `docker compose restart api`.
+> O `check:auth` lê o link de recuperação do log do container `domusapp_api`;
+> se o Docker não estiver acessível, ele pula essa parte em vez de falhar.
 
 ---
 
