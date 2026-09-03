@@ -17,6 +17,9 @@ interface UserFormModalProps {
     onSuccess: () => void;
 }
 
+// Mesmo piso do schema Zod da API (`common.ts`).
+const MIN_PASSWORD_LENGTH = 8;
+
 const emptyForm: UserFormData = {
     name: '',
     email: '',
@@ -134,6 +137,12 @@ export default function UserFormModal({ isOpen, user, onClose, onSuccess }: User
         }
         if (!isEditing && !form.password) {
             toast.error('Senha é obrigatória para novo usuário.');
+            return;
+        }
+        // Espelha o mínimo exigido pelo schema Zod da API. Sem isto o usuário só
+        // descobriria a regra depois do 400, já com o formulário preenchido.
+        if (form.password && form.password.length < MIN_PASSWORD_LENGTH) {
+            toast.error(`A senha deve ter ao menos ${MIN_PASSWORD_LENGTH} caracteres.`);
             return;
         }
         if (form.phone) {

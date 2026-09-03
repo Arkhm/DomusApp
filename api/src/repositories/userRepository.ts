@@ -9,6 +9,12 @@ export const userRepository = {
     return await prisma.user.findUnique({ where: { cpf } });
   },
 
+  // RF-007 — o lookup do reset é feito pelo **hash** do token, nunca pelo token
+  // em claro. `resetToken` é UNIQUE no banco, então isto usa índice.
+  findByResetToken: async (hashedToken: string) => {
+    return await prisma.user.findUnique({ where: { resetToken: hashedToken } });
+  },
+
   findById: async (id: string) => {
     return await prisma.user.findUnique({ 
       where: { id },

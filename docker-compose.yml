@@ -31,6 +31,14 @@ services:
       - COOKIE_SECURE=${COOKIE_SECURE:-}
       - COOKIE_SAMESITE=${COOKIE_SAMESITE:-}
       - TRUST_PROXY=${TRUST_PROXY:-}
+      - JWT_REFRESH_SECRET=${JWT_REFRESH_SECRET:-}
+      - APP_URL=${APP_URL:-http://localhost:5173}
+      - SMTP_HOST=${SMTP_HOST:-}
+      - SMTP_PORT=${SMTP_PORT:-}
+      - SMTP_USER=${SMTP_USER:-}
+      - SMTP_PASS=${SMTP_PASS:-}
+      - SMTP_SECURE=${SMTP_SECURE:-}
+      - MAIL_FROM=${MAIL_FROM:-}
     command: npm run dev
     depends_on:
       - db

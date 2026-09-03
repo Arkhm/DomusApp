@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
-import jwt from 'jsonwebtoken';
 import { AUTH_COOKIE, clearAuthCookie } from '../lib/authCookie';
+import { verifyAccessToken } from '../lib/tokens';
 
 export interface AuthRequest extends Request {
   user?: {
@@ -34,17 +34,14 @@ export const authMiddleware = (req: AuthRequest, res: Response, next: NextFuncti
   }
 
   try {
-    // Descriptografa e valida a assinatura usando o segredo do seu .env
-    const secret = process.env.JWT_SECRET as string;
-    const decoded = jwt.verify(token, secret) as { id: string; role: string };
-
-    // Acopla os dados do usuário (id e role) na requisição.
-    req.user = decoded;
+    // Valida assinatura e prazo do access token (15 min) e acopla { id, role }.
+    req.user = verifyAccessToken(token);
 
     next();
   } catch (error) {
-    // Token expirado/adulterado: derruba o cookie para o browser não continuar
-    // reenviando lixo em toda requisição.
+    // Token expirado/adulterado: derruba **só** o cookie de acesso. O refresh
+    // sobrevive de propósito — é com ele que o front chama /auth/refresh e
+    // renova a sessão sem mandar o usuário de volta para a tela de login.
     clearAuthCookie(res);
     res.status(401).json({ error: 'Token inválido ou expirado.' });
     return;

@@ -20,6 +20,17 @@ model User {
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
+  // RF-007 — recuperação de senha. `resetToken` guarda o SHA-256 do token que
+  // foi enviado por email, nunca o token em si: se o banco vazar, os hashes não
+  // servem para trocar a senha de ninguém.
+  resetToken       String?   @unique
+  resetTokenExpiry DateTime?
+
+  // Instante da última troca de senha. O /auth/refresh recusa refresh tokens
+  // emitidos antes disso, então um reset derruba as sessões antigas em vez de
+  // deixá-las vivas pelos 7 dias restantes do refresh token.
+  passwordChangedAt DateTime?
+
   unitId          String?  
   unit            Unit?    @relation(fields: [unitId], references: [id])
 

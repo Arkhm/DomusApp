@@ -19,9 +19,25 @@ export const authService = {
         return response.data.user;
     },
 
+    // RF-007 — passo 1. A API responde 200 exista ou não a conta, de propósito:
+    // uma resposta diferente por email inexistente entregaria quem tem cadastro.
+    async forgotPassword(email: string): Promise<string> {
+        const response = await api.post<{ message: string }>('/auth/forgot-password', { email });
+        return response.data.message;
+    },
+
+    // RF-007 — passo 2. O token vem do link enviado por email.
+    async resetPassword(token: string, password: string): Promise<string> {
+        const response = await api.post<{ message: string }>('/auth/reset-password', {
+            token,
+            password,
+        });
+        return response.data.message;
+    },
+
     async logout(): Promise<void> {
         try {
-            // Cookie httpOnly não é apagável pelo JS — só a API consegue.
+            // Cookies httpOnly não são apagáveis pelo JS — só a API consegue.
             await api.post('/auth/logout');
         } finally {
             localStorage.removeItem(USER_CACHE_KEY);

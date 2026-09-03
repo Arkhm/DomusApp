@@ -24,7 +24,7 @@ export const eventController = {
 
   async delete(req: Request, res: Response) {
     try {
-      const { id: eventId } = req.params;
+      const eventId = req.params.id as string;
       const { id: userId, role } = (req as any).user;
       const result = await eventService.delete(eventId, userId, role);
       res.status(200).json(result);

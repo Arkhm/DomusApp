@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { Eye, EyeOff, ArrowRight, Loader2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useAuth } from '../hooks/useAuth';
@@ -292,12 +292,8 @@ export default function Login() {
                             )}
                         </button>
 
-                        <a
-                            href="#"
-                            onClick={(e) => {
-                                e.preventDefault();
-                                toast('Esqueci minha senha — em breve!', { icon: '🚧' });
-                            }}
+                        <Link
+                            to="/esqueci-senha"
                             style={{
                                 textAlign: 'center',
                                 fontFamily: 'var(--font-sans)',
@@ -308,7 +304,7 @@ export default function Login() {
                             }}
                         >
                             Esqueci minha senha
-                        </a>
+                        </Link>
                     </form>
                 </div>
 

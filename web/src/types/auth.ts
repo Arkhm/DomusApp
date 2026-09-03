@@ -5,7 +5,8 @@ export interface LoginRequest {
     password: string;
 }
 
-// A API não devolve mais token no corpo — ele viaja em cookie httpOnly.
+// A API não devolve mais token no corpo — access e refresh viajam em cookies
+// httpOnly separados (domusapp_token e domusapp_refresh).
 export interface LoginResponse {
     user: User;
 }
@@ -17,4 +18,13 @@ export interface SessionResponse {
 export interface AuthState {
     user: User | null;
     isAuthenticated: boolean;
+}
+
+export interface ForgotPasswordRequest {
+    email: string;
+}
+
+export interface ResetPasswordRequest {
+    token: string;
+    password: string;
 }
