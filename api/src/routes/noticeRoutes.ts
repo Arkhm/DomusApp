@@ -14,7 +14,7 @@
     router.post('/:id/read', noticeController.markRead);
 
     // Apenas ADMIN pode CRIAR ou DELETAR avisos
-    router.post('/', authorizeRole(['ADMIN']), noticeController.create);
-    router.delete('/:id', authorizeRole(['ADMIN']), noticeController.delete);
+    router.post('/', authorizeRole(['ADMIN', 'SYNDIC']), noticeController.create);
+    router.delete('/:id', authorizeRole(['ADMIN', 'SYNDIC']), noticeController.delete);
 
     export default router;

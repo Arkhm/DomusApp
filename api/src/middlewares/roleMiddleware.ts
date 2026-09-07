@@ -9,13 +9,18 @@ export const authorizeRole = (allowedRoles: string[]) => {
       return;
     }
 
-    if (!allowedRoles.includes(req.user.role)) {
-      res.status(403).json({ 
-        error: 'Acesso proibido. Não tem permissões para realizar esta ação.' 
-      });
-      return;
+    if (allowedRoles.includes(req.user.role)) {
+      return next();
     }
 
-    next();
+    // Checa o atributo "cargo virtual" SYNDIC
+    if (allowedRoles.includes('SYNDIC') && req.user.isSyndic === true) {
+      return next();
+    }
+
+    res.status(403).json({ 
+      error: 'Acesso negado. Não tem permissões para realizar esta ação.' 
+    });
+    return;
   };
 };

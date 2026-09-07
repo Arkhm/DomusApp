@@ -7,11 +7,9 @@ const router = Router();
 
 router.use(authMiddleware);
 
-// ADMIN e FUNCIONARIO podem listar as votações
-router.get('/', authorizeRole(['ADMIN', 'FUNCIONARIO']), votingController.list);
+router.get('/', authorizeRole(['ADMIN', 'FUNCIONARIO', 'SYNDIC']), votingController.list);
 
-// Apenas ADMIN pode criar ou apagar votações
-router.post('/', authorizeRole(['ADMIN']), votingController.create);
-router.delete('/:id', authorizeRole(['ADMIN']), votingController.delete);
+router.post('/', authorizeRole(['ADMIN', 'SYNDIC']), votingController.create);
+router.delete('/:id', authorizeRole(['ADMIN', 'SYNDIC']), votingController.delete);
 
 export default router;
