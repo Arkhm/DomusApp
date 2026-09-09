@@ -1,5 +1,6 @@
 import bcrypt from 'bcryptjs';
 import { userRepository } from '../repositories/userRepository';
+import { sanitizeUser } from '../lib/sanitizeUser';
 
 export const userService = {
   async listAll() {
@@ -9,9 +10,8 @@ export const userService = {
   async getById(id: string) {
     const user = await userRepository.findById(id);
     if (!user) throw new Error('Usuário não encontrado.');
-    
-    const { password, ...userWithoutPassword } = user;
-    return userWithoutPassword;
+
+    return sanitizeUser(user);
   },
 
   async search(query: string) {
@@ -51,8 +51,7 @@ export const userService = {
     data.password = await bcrypt.hash(data.password, 10);
 
     const newUser = await userRepository.create(data);
-    const { password, ...userWithoutPassword } = newUser;
-    return userWithoutPassword;
+    return sanitizeUser(newUser);
   },
 
   async update(id: string, data: any) {
@@ -94,8 +93,7 @@ export const userService = {
     }
 
     const updatedUser = await userRepository.update(id, data);
-    const { password, ...userWithoutPassword } = updatedUser;
-    return userWithoutPassword;
+    return sanitizeUser(updatedUser);
   },
 
   async delete(id: string) {

@@ -10,6 +10,12 @@ const api = axios.create({
     withCredentials: true,
 });
 
+// Rotas que não exigem sessão. A AuthContext chama /auth/me em toda página pra
+// saber se existe cookie válido — nas páginas daqui, um 401 dessa checagem é
+// esperado (visitante deslogado abrindo "esqueci minha senha", por exemplo) e
+// não deve disparar o redirect abaixo.
+const PUBLIC_PATHS = ['/login', '/esqueci-senha', '/redefinir-senha'];
+
 // Response interceptor — handle 401 (unauthorized)
 api.interceptors.response.use(
     (response) => response,
@@ -19,7 +25,7 @@ api.interceptors.response.use(
             localStorage.removeItem('@domusapp:user');
 
             // Redirect to login if not already there
-            if (window.location.pathname !== '/login') {
+            if (!PUBLIC_PATHS.includes(window.location.pathname)) {
                 window.location.href = '/login';
             }
         }

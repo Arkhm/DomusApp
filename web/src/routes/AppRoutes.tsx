@@ -1,6 +1,8 @@
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import Login from '../pages/Login';
+import ForgotPassword from '../pages/ForgotPassword';
+import ResetPassword from '../pages/ResetPassword';
 import ProtectedLayout from '../components/layout/ProtectedLayout';
 import UsersList from '../pages/Users/UsersList';
 import NoticesList from '../pages/Notices/NoticesList';
@@ -28,6 +30,11 @@ export default function AppRoutes() {
                     isAuthenticated ? <Navigate to="/dashboard" replace /> : <Login />
                 }
             />
+            {/* Públicas de propósito, independente de sessão ativa: um link de
+                e-mail de redefinição precisa funcionar mesmo com o navegador
+                já logado em outra conta. */}
+            <Route path="/esqueci-senha" element={<ForgotPassword />} />
+            <Route path="/redefinir-senha" element={<ResetPassword />} />
 
             <Route element={<ProtectedLayout />}>
                 <Route path="/dashboard" element={<Dashboard />} />

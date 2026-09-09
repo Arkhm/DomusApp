@@ -11,3 +11,16 @@ export const loginLimiter = rateLimit({
   // Um login bem-sucedido não consome cota — a proteção é contra força bruta.
   skipSuccessfulRequests: true,
 });
+
+// Máximo de 5 solicitações de redefinição de senha por IP a cada 15 minutos.
+// Sem isso, o endpoint vira um jeito fácil de floodar a caixa de entrada de
+// alguém. Sem `skipSuccessfulRequests`: toda solicitação aqui responde 200
+// (é assim que evitamos revelar se o e-mail existe), então pular sucesso
+// desativaria o limite por completo.
+export const forgotPasswordLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Muitas solicitações. Tente novamente em 15 minutos.' },
+});
