@@ -3,13 +3,16 @@ import { authController } from '../controllers/authController';
 import { authMiddleware } from '../middlewares/authMiddleware';
 import { authorizeRole } from '../middlewares/roleMiddleware';
 import { loginLimiter } from '../middlewares/rateLimitMiddleware';
+import { validate } from '../middlewares/validate';
+import { loginSchema, registerSchema } from '../schemas/authSchema';
 
 const router = Router();
 
 // Rotas Públicas
-router.post('/register', authController.register);
-// `loginLimiter` corta força bruta: 10 tentativas falhas por IP a cada 15min
-router.post('/login', loginLimiter, authController.login);
+router.post('/register', validate(registerSchema), authController.register);
+// `loginLimiter` corta força bruta antes da validação de propósito: um body
+// malformado ainda deve consumir cota (só login bem-sucedido é de graça).
+router.post('/login', loginLimiter, validate(loginSchema), authController.login);
 // Logout é público de propósito: derrubar o cookie precisa funcionar mesmo com
 // token já expirado, senão a sessão morta ficaria presa no browser.
 router.post('/logout', authController.logout);
@@ -25,6 +28,7 @@ router.post(
   '/register-admin',
   authMiddleware,
   authorizeRole(['ADMIN']),
+  validate(registerSchema),
   authController.registerAdmin
 );
 
