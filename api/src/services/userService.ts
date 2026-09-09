@@ -1,5 +1,6 @@
 import bcrypt from 'bcryptjs';
 import { userRepository } from '../repositories/userRepository';
+import { isValidCpf } from '../lib/cpf';
 
 export const userService = {
   async listAll() {
@@ -64,6 +65,12 @@ export const userService = {
     }
 
     if (data.cpf && data.cpf !== user.cpf) {
+      // O dígito verificador só é conferido quando o CPF muda de fato. O
+      // schema Zod da edição valida só o formato (11 dígitos) — registros
+      // antigos/seed podem ter CPF sem dígito verificador válido, e reenviar
+      // o mesmo CPF em uma edição de outro campo não pode travar. Mesma regra
+      // já aplicada no front (ver UserFormModal `cpfUnchanged`).
+      if (!isValidCpf(data.cpf)) throw new Error('CPF inválido.');
       if (await userRepository.findByCpf(data.cpf)) throw new Error('CPF já cadastrado por outro.');
     }
 

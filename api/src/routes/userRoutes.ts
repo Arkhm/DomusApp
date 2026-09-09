@@ -2,6 +2,8 @@ import { Router, Response } from 'express';
 import { userController } from '../controllers/userController';
 import { authMiddleware, AuthRequest } from '../middlewares/authMiddleware';
 import { authorizeRole } from '../middlewares/roleMiddleware';
+import { validate } from '../middlewares/validate';
+import { createUserSchema, updateUserSchema } from '../schemas/userSchema';
 
 const router = Router();
 
@@ -18,8 +20,8 @@ router.get('/', authorizeRole(['ADMIN', 'FUNCIONARIO']), userController.list);
 router.get('/:id', authorizeRole(['ADMIN', 'FUNCIONARIO']), userController.getById);
 
 // Apenas ADMIN pode criar, editar ou apagar utilizadores pelo painel
-router.post('/', authorizeRole(['ADMIN']), userController.create);
-router.put('/:id', authorizeRole(['ADMIN']), userController.update);
+router.post('/', authorizeRole(['ADMIN']), validate(createUserSchema), userController.create);
+router.put('/:id', authorizeRole(['ADMIN']), validate(updateUserSchema), userController.update);
 router.delete('/:id', authorizeRole(['ADMIN']), userController.delete);
 
 export default router;
