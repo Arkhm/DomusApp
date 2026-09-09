@@ -9,6 +9,10 @@ export const userRepository = {
     return await prisma.user.findUnique({ where: { cpf } });
   },
 
+  findByResetTokenHash: async (resetToken: string) => {
+    return await prisma.user.findUnique({ where: { resetToken } });
+  },
+
   findById: async (id: string) => {
     return await prisma.user.findUnique({ 
       where: { id },

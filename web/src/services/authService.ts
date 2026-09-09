@@ -1,5 +1,5 @@
 import api from './api';
-import type { LoginRequest, LoginResponse, SessionResponse } from '../types/auth';
+import type { LoginRequest, LoginResponse, MessageResponse, SessionResponse } from '../types/auth';
 import type { User } from '../types/user';
 
 // Chave herdada da era do localStorage. Hoje guarda **apenas** o perfil (nome,
@@ -45,5 +45,17 @@ export const authService = {
             localStorage.removeItem(USER_CACHE_KEY);
             return null;
         }
+    },
+
+    // RF-007. A resposta é sempre a mesma frase genérica, exista ou não o
+    // e-mail — isso já vem assim da API, o front só repassa.
+    async forgotPassword(email: string): Promise<MessageResponse> {
+        const response = await api.post<MessageResponse>('/auth/forgot-password', { email });
+        return response.data;
+    },
+
+    async resetPassword(token: string, newPassword: string): Promise<MessageResponse> {
+        const response = await api.post<MessageResponse>('/auth/reset-password', { token, newPassword });
+        return response.data;
     },
 };

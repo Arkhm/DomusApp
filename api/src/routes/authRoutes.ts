@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { authController } from '../controllers/authController';
 import { authMiddleware } from '../middlewares/authMiddleware';
 import { authorizeRole } from '../middlewares/roleMiddleware';
-import { loginLimiter } from '../middlewares/rateLimitMiddleware';
+import { forgotPasswordLimiter, loginLimiter } from '../middlewares/rateLimitMiddleware';
 
 const router = Router();
 
@@ -13,6 +13,10 @@ router.post('/login', loginLimiter, authController.login);
 // Logout é público de propósito: derrubar o cookie precisa funcionar mesmo com
 // token já expirado, senão a sessão morta ficaria presa no browser.
 router.post('/logout', authController.logout);
+
+// RF-007 — recuperação de senha.
+router.post('/forgot-password', forgotPasswordLimiter, authController.forgotPassword);
+router.post('/reset-password', authController.resetPassword);
 
 // Rotas Protegidas
 router.get('/me', authMiddleware, authController.me);

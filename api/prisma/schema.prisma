@@ -15,10 +15,16 @@ model User {
   password        String
   role            String   @default("MORADOR")
   status          String   @default("ACTIVE") 
-  isSyndic        Boolean  @default(false)   
-  isCouncilMember Boolean  @default(false)   
+  isSyndic        Boolean  @default(false)
+  isCouncilMember Boolean  @default(false)
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
+
+  // RF-007 — recuperação de senha. Guarda o hash SHA-256 do token (nunca o
+  // token em si, mesmo princípio do bcrypt nas senhas): se o banco vazar,
+  // ninguém consegue redefinir a senha de ninguém com o que está aqui.
+  resetToken       String?   @unique
+  resetTokenExpiry DateTime?
 
   unitId          String?  
   unit            Unit?    @relation(fields: [unitId], references: [id])
