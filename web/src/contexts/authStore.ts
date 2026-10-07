@@ -4,11 +4,10 @@ import type { LoginRequest } from '../types/auth';
 
 export interface AuthContextData {
     user: User | null;
-    token: string | null;
     isAuthenticated: boolean;
     isLoading: boolean;
     login: (data: LoginRequest) => Promise<void>;
-    logout: () => void;
+    logout: () => Promise<void>;
 }
 
 /**

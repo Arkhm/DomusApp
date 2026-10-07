@@ -1,6 +1,11 @@
 import api from './api';
-import type { LoginRequest, LoginResponse } from '../types/auth';
+import type { LoginRequest, LoginResponse, SessionResponse } from '../types/auth';
 import type { User } from '../types/user';
+
+// Chave herdada da era do localStorage. Hoje guarda **apenas** o perfil (nome,
+// role, unidade) para o primeiro frame não piscar a tela de login — o token
+// não passa mais por aqui.
+const USER_CACHE_KEY = '@domusapp:user';
 
 export const authService = {
     async login(data: LoginRequest): Promise<LoginResponse> {
@@ -8,22 +13,37 @@ export const authService = {
         return response.data;
     },
 
-    saveAuth(token: string, user: User): void {
-        localStorage.setItem('@domusapp:token', token);
-        localStorage.setItem('@domusapp:user', JSON.stringify(user));
+    // Reidrata a sessão no reload: quem valida o cookie httpOnly é a API.
+    async me(): Promise<User> {
+        const response = await api.get<SessionResponse>('/auth/me');
+        return response.data.user;
     },
 
-    logout(): void {
-        localStorage.removeItem('@domusapp:token');
-        localStorage.removeItem('@domusapp:user');
+    async logout(): Promise<void> {
+        try {
+            // Cookie httpOnly não é apagável pelo JS — só a API consegue.
+            await api.post('/auth/logout');
+        } finally {
+            localStorage.removeItem(USER_CACHE_KEY);
+        }
     },
 
-    getStoredToken(): string | null {
-        return localStorage.getItem('@domusapp:token');
+    cacheUser(user: User): void {
+        localStorage.setItem(USER_CACHE_KEY, JSON.stringify(user));
     },
 
-    getStoredUser(): User | null {
-        const user = localStorage.getItem('@domusapp:user');
-        return user ? (JSON.parse(user) as User) : null;
+    clearCachedUser(): void {
+        localStorage.removeItem(USER_CACHE_KEY);
+    },
+
+    getCachedUser(): User | null {
+        const user = localStorage.getItem(USER_CACHE_KEY);
+        if (!user) return null;
+        try {
+            return JSON.parse(user) as User;
+        } catch {
+            localStorage.removeItem(USER_CACHE_KEY);
+            return null;
+        }
     },
 };

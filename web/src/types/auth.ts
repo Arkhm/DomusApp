@@ -5,14 +5,16 @@ export interface LoginRequest {
     password: string;
 }
 
+// A API não devolve mais token no corpo — ele viaja em cookie httpOnly.
 export interface LoginResponse {
-    token: string;
-    refreshToken?: string;
+    user: User;
+}
+
+export interface SessionResponse {
     user: User;
 }
 
 export interface AuthState {
     user: User | null;
-    token: string | null;
     isAuthenticated: boolean;
 }
