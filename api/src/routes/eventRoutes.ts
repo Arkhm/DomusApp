@@ -12,7 +12,7 @@ router.use(authMiddleware);
 
 router.get('/', eventController.list);
 
-router.post('/', authorizeRole(['ADMIN']), validate(createEventSchema), eventController.create);
-router.delete('/:id', authorizeRole(['ADMIN']), validate(idParamSchema, 'params'), eventController.delete);
+router.post('/', authorizeRole(['ADMIN', 'SYNDIC']), validate(createEventSchema), eventController.create);
+router.delete('/:id', authorizeRole(['ADMIN', 'SYNDIC']), validate(idParamSchema, 'params'), eventController.delete);
 
 export default router;

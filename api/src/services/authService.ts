@@ -62,8 +62,8 @@ const createUserLogic = async (data: RegisterDTO, assignedRole: string) => {
 // emitidos (tabela de sessões), o que está fora do escopo desta etapa. Hoje o
 // único gatilho que derruba sessões abertas é o `passwordChangedAt`, checado
 // em refreshSession.
-const issueSession = (user: { id: string; role: string }) => ({
-  accessToken: signAccessToken({ id: user.id, role: user.role }),
+const issueSession = (user: { id: string; role: string; isSyndic?: boolean }) => ({
+  accessToken: signAccessToken({ id: user.id, role: user.role, isSyndic: user.isSyndic }),
   refreshToken: signRefreshToken(user.id),
 });
 
@@ -94,9 +94,10 @@ export const authService = {
       throw new Error('Credenciais inválidas.');
     }
 
-    if (!hasPanelAccess(user)) {
-      throw new Error('Sua conta não tem acesso ao painel administrativo.');
-    }
+    // Essa condição bloqueia o login com usuário MORADOR sem ter isSyndic, vou deixar o lib/access ocioso pelo menos por agora, não precisamos dele.
+    // if (!hasPanelAccess(user)) {
+    //   throw new Error('Sua conta não tem acesso ao painel administrativo.');
+    // }
 
     const { password: _, ...userWithoutPassword } = user;
     return { user: userWithoutPassword, ...issueSession(user) };

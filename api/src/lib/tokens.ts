@@ -22,6 +22,7 @@ export const REFRESH_TOKEN_TTL_SECONDS = 7 * 24 * 60 * 60;
 export interface AccessTokenPayload {
   id: string;
   role: string;
+  isSyndic?: boolean;
 }
 
 // `type` é conferido na verificação. É o cinto de segurança caso um dia os dois
