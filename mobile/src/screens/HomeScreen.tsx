@@ -10,7 +10,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
-import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import type { StackNavigationProp } from '@react-navigation/stack';
 import {
   ConfirmSheet,
   ModuleCard,
@@ -32,7 +32,7 @@ import {
 import { colors, layout, radius, spacing, typography } from '../theme';
 import type { RootStackParamList } from '../types';
 
-type HomeNavigation = NativeStackNavigationProp<RootStackParamList>;
+type HomeNavigation = StackNavigationProp<RootStackParamList>;
 
 function initialsOf(name: string): string {
   const parts = name.trim().split(/\s+/).slice(0, 2);
@@ -71,8 +71,14 @@ export function HomeScreen(): React.JSX.Element {
   }
 
   function openModule(module: AppModule): void {
-    // Nenhum módulo tem tela própria nesta entrega: todos caem no placeholder,
-    // que explica o que falta do lado da API.
+    if (module.id === 'comunicados') {
+      navigation.navigate('Comunicados');
+      return;
+    }
+    if (module.id === 'notificacoes') {
+      navigation.navigate('Main', { screen: 'Notificacoes' });
+      return;
+    }
     navigation.navigate('EmBreve', {
       title: module.label,
       description: module.pendingNote,
@@ -180,7 +186,7 @@ export function HomeScreen(): React.JSX.Element {
                   label={module.label}
                   icon={module.icon}
                   onPress={() => openModule(module)}
-                  isComingSoon
+                  isComingSoon={module.id !== 'comunicados'}
                 />
               </View>
             ))}

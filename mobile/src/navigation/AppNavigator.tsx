@@ -1,18 +1,19 @@
-import React from 'react';
-import { ActivityIndicator, StyleSheet, View } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { AccessibilityInfo, ActivityIndicator, Easing, StyleSheet, View } from 'react-native';
 import { NavigationContainer, type Theme } from '@react-navigation/native';
-import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import { CardStyleInterpolators, createStackNavigator } from '@react-navigation/stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
 import { LoginScreen } from '../screens/LoginScreen';
 import { HomeScreen } from '../screens/HomeScreen';
 import { ProfileScreen } from '../screens/ProfileScreen';
+import { NoticesScreen, NoticeDetailScreen } from '../screens/NoticesScreen';
 import { ComingSoonScreen, TabPlaceholder } from '../screens/ComingSoonScreen';
 import { useAuth } from '../contexts/AuthContext';
 import { colors, fontFamily, layout, spacing, typography } from '../theme';
 import type { MainTabParamList, RootStackParamList } from '../types';
 
-const Stack = createNativeStackNavigator<RootStackParamList>();
+const Stack = createStackNavigator<RootStackParamList>();
 const Tab = createBottomTabNavigator<MainTabParamList>();
 
 const navigationTheme: Theme = {
@@ -51,11 +52,11 @@ function AccessScreen(): React.JSX.Element {
   );
 }
 
-function PackagesScreen(): React.JSX.Element {
+function NotificationsScreen(): React.JSX.Element {
   return (
     <TabPlaceholder
-      title="Encomendas"
-      description="A API ainda não expõe /packages para consultar entregas na portaria."
+      title="Notificações"
+      description="Em breve, você poderá acompanhar aqui as novidades e os alertas do seu condomínio."
     />
   );
 }
@@ -64,7 +65,7 @@ const TAB_ICONS: Record<keyof MainTabParamList, [active: string, inactive: strin
   Inicio: ['home', 'home-outline'],
   Reservas: ['calendar', 'calendar-outline'],
   Acessos: ['key', 'key-outline'],
-  Encomendas: ['cube', 'cube-outline'],
+  Notificacoes: ['notifications', 'notifications-outline'],
   Perfil: ['person', 'person-outline'],
 };
 
@@ -90,7 +91,7 @@ function MainTabs(): React.JSX.Element {
       <Tab.Screen name="Inicio" component={HomeScreen} options={{ title: 'Início' }} />
       <Tab.Screen name="Reservas" component={ReservationsScreen} />
       <Tab.Screen name="Acessos" component={AccessScreen} />
-      <Tab.Screen name="Encomendas" component={PackagesScreen} />
+      <Tab.Screen name="Notificacoes" component={NotificationsScreen} options={{ title: 'Notificações' }} />
       <Tab.Screen name="Perfil" component={ProfileScreen} />
     </Tab.Navigator>
   );
@@ -106,15 +107,40 @@ function BootSplash(): React.JSX.Element {
 
 export function AppNavigator(): React.JSX.Element {
   const { user, isRestoring } = useAuth();
+  const [reduceMotion, setReduceMotion] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    void AccessibilityInfo.isReduceMotionEnabled().then((enabled) => {
+      if (active) setReduceMotion(enabled);
+    });
+    const subscription = AccessibilityInfo.addEventListener('reduceMotionChanged', setReduceMotion);
+    return () => { active = false; subscription.remove(); };
+  }, []);
 
   if (isRestoring) return <BootSplash />;
 
   return (
     <NavigationContainer theme={navigationTheme}>
-      <Stack.Navigator>
+      <Stack.Navigator screenOptions={{
+        animation: reduceMotion ? 'none' : 'slide_from_right',
+        gestureDirection: 'horizontal',
+        gestureEnabled: !reduceMotion,
+        cardStyleInterpolator: CardStyleInterpolators.forHorizontalIOS,
+        transitionSpec: {
+          open: { animation: 'timing', config: { duration: 280, easing: Easing.out(Easing.cubic) } },
+          close: { animation: 'timing', config: { duration: 240, easing: Easing.out(Easing.cubic) } },
+        },
+        cardStyle: { flex: 1, backgroundColor: colors.background },
+        cardShadowEnabled: false,
+        cardOverlayEnabled: false,
+        headerMode: 'screen',
+      }}>
         {user ? (
           <>
             <Stack.Screen name="Main" component={MainTabs} options={{ headerShown: false }} />
+            <Stack.Screen name="Comunicados" component={NoticesScreen} options={{ headerShown: false }} />
+            <Stack.Screen name="Comunicado" component={NoticeDetailScreen} options={{ headerShown: false }} />
             <Stack.Screen
               name="EmBreve"
               component={ComingSoonScreen}
@@ -124,7 +150,6 @@ export function AppNavigator(): React.JSX.Element {
                 headerTintColor: colors.textOnBrand,
                 headerTitleStyle: styles.headerTitle,
                 headerStyle: styles.header,
-                headerShadowVisible: false,
               })}
             />
           </>

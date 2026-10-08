@@ -1,30 +1,26 @@
-import { api } from './api';
+import { api, usesCookieSession } from './api';
 import type { LoginResponse, SessionProfile, User } from '../types';
 
-/**
- * `POST /auth/login`
- *
- * 200 → `{ user, token }` (user sem `password`, sem a relação `unit`)
- * 401 → `{ error: string }`
- *
- * ⚠️ Hoje o `authService.login` da API barra MORADOR comum via
- * `hasPanelAccess` (api/src/lib/access.ts): só ADMIN, FUNCIONARIO e a síndica
- * (`isSyndic: true`) conseguem autenticar. Ver TODO no README do mobile.
- */
+/** Login: no navegador, a API cria a sessão em cookies httpOnly. */
 export async function login(email: string, password: string): Promise<LoginResponse> {
   const { data } = await api.post<LoginResponse>('/auth/login', { email, password });
   return data;
 }
 
-/**
- * `GET /users/me` → `{ perfil: <payload do JWT> }`.
- *
- * Só devolve `id` e `role` — não traz nome, unidade nem condomínio. Serve
- * apenas para validar que o token guardado ainda é aceito pela API.
- */
+/** Valida a sessão: web usa /auth/me; transporte nativo legado usa /users/me. */
 export async function fetchSessionProfile(): Promise<SessionProfile> {
+  if (usesCookieSession) return fetchCurrentUser();
   const { data } = await api.get<{ perfil: SessionProfile }>('/users/me');
   return data.perfil;
+}
+
+export async function fetchCurrentUser(): Promise<User> {
+  const { data } = await api.get<{ user: User }>('/auth/me');
+  return data.user;
+}
+
+export async function logout(): Promise<void> {
+  if (usesCookieSession) await api.post('/auth/logout');
 }
 
 /**
@@ -38,11 +34,9 @@ export async function fetchUserById(id: string): Promise<User> {
   return data;
 }
 
-/**
- * Tenta completar o usuário do login com a relação `unit`.
- * Nunca lança: se a API negar (403) ou estiver fora, devolve o usuário original.
- */
+/** Web obtém perfil e unidade por /auth/me, sem acessar outros usuários. */
 export async function withResolvedUnit(user: User): Promise<User> {
+  if (usesCookieSession) return fetchCurrentUser();
   if (!user.unitId || user.unit) return user;
   try {
     const full = await fetchUserById(user.id);

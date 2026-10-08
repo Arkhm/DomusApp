@@ -9,6 +9,14 @@ Esta rodada entrega **duas telas navegáveis e funcionais**: **Login** e **Home
 
 ---
 
+## Etapa atual — Comunicados
+
+- A aba inferior Notificações substitui Encomendas, com ícone de sino; sua tela ainda está em preparação.
+- Comunicados abre pelo cartão da Home: lista de publicações, busca por título/conteúdo, filtros Todos, Não lidos e Urgentes.
+- O detalhe mostra o texto completo, autor, data e destinatários. Confirmar leitura grava na API e atualiza a lista e o resumo da Home ao retornar.
+- Há estados de carregamento, lista vazia, erro com nova tentativa e atualização manual/por gesto.
+- A composição mantém os tokens azul-escuro, dourado e superfícies claras existentes. A referência do Figma ainda depende de acesso ao arquivo; o login foi preservado.
+
 ## O que está pronto
 
 | Item | Situação |
@@ -30,6 +38,23 @@ administração do condomínio: a redefinição de senha é feita sempre por ela
 não pelo app.
 
 ---
+
+## Prévia web integrada à sessão atual
+
+A prévia em http://localhost:8082 usa cookies httpOnly, com renovação automática
+em /auth/refresh, restauração via /auth/me e encerramento em /auth/logout.
+O navegador não armazena tokens em localStorage; guarda somente o perfil em cache.
+Moradores ativos podem autenticar e obter sua unidade sem acessar /users/:id.
+
+Inclua http://localhost:8082 em ALLOWED_ORIGIN no .env da raiz e recrie a API
+com `docker compose up -d api` após alterar essa variável. Inicie a prévia com
+`npx expo start --web --localhost --port 8082` dentro de mobile.
+
+O transporte Bearer nativo ainda precisa ser integrado à API atual, que não
+retorna tokens no corpo. As notas históricas abaixo sobre token no navegador,
+bloqueio de moradores e unidade indisponível não se aplicam à prévia web.
+As credenciais do seed só existem no banco depois de ele ter sido populado;
+a instalação local antiga usa joao@email.com / 123456 para o morador.
 
 ## Como rodar
 

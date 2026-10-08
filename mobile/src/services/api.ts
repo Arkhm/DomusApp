@@ -1,4 +1,5 @@
-import axios, { AxiosError, type AxiosInstance } from 'axios';
+import axios, { AxiosError, type AxiosInstance, type InternalAxiosRequestConfig } from 'axios';
+import { Platform } from 'react-native';
 import Constants from 'expo-constants';
 import { secureStorage, STORAGE_KEYS } from './secureStorage';
 
@@ -9,15 +10,18 @@ function resolveBaseUrl(): string {
 }
 
 export const API_BASE_URL = resolveBaseUrl();
+export const usesCookieSession = Platform.OS === 'web';
 
 export const api: AxiosInstance = axios.create({
   baseURL: API_BASE_URL,
   timeout: 10000,
+  withCredentials: usesCookieSession,
   headers: { 'Content-Type': 'application/json' },
 });
 
 // Anexa o JWT em toda requisição autenticada.
 api.interceptors.request.use(async (config) => {
+  if (usesCookieSession) return config;
   const token = await secureStorage.get(STORAGE_KEYS.token);
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
@@ -39,10 +43,31 @@ export function onUnauthorized(listener: UnauthorizedListener): () => void {
   };
 }
 
+type RetriableRequest = InternalAxiosRequestConfig & { _retried?: boolean };
+let refreshing: Promise<void> | null = null;
+const sessionEndpoints = ['/auth/login', '/auth/refresh', '/auth/logout'];
+
 api.interceptors.response.use(
   (response) => response,
-  (error: unknown) => {
+  async (error: unknown) => {
     if (isAxiosError(error) && error.response?.status === 401) {
+      const request = error.config as RetriableRequest | undefined;
+      if (sessionEndpoints.includes(request?.url ?? '')) return Promise.reject(error);
+      if (usesCookieSession && request && !request._retried) {
+        request._retried = true;
+        try {
+          refreshing ??= api.post('/auth/refresh').then(() => undefined).finally(() => {
+            refreshing = null;
+          });
+          await refreshing;
+          return api(request);
+        } catch (refreshError) {
+          // Uma falha de rede não invalida a sessão salva.
+          if (!isAxiosError(refreshError) || refreshError.response?.status !== 401) {
+            return Promise.reject(refreshError);
+          }
+        }
+      }
       unauthorizedListeners.forEach((listener) => listener());
     }
     return Promise.reject(error);

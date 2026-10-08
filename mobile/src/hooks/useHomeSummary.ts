@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
 import { listNotices, countUnread } from '../services/noticeService';
 import { findNextEvent, listEvents } from '../services/eventService';
 import { toApiFailure, type ApiFailure } from '../services/api';
@@ -77,9 +78,9 @@ export function useHomeSummary(): UseHomeSummaryResult {
     }
   }, []);
 
-  useEffect(() => {
+  useFocusEffect(useCallback(() => {
     void load('initial');
-  }, [load]);
+  }, [load]));
 
   const reload = useCallback(() => {
     void load('refresh');

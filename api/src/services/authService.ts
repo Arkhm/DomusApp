@@ -1,7 +1,7 @@
 import bcrypt from 'bcryptjs';
 import crypto from 'node:crypto';
 import { userRepository } from '../repositories/userRepository';
-import { hasPanelAccess } from '../lib/access';
+import type { User } from '@prisma/client';
 import { mailer } from '../lib/mailer';
 import { signAccessToken, signRefreshToken, verifyRefreshToken } from '../lib/tokens';
 
@@ -67,6 +67,17 @@ const issueSession = (user: { id: string; role: string; isSyndic?: boolean }) =>
   refreshToken: signRefreshToken(user.id),
 });
 
+// Autenticação é compartilhada pelo painel e pelo app do morador.
+// As permissões administrativas continuam nas rotas protegidas.
+function assertActiveUser(user: { status: string }) {
+  if (user.status !== 'ACTIVE') throw new Error('Sua conta está inativa. Procure a administração.');
+}
+
+function publicUser<T extends User>(user: T) {
+  const { password, resetToken, resetTokenExpiry, passwordChangedAt, ...profile } = user;
+  return profile;
+}
+
 export const authService = {
 
   async register(data: RegisterDTO) {
@@ -94,12 +105,9 @@ export const authService = {
       throw new Error('Credenciais inválidas.');
     }
 
-    // Essa condição bloqueia o login com usuário MORADOR sem ter isSyndic, vou deixar o lib/access ocioso pelo menos por agora, não precisamos dele.
-    // if (!hasPanelAccess(user)) {
-    //   throw new Error('Sua conta não tem acesso ao painel administrativo.');
-    // }
+    assertActiveUser(user);
 
-    const { password: _, ...userWithoutPassword } = user;
+    const userWithoutPassword = publicUser(user);
     return { user: userWithoutPassword, ...issueSession(user) };
   },
 
@@ -135,11 +143,9 @@ export const authService = {
       throw new Error('Sua senha foi alterada. Faça login novamente.');
     }
 
-    if (!hasPanelAccess(user)) {
-      throw new Error('Sua conta não tem acesso ao painel administrativo.');
-    }
+    assertActiveUser(user);
 
-    const { password: _, ...userWithoutPassword } = user;
+    const userWithoutPassword = publicUser(user);
     return { user: userWithoutPassword, ...issueSession(user) };
   },
 
@@ -152,11 +158,9 @@ export const authService = {
       throw new Error('Sessão inválida.');
     }
 
-    if (!hasPanelAccess(user)) {
-      throw new Error('Sua conta não tem acesso ao painel administrativo.');
-    }
+    assertActiveUser(user);
 
-    const { password: _, ...userWithoutPassword } = user;
+    const userWithoutPassword = publicUser(user);
     return userWithoutPassword;
   },
 

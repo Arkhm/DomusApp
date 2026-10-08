@@ -106,7 +106,8 @@ export interface CondoEvent {
 /** Corpo de `POST /auth/login` em caso de sucesso (200). */
 export interface LoginResponse {
   user: User;
-  token: string;
+  /** Apenas clientes nativos com transporte Bearer; web usa cookies httpOnly. */
+  token?: string;
 }
 
 /** Payload do JWT, devolvido por `GET /users/me` dentro de `perfil`. */

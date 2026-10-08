@@ -8,10 +8,13 @@ import React, {
   useState,
   type ReactNode,
 } from 'react';
-import { onUnauthorized, toApiFailure, type ApiFailure } from '../services/api';
+import { Alert } from 'react-native';
+import { onUnauthorized, toApiFailure, usesCookieSession, type ApiFailure } from '../services/api';
 import { secureStorage, STORAGE_KEYS } from '../services/secureStorage';
 import {
   fetchSessionProfile,
+  fetchCurrentUser,
+  logout as logoutRequest,
   login as loginRequest,
   withResolvedUnit,
 } from '../services/authService';
@@ -71,14 +74,16 @@ export function AuthProvider({ children }: { children: ReactNode }): React.JSX.E
       ]);
 
       const cached = parseStoredUser(storedUser);
-      if (!token || !cached) {
+      if (!usesCookieSession && (!token || !cached)) {
         if (!cancelled) setIsRestoring(false);
         return;
       }
 
       try {
-        await fetchSessionProfile();
-        const enriched = await withResolvedUnit(cached);
+        if (!usesCookieSession) await fetchSessionProfile();
+        const enriched = usesCookieSession
+          ? await fetchCurrentUser()
+          : await withResolvedUnit(cached!);
         if (!cancelled) setUser(enriched);
       } catch (error) {
         const failure = toApiFailure(error, 'Falha ao restaurar a sessão.');
@@ -106,12 +111,15 @@ export function AuthProvider({ children }: { children: ReactNode }): React.JSX.E
     try {
       const { user: loggedUser, token } = await loginRequest(email, password);
 
-      await Promise.all([
-        secureStorage.set(STORAGE_KEYS.token, token),
-        secureStorage.set(STORAGE_KEYS.user, JSON.stringify(loggedUser)),
-      ]);
+      if (usesCookieSession) {
+        await secureStorage.remove(STORAGE_KEYS.token);
+      } else {
+        if (!token) throw new Error('A API não retornou um token para o app nativo.');
+        await secureStorage.set(STORAGE_KEYS.token, token);
+      }
 
       const enriched = await withResolvedUnit(loggedUser);
+      await secureStorage.set(STORAGE_KEYS.user, JSON.stringify(enriched));
       if (isMounted.current) setUser(enriched);
       return null;
     } catch (error) {
@@ -122,7 +130,12 @@ export function AuthProvider({ children }: { children: ReactNode }): React.JSX.E
   }, []);
 
   const signOut = useCallback(async () => {
-    await clearSession();
+    try {
+      await logoutRequest();
+      await clearSession();
+    } catch {
+      Alert.alert('Não foi possível sair', 'Verifique sua conexão e tente novamente.');
+    }
   }, [clearSession]);
 
   const value = useMemo<AuthContextValue>(
