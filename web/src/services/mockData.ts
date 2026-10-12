@@ -226,9 +226,10 @@ export const mockAuthService = {
             throw { response: { data: { error: 'Credenciais inválidas.' } } };
         }
 
+        // Espelha o contrato real: token nenhum no corpo, só o perfil — na API
+        // ele viaja em cookie httpOnly.
         const mockUser = mockUsers[0];
         return {
-            token: 'mock-jwt-token-domusapp',
             user: mockUser,
         };
     },

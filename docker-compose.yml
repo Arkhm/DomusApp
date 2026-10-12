@@ -26,6 +26,11 @@ services:
       - DATABASE_PASSWORD=${DATABASE_PASSWORD}
       - DATABASE_NAME=${DATABASE_NAME}
       - JWT_SECRET=${JWT_SECRET}
+      - NODE_ENV=${NODE_ENV:-development}
+      - ALLOWED_ORIGIN=${ALLOWED_ORIGIN:-http://localhost:5173}
+      - COOKIE_SECURE=${COOKIE_SECURE:-}
+      - COOKIE_SAMESITE=${COOKIE_SAMESITE:-}
+      - TRUST_PROXY=${TRUST_PROXY:-}
     command: npm run dev
     depends_on:
       - db
