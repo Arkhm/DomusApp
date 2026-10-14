@@ -3,6 +3,34 @@
 App do morador do DomusApp, em Expo + React Native + TypeScript.
 Consome a API REST do monorepo (`../api`).
 
+## Central de notificações
+
+A aba Notificações reúne comunicados publicados e eventos publicados/cancelados
+destinados a todos ou à unidade do usuário, dos mais recentes aos mais antigos.
+O histórico já publicado também aparece na primeira abertura. Rascunhos e
+conteúdos de outras unidades não aparecem, inclusive na central de um síndico.
+
+Há filtro Todas/Não lidas, atualização manual, contador no sino, estados de
+carregamento/erro/vazio e abertura do comunicado ou do detalhe do evento.
+Abrir uma notificação salva sua leitura no banco para aquela conta, sem confirmar
+a ciência do comunicado. Essa confirmação continua na tela de Comunicados.
+A lista atualiza ao entrar na aba ou retornar do detalhe; não há push ou atualização em tempo real.
+
+API: `GET /notifications` e `POST /notifications/:type/:id/read`
+(`type` é `NOTICE` ou `EVENT`). A leitura usa a tabela `NotificationRead`.
+
+Depois de atualizar o código, na raiz do projeto:
+
+```sh
+docker compose exec -T api npx prisma migrate deploy
+docker compose exec -T api npx prisma generate
+docker compose restart api
+docker compose exec -T api npm run check:notifications
+```
+
+O check cria fixtures próprias, testa destinatários, validação e persistência,
+e remove somente essas fixtures ao finalizar. Execute em desenvolvimento.
+
 Esta rodada entrega **duas telas navegáveis e funcionais**: **Login** e **Home
 (dashboard)**. Os demais módulos aparecem no grid e levam a um placeholder
 "Em breve" que explica exatamente o que falta do lado da API.
@@ -11,7 +39,7 @@ Esta rodada entrega **duas telas navegáveis e funcionais**: **Login** e **Home
 
 ## Etapa atual — Comunicados
 
-- A aba inferior Notificações substitui Encomendas, com ícone de sino; sua tela ainda está em preparação.
+- A aba inferior Notificações substitui Encomendas, com ícone de sino e contador de não lidas.
 - Comunicados abre pelo cartão da Home: lista de publicações, busca por título/conteúdo, filtros Todos, Não lidos e Urgentes.
 - O detalhe mostra o texto completo, autor, data e destinatários. Confirmar leitura grava na API e atualiza a lista e o resumo da Home ao retornar.
 - Há estados de carregamento, lista vazia, erro com nova tentativa e atualização manual/por gesto.

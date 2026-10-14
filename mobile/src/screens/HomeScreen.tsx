@@ -186,7 +186,7 @@ export function HomeScreen(): React.JSX.Element {
                   label={module.label}
                   icon={module.icon}
                   onPress={() => openModule(module)}
-                  isComingSoon={module.id !== 'comunicados'}
+                  isComingSoon={!['comunicados', 'notificacoes'].includes(module.id)}
                 />
               </View>
             ))}

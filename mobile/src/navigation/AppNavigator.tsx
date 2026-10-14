@@ -8,6 +8,8 @@ import { LoginScreen } from '../screens/LoginScreen';
 import { HomeScreen } from '../screens/HomeScreen';
 import { ProfileScreen } from '../screens/ProfileScreen';
 import { NoticesScreen, NoticeDetailScreen } from '../screens/NoticesScreen';
+import { NotificationsScreen, NotificationEventScreen } from '../screens/NotificationsScreen';
+import { useNotifications } from '../hooks/useNotifications';
 import { ComingSoonScreen, TabPlaceholder } from '../screens/ComingSoonScreen';
 import { useAuth } from '../contexts/AuthContext';
 import { colors, fontFamily, layout, spacing, typography } from '../theme';
@@ -52,15 +54,6 @@ function AccessScreen(): React.JSX.Element {
   );
 }
 
-function NotificationsScreen(): React.JSX.Element {
-  return (
-    <TabPlaceholder
-      title="Notificações"
-      description="Em breve, você poderá acompanhar aqui as novidades e os alertas do seu condomínio."
-    />
-  );
-}
-
 const TAB_ICONS: Record<keyof MainTabParamList, [active: string, inactive: string]> = {
   Inicio: ['home', 'home-outline'],
   Reservas: ['calendar', 'calendar-outline'],
@@ -70,6 +63,7 @@ const TAB_ICONS: Record<keyof MainTabParamList, [active: string, inactive: strin
 };
 
 function MainTabs(): React.JSX.Element {
+  const inbox = useNotifications();
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
@@ -91,7 +85,9 @@ function MainTabs(): React.JSX.Element {
       <Tab.Screen name="Inicio" component={HomeScreen} options={{ title: 'Início' }} />
       <Tab.Screen name="Reservas" component={ReservationsScreen} />
       <Tab.Screen name="Acessos" component={AccessScreen} />
-      <Tab.Screen name="Notificacoes" component={NotificationsScreen} options={{ title: 'Notificações' }} />
+      <Tab.Screen name="Notificacoes" options={{ title: 'Notificações', tabBarBadge: inbox.unread || undefined, tabBarBadgeStyle: { backgroundColor: colors.accent, color: colors.brand } }}>
+        {() => <NotificationsScreen inbox={inbox} />}
+      </Tab.Screen>
       <Tab.Screen name="Perfil" component={ProfileScreen} />
     </Tab.Navigator>
   );
@@ -141,6 +137,7 @@ export function AppNavigator(): React.JSX.Element {
             <Stack.Screen name="Main" component={MainTabs} options={{ headerShown: false }} />
             <Stack.Screen name="Comunicados" component={NoticesScreen} options={{ headerShown: false }} />
             <Stack.Screen name="Comunicado" component={NoticeDetailScreen} options={{ headerShown: false }} />
+            <Stack.Screen name="Evento" component={NotificationEventScreen} options={{ title: 'Evento', headerBackTitle: 'Voltar', headerTintColor: colors.textOnBrand, headerStyle: styles.header, headerTitleStyle: styles.headerTitle }} />
             <Stack.Screen
               name="EmBreve"
               component={ComingSoonScreen}

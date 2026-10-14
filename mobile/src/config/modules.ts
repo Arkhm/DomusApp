@@ -113,8 +113,8 @@ export const APP_MODULES: readonly AppModule[] = [
     id: 'notificacoes',
     label: 'Notificações',
     icon: 'notifications-outline',
-    apiStatus: 'missing',
-    pendingNote: 'A API ainda não tem /notifications nem push.',
+    apiStatus: 'ready',
+    pendingNote: '',
   },
   {
     id: 'pagamentos',
