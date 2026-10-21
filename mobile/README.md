@@ -237,8 +237,19 @@ Existem hoje: `/auth`, `/users`, `/notices`, `/units`, `/events`, `/votings`.
 `/notifications`, `/occurrences`, `/permissions`, além de documentos, multas,
 achados e perdidos, pagamentos e histórico.
 
-`GET /votings` existe, mas hoje só `ADMIN`/`FUNCIONARIO` podem listar — falta
-liberar para morador e criar o endpoint de registro de voto.
+**Votações** já têm tela no app (`src/screens/VotingsScreen.tsx`). A API:
+
+- `GET /votings` — qualquer usuário autenticado. Cada votação vem com `status`
+  (`SCHEDULED`/`OPEN`/`CLOSED`, calculado no servidor pelas datas), `hasVoted` e
+  `myOptionId`. A contagem `votes` das opções só vai para o painel
+  (ADMIN/FUNCIONARIO/síndica) ou depois que a votação encerra — o morador não
+  recebe resultado parcial nem lendo o JSON.
+- `POST /votings/:id/vote` com `{ optionId }` — só `MORADOR` ativo, só com a
+  votação aberta, um voto por morador e sem troca (tabela `VotingVote`, única
+  por votação + morador). Respostas: 201, 400 (opção inválida), 403 (não é
+  morador), 404, 409 (já votou / encerrada / ainda não começou).
+- A síndica é `MORADOR` e vota; mesmo recebendo `votes` da API, o app só exibe o
+  resultado depois do encerramento.
 
 Cada cartão do grid leva ao placeholder com a nota correspondente
 (`src/config/modules.ts`).
