@@ -27,19 +27,22 @@ model User {
   events          Event[]  @relation("EventAuthor")
   votings         Voting[] @relation("VotingAuthor")
   noticeReads     NoticeRead[]
+  pets            Pet[]
 }
 
 model Unit {
   id          String   @id @default(uuid())
   type        String   @default("APARTMENT") // "APARTMENT" | "HOUSE"
-  block       String?  // APARTMENT: bloco/torre · HOUSE: quadra/setor (opcional)
-  number      String   // identificador da unidade (número do apto ou da casa)
+  block       String? 
+  number      String  
+  parkingSpots Int     @default(0)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
   residents   User[]
 
   notices     Notice[] @relation("NoticeTargetUnit")
+  vehicles    Vehicle[]
   events      Event[]  @relation("EventTargetUnit")
 }
 
@@ -49,8 +52,8 @@ model Notice {
   content      String   @db.Text
   targetType   String   @default("ALL")
 
-  status       String   @default("PUBLISHED") // "DRAFT" | "PUBLISHED"
-  priority     String   @default("NORMAL")    // "NORMAL" | "URGENT"
+  status       String   @default("PUBLISHED") 
+  priority     String   @default("NORMAL")    
 
   targetUnitId String?
   targetUnit   Unit?    @relation("NoticeTargetUnit", fields: [targetUnitId], references: [id])
@@ -85,9 +88,9 @@ model Event {
   location     String?
   targetType   String   @default("ALL")
 
-  category     String   @default("OUTRO")     // ASSEMBLEIA | CONFRATERNIZACAO | MANUTENCAO | REUNIAO | OUTRO
+  category     String   @default("OUTRO")     
   capacity     Int?
-  status       String   @default("PUBLISHED") // DRAFT | PUBLISHED | CANCELLED
+  status       String   @default("PUBLISHED") 
 
   targetUnitId String?
   targetUnit   Unit?    @relation("EventTargetUnit", fields: [targetUnitId], references: [id])
@@ -119,4 +122,26 @@ model VotingOption {
   voting    Voting   @relation(fields: [votingId], references: [id], onDelete: Cascade)
   votes     Int      @default(0)
   createdAt DateTime @default(now())
+}
+
+model Vehicle {
+  id        String   @id @default(uuid())
+  plate     String   @unique 
+  model     String
+  color     String?
+  unitId    String
+  unit      Unit     @relation(fields: [unitId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Pet {
+  id        String   @id @default(uuid())
+  name      String
+  species   String 
+  size      String   
+  ownerId   String
+  owner     User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
