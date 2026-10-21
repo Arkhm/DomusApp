@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
-import { votingService } from '../services/votingService';
+import { AuthRequest } from '../middlewares/authMiddleware';
+import { votingService, VotingError } from '../services/votingService';
 
 export const votingController = {
   async create(req: Request, res: Response) {
@@ -12,12 +13,24 @@ export const votingController = {
     }
   },
 
-  async list(req: Request, res: Response) {
+  async list(req: AuthRequest, res: Response) {
     try {
-      const votings = await votingService.list();
+      const userId = req.user?.id as string;
+      const votings = await votingService.list(userId);
       res.status(200).json(votings);
     } catch (error: any) {
-      res.status(400).json({ error: error.message });
+      res.status(error instanceof VotingError ? error.status : 400).json({ error: error.message });
+    }
+  },
+
+  async vote(req: AuthRequest, res: Response) {
+    try {
+      const id = req.params.id as string;
+      const userId = req.user?.id as string;
+      const result = await votingService.vote(id, req.body.optionId, userId);
+      res.status(201).json(result);
+    } catch (error: any) {
+      res.status(error instanceof VotingError ? error.status : 400).json({ error: error.message });
     }
   },
 

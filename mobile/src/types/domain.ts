@@ -103,6 +103,37 @@ export interface CondoEvent {
   updatedAt: string;
 }
 
+export type VotingStatus = 'SCHEDULED' | 'OPEN' | 'CLOSED';
+
+export interface VotingOption {
+  id: string;
+  text: string;
+  votingId: string;
+  createdAt: string;
+  /**
+   * Só vem para o painel ou depois que a votação encerra — o morador não
+   * recebe o resultado parcial.
+   */
+  votes?: number;
+}
+
+export interface Voting {
+  id: string;
+  title: string;
+  description: string;
+  startDate: string;
+  endDate: string;
+  authorId: string;
+  author: AuthorSummary;
+  options: VotingOption[];
+  /** Calculado pela API no relógio do servidor, a partir das datas. */
+  status: VotingStatus;
+  hasVoted: boolean;
+  myOptionId: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
 /** Corpo de `POST /auth/login` em caso de sucesso (200). */
 export interface LoginResponse {
   user: User;
