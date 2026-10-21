@@ -8,7 +8,8 @@ import { LoginScreen } from '../screens/LoginScreen';
 import { HomeScreen } from '../screens/HomeScreen';
 import { ProfileScreen } from '../screens/ProfileScreen';
 import { NoticesScreen, NoticeDetailScreen } from '../screens/NoticesScreen';
-import { NotificationsScreen, NotificationEventScreen } from '../screens/NotificationsScreen';
+import { EventsScreen, EventDetailScreen } from '../screens/EventsScreen';
+import { NotificationsScreen } from '../screens/NotificationsScreen';
 import { useNotifications } from '../hooks/useNotifications';
 import { ComingSoonScreen, TabPlaceholder } from '../screens/ComingSoonScreen';
 import { useAuth } from '../contexts/AuthContext';
@@ -137,7 +138,8 @@ export function AppNavigator(): React.JSX.Element {
             <Stack.Screen name="Main" component={MainTabs} options={{ headerShown: false }} />
             <Stack.Screen name="Comunicados" component={NoticesScreen} options={{ headerShown: false }} />
             <Stack.Screen name="Comunicado" component={NoticeDetailScreen} options={{ headerShown: false }} />
-            <Stack.Screen name="Evento" component={NotificationEventScreen} options={{ title: 'Evento', headerBackTitle: 'Voltar', headerTintColor: colors.textOnBrand, headerStyle: styles.header, headerTitleStyle: styles.headerTitle }} />
+            <Stack.Screen name="Eventos" component={EventsScreen} options={{ headerShown: false }} />
+            <Stack.Screen name="Evento" component={EventDetailScreen} options={{ headerShown: false }} />
             <Stack.Screen
               name="EmBreve"
               component={ComingSoonScreen}

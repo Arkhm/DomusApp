@@ -79,6 +79,10 @@ export function HomeScreen(): React.JSX.Element {
       navigation.navigate('Main', { screen: 'Notificacoes' });
       return;
     }
+    if (module.id === 'eventos') {
+      navigation.navigate('Eventos');
+      return;
+    }
     navigation.navigate('EmBreve', {
       title: module.label,
       description: module.pendingNote,
@@ -186,7 +190,7 @@ export function HomeScreen(): React.JSX.Element {
                   label={module.label}
                   icon={module.icon}
                   onPress={() => openModule(module)}
-                  isComingSoon={!['comunicados', 'notificacoes'].includes(module.id)}
+                  isComingSoon={!['comunicados', 'notificacoes', 'eventos'].includes(module.id)}
                 />
               </View>
             ))}

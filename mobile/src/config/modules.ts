@@ -39,6 +39,13 @@ export const APP_MODULES: readonly AppModule[] = [
     pendingNote: 'A API já expõe GET /notices. Falta a tela de listagem e leitura.',
   },
   {
+    id: 'eventos',
+    label: 'Eventos',
+    icon: 'calendar-outline',
+    apiStatus: 'ready',
+    pendingNote: '',
+  },
+  {
     id: 'cobrancas',
     label: 'Cobranças',
     icon: 'receipt-outline',
