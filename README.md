@@ -173,12 +173,21 @@ O painel web é **administrativo** — só estas pessoas conseguem logar:
 
 ## 👤 Credenciais (geradas no seed)
 
+Fonte da verdade: `api/src/seed.ts`.
+
 | Perfil | E-mail | Senha | Acessa o painel? |
 |---|---|---|---|
 | Administrador | `admin@domusapp.com` | `admin123` | ✅ acesso total |
-| Síndica (Maria, Bloco A 101) | `maria@email.com` | `123456` | ✅ leitura |
-| Funcionário (Carlos, porteiro) | `carlos@email.com` | `123456` | ✅ leitura |
-| Morador (João, Bloco B 202) | `joao@email.com` | `123456` | ❌ bloqueado (mobile) |
+| Síndica (Maria Silva) | `maria.sindica@email.com` | `123456` | ✅ leitura |
+| Funcionário (Carlos, portaria) | `carlos.portaria@domus.com` | `123456` | ✅ leitura |
+| Conselho (João Pereira) | `joao.conselho@email.com` | `123456` | ❌ só app mobile |
+| Morador (Fernando Costa) | `fernando@email.com` | `123456` | ❌ só app mobile |
+
+Os demais funcionários e moradores do seed usam a mesma senha `123456`.
+
+> Bancos locais populados antes do seed atual ainda têm os usuários antigos
+> (`maria@email.com`, `carlos@email.com`, `joao@email.com`, senha `123456`).
+> Para trocar pelos do seed, recrie o volume do MySQL e rode o seed de novo.
 
 ---
 
