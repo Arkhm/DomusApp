@@ -13,6 +13,7 @@ import eventRoutes from './routes/eventRoutes';
 import votingRoutes from './routes/votingRoutes';
 import vehicleRoutes from './routes/vehicleRoutes';
 import petRoutes from './routes/petRoutes';
+import invoiceRoutes from './routes/invoiceRoutes';
 
 const app = express();
 
@@ -65,6 +66,7 @@ app.use('/events', eventRoutes);
 app.use('/votings', votingRoutes);
 app.use('/vehicles', vehicleRoutes);
 app.use('/pets', petRoutes);
+app.use('/invoices', invoiceRoutes);
 
 // O `cors()` rejeita origem desconhecida lançando erro. Sem este handler o
 // Express responderia 500 em HTML; aqui vira um 403 JSON explícito.
