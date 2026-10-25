@@ -84,9 +84,8 @@ export const APP_MODULES: readonly AppModule[] = [
     id: 'votacoes',
     label: 'Votações',
     icon: 'checkbox-outline',
-    apiStatus: 'restricted',
-    pendingNote:
-      'GET /votings existe, mas hoje só ADMIN e FUNCIONARIO podem listar. Falta liberar para morador e criar o endpoint de voto.',
+    apiStatus: 'ready',
+    pendingNote: '',
   },
   {
     id: 'documentos',

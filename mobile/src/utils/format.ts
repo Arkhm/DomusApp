@@ -55,6 +55,13 @@ export function formatEventDateTime(event: CondoEvent): string {
   return `${dateFormatter.format(date)} · ${timeFormatter.format(date)}`;
 }
 
+/** "12 de set · 19:30" para qualquer data ISO — vazio se vier inválida. */
+export function formatDateTime(isoDate: string): string {
+  const date = new Date(isoDate);
+  if (Number.isNaN(date.getTime())) return '';
+  return `${dateFormatter.format(date)} · ${timeFormatter.format(date)}`;
+}
+
 const shortDateFormatter = new Intl.DateTimeFormat('pt-BR', {
   day: '2-digit',
   month: '2-digit',

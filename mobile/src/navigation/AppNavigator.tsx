@@ -9,6 +9,7 @@ import { HomeScreen } from '../screens/HomeScreen';
 import { ProfileScreen } from '../screens/ProfileScreen';
 import { NoticesScreen, NoticeDetailScreen } from '../screens/NoticesScreen';
 import { EventsScreen, EventDetailScreen } from '../screens/EventsScreen';
+import { VotingsScreen, VotingDetailScreen } from '../screens/VotingsScreen';
 import { NotificationsScreen } from '../screens/NotificationsScreen';
 import { useNotifications } from '../hooks/useNotifications';
 import { ComingSoonScreen, TabPlaceholder } from '../screens/ComingSoonScreen';
@@ -140,6 +141,8 @@ export function AppNavigator(): React.JSX.Element {
             <Stack.Screen name="Comunicado" component={NoticeDetailScreen} options={{ headerShown: false }} />
             <Stack.Screen name="Eventos" component={EventsScreen} options={{ headerShown: false }} />
             <Stack.Screen name="Evento" component={EventDetailScreen} options={{ headerShown: false }} />
+            <Stack.Screen name="Votacoes" component={VotingsScreen} options={{ headerShown: false }} />
+            <Stack.Screen name="Votacao" component={VotingDetailScreen} options={{ headerShown: false }} />
             <Stack.Screen
               name="EmBreve"
               component={ComingSoonScreen}

@@ -1,6 +1,10 @@
 import { z } from 'zod';
 import { dateString, longText, requiredText } from './common';
 
+export const voteSchema = z.object({
+  optionId: z.uuid({ error: 'Opção inválida.' }),
+});
+
 export const createVotingSchema = z
   .object({
     title: requiredText('Título', 150),

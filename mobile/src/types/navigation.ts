@@ -1,7 +1,7 @@
 import type { NavigatorScreenParams } from '@react-navigation/native';
 import type { StackScreenProps } from '@react-navigation/stack';
 import type { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
-import type { CondoEvent, Notice } from './domain';
+import type { CondoEvent, Notice, Voting } from './domain';
 
 export type MainTabParamList = {
   Inicio: undefined;
@@ -17,6 +17,8 @@ export type RootStackParamList = {
   Comunicado: { notice: Notice };
   Eventos: undefined;
   Evento: { event: CondoEvent };
+  Votacoes: undefined;
+  Votacao: { voting: Voting };
   Main: NavigatorScreenParams<MainTabParamList> | undefined;
   /** Tela "Em breve" para módulos que ainda não têm implementação. */
   EmBreve: { title: string; description?: string };
