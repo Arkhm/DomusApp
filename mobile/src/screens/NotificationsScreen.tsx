@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { AccessibilityInfo, ActivityIndicator, Animated, Easing, FlatList, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { AccessibilityInfo, ActivityIndicator, Animated, Easing, FlatList, Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import type { StackNavigationProp } from '@react-navigation/stack';
@@ -7,8 +7,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { StatusBanner } from '../components';
 import type { NotificationsInbox } from '../hooks/useNotifications';
 import type { AppNotification } from '../services/notificationService';
-import type { RootStackParamList, RootStackScreenProps } from '../types';
-import { formatEventDateTime } from '../utils/format';
+import type { RootStackParamList } from '../types';
 import { colors, layout, radius, spacing, typography } from '../theme';
 
 const formatDate = (value: string) => new Date(value).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' });
@@ -98,21 +97,6 @@ export function NotificationsScreen({ inbox }: { inbox: NotificationsInbox }) {
   </SafeAreaView>;
 }
 
-export function NotificationEventScreen({ route }: RootStackScreenProps<'Evento'>) {
-  const { event } = route.params;
-  return <SafeAreaView style={styles.eventScreen} edges={['bottom']}><ScrollView contentContainerStyle={styles.eventContent}>
-    <View style={styles.eventCard}>
-      <View style={styles.icon}><Ionicons name="calendar-outline" size={spacing.xxl} color={colors.brand} /></View>
-      {event.status === 'CANCELLED' && <Text style={styles.urgentText}>Evento cancelado</Text>}
-      <Text accessibilityRole="header" style={styles.eventTitle}>{event.title}</Text>
-      <Text style={styles.eventMeta}>{formatEventDateTime(event)}</Text>
-      {event.location && <Text style={styles.eventMeta}>{event.location}</Text>}
-      <Text selectable style={styles.eventText}>{event.content}</Text>
-      <Text style={styles.date}>Publicado por {event.author?.name ?? 'Administração'}</Text>
-    </View>
-  </ScrollView></SafeAreaView>;
-}
-
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.brand },
   hero: { padding: layout.screenPadding, gap: spacing.sm },
@@ -147,10 +131,4 @@ const styles = StyleSheet.create({
   emptyIcon: { padding: spacing.xl, borderRadius: radius.pill, backgroundColor: colors.accentSoft },
   emptyTitle: { ...typography.subtitle, textAlign: 'center', color: colors.textPrimary },
   emptyCaption: { ...typography.body, textAlign: 'center', color: colors.textSecondary },
-  eventScreen: { flex: 1, backgroundColor: colors.background },
-  eventContent: { padding: layout.screenPadding },
-  eventCard: { padding: spacing.xl, backgroundColor: colors.surface, borderRadius: radius.xl, gap: spacing.lg, borderWidth: 1, borderColor: colors.border },
-  eventTitle: { ...typography.title, color: colors.textPrimary },
-  eventMeta: { ...typography.bodyStrong, color: colors.textSecondary },
-  eventText: { ...typography.body, color: colors.textPrimary },
 });

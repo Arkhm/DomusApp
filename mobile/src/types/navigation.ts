@@ -15,6 +15,7 @@ export type RootStackParamList = {
   Login: undefined;
   Comunicados: undefined;
   Comunicado: { notice: Notice };
+  Eventos: undefined;
   Evento: { event: CondoEvent };
   Main: NavigatorScreenParams<MainTabParamList> | undefined;
   /** Tela "Em breve" para módulos que ainda não têm implementação. */
