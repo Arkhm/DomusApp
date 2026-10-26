@@ -1,382 +1,188 @@
+import { randomUUID } from 'node:crypto';
+import { Prisma } from '@prisma/client';
 import { invoiceRepository } from '../repositories/invoiceRepository';
 import { userRepository } from '../repositories/userRepository';
 import { unitRepository } from '../repositories/unitRepository';
-import { mercadoPagoService } from './mercadoPagoService';
+import { paymentRepository } from '../repositories/paymentRepository';
+import { buildPixPayload } from './mercadoPagoService';
+import { paymentService } from './paymentService';
+import { PaymentActor, PaymentError, canManageInvoices, hash, idempotencyKey, money, paymentConfig,
+  publicInvoice, requiredText, stableJson, validDate } from '../lib/paymentDomain';
 
-const VALID_STATUSES = new Set(['PENDING', 'PAID', 'OVERDUE', 'CANCELLED', 'EXPIRED', 'REJECTED', 'REFUNDED', 'CHARGED_BACK']);
+const VALID_STATUSES = new Set(['PENDING', 'PAID', 'OVERDUE', 'CANCELLED', 'EXPIRED', 'REJECTED', 'REFUNDED', 'CHARGED_BACK', 'PARTIALLY_REFUNDED']);
 const VALID_TYPES = new Set(['MONTHLY_FEE', 'EXTRAORDINARY', 'FINE', 'OTHER']);
-
-interface CreateInvoiceData {
-  description: string;
-  amount: number;
-  dueDate: Date | string;
-  userId: string;
-  unitId: string;
-  type?: string;
-  referenceMonth?: Date | string;
+export interface InvoiceFilters {
+  status?: string; type?: string; startDate?: Date; endDate?: Date; page?: number; limit?: number; userId?: string; unitId?: string;
 }
 
-interface CreateBatchInvoiceData {
-  description: string;
-  amount: number;
-  dueDate: Date | string;
-  type?: string;
-  referenceMonth?: Date | string;
-  userIds: string[];
+function normalize(data: any, batch: boolean) {
+  if (!data || typeof data !== 'object' || Array.isArray(data)) throw new PaymentError(400, 'Dados da fatura inválidos.');
+  const type = data.type ?? 'MONTHLY_FEE';
+  if (!VALID_TYPES.has(type)) throw new PaymentError(400, 'Tipo de fatura inválido.');
+  const common = { description: requiredText(data.description, 'Descrição'), amount: money(data.amount),
+    dueDate: validDate(data.dueDate, 'Data de vencimento').toISOString(), type,
+    referenceMonth: data.referenceMonth ? validDate(data.referenceMonth, 'Mês de referência').toISOString() : null };
+  if (!batch) return { ...common, userIds: [requiredText(data.userId, 'Usuário')], unitId: requiredText(data.unitId, 'Unidade') };
+  if (!Array.isArray(data.userIds) || !data.userIds.length || data.userIds.length > 100) {
+    throw new PaymentError(400, 'Informe entre 1 e 100 usuários por lote.');
+  }
+  const userIds: string[] = data.userIds.map((id: unknown) => requiredText(id, 'Usuário'));
+  if (new Set(userIds).size !== userIds.length) throw new PaymentError(400, 'O lote contém usuários repetidos.');
+  return { ...common, userIds: userIds.sort(), unitId: null };
+}
+
+function validateFilters(filters: InvoiceFilters = {}) {
+  if ((filters.status && !VALID_STATUSES.has(filters.status)) || (filters.type && !VALID_TYPES.has(filters.type))) {
+    throw new PaymentError(400, 'Filtro inválido.');
+  }
+  for (const date of [filters.startDate, filters.endDate]) {
+    if (date && !Number.isFinite(date.getTime())) throw new PaymentError(400, 'Data de filtro inválida.');
+  }
+  if (filters.startDate && filters.endDate && filters.startDate > filters.endDate) throw new PaymentError(400, 'Intervalo de datas inválido.');
+  if ((filters.page !== undefined && (!Number.isInteger(filters.page) || filters.page < 1 || filters.page > 100000)) ||
+      (filters.limit !== undefined && (!Number.isInteger(filters.limit) || filters.limit < 1 || filters.limit > 100))) {
+    throw new PaymentError(400, 'Paginação inválida. Use limite entre 1 e 100.');
+  }
+  return filters;
 }
 
 export const invoiceService = {
-  async create(data: CreateInvoiceData, baseUrl: string, webhookUrl: string) {
-    if (!data.description || !data.amount || !data.dueDate || !data.userId || !data.unitId) {
-      throw new Error('Descrição, valor, data de vencimento, usuário e unidade são obrigatórios.');
+  async createOperation(data: unknown, key: unknown, actor: PaymentActor, batch: boolean) {
+    if (!canManageInvoices(actor)) throw new PaymentError(403, 'Acesso negado.');
+    const config = paymentConfig();
+    const input = normalize(data, batch);
+    const kind = batch ? 'BATCH' : 'SINGLE';
+    const keyHash = hash(`${actor.id}:${kind}:${idempotencyKey(key)}`);
+    const requestHash = hash(stableJson(input));
+    const existing = await paymentRepository.findOperation(keyHash);
+    if (existing) {
+      if (existing.requestHash !== requestHash) throw new PaymentError(409, 'Idempotency-Key já usada com outros dados.');
+      return existing;
     }
-
-    if (data.amount <= 0) {
-      throw new Error('O valor deve ser maior que zero.');
+    const invoices: Prisma.InvoiceCreateWithoutOperationInput[] = [];
+    for (const userId of input.userIds) {
+      const user = await userRepository.findById(userId);
+      if (!user) throw new PaymentError(400, 'Usuário não encontrado.');
+      const unitId = input.unitId ?? user.unitId;
+      if (!unitId || user.unitId !== unitId) throw new PaymentError(400, 'Usuário não pertence à unidade informada.');
+      if (!await unitRepository.findById(unitId)) throw new PaymentError(400, 'Unidade não encontrada.');
+      if (user.status !== 'ACTIVE' || !user.name.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(user.email) ||
+          !/^\d{11}$/.test(user.cpf.replace(/\D/g, ''))) throw new PaymentError(400, 'Cadastro do pagador inválido ou inativo.');
+      const attemptId = randomUUID();
+      const payload = buildPixPayload({ externalReference: attemptId, amount: input.amount,
+        description: input.description, payer: { name: user.name, email: user.email, cpf: user.cpf } }, config.environment);
+      invoices.push({ id: randomUUID(), description: input.description, amount: input.amount,
+        dueDate: new Date(input.dueDate), type: input.type,
+        referenceMonth: input.referenceMonth ? new Date(input.referenceMonth) : null,
+        user: { connect: { id: userId } }, unit: { connect: { id: unitId } },
+        paymentAttempt: { create: { id: attemptId, externalReference: attemptId, idempotencyKey: attemptId,
+          amount: payload.total_amount, environment: config.environment, sellerId: config.sellerId,
+          requestPayload: payload as unknown as Prisma.InputJsonValue } },
+        audits: { create: { actorId: actor.id, source: 'SYSTEM', action: 'CREATE', fromStatus: 'PENDING', toStatus: 'PENDING', amount: input.amount } },
+      });
     }
-
-    const dueDate = new Date(data.dueDate);
-    if (isNaN(dueDate.getTime())) {
-      throw new Error('Data de vencimento inválida.');
-    }
-
-    const user = await userRepository.findById(data.userId);
-    if (!user) {
-      throw new Error('Usuário não encontrado.');
-    }
-
-    const unit = await unitRepository.findById(data.unitId);
-    if (!unit) {
-      throw new Error('Unidade não encontrada.');
-    }
-
-    const type = data.type || 'MONTHLY_FEE';
-    if (!VALID_TYPES.has(type)) {
-      throw new Error(`Tipo inválido. Use: ${Array.from(VALID_TYPES).join(', ')}`);
-    }
-
-    const referenceMonth = data.referenceMonth ? new Date(data.referenceMonth) : null;
-    if (referenceMonth && isNaN(referenceMonth.getTime())) {
-      throw new Error('Mês de referência inválido.');
-    }
-
-    const externalReference = `INV-${Date.now()}-${data.userId.slice(0, 8)}`;
-
-    const payer: any = {
-      name: user.name,
-      email: user.email,
-    };
-
-    if (user.cpf) {
-      payer.identification = {
-        type: 'CPF',
-        number: user.cpf.replace(/\D/g, ''),
-      };
-    }
-
-    if (user.phone) {
-      const phoneDigits = user.phone.replace(/\D/g, '');
-      if (phoneDigits.length >= 10) {
-        payer.phone = {
-          area_code: phoneDigits.slice(0, 2),
-          number: phoneDigits.slice(2),
-        };
+    try {
+      return await paymentRepository.createOperation({ keyHash, requestHash, actorId: actor.id, kind,
+        invoices: { create: invoices } });
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+        const duplicate = await paymentRepository.findOperation(keyHash);
+        if (duplicate?.requestHash === requestHash) return duplicate;
+        throw new PaymentError(409, 'Idempotency-Key já usada com outros dados.');
       }
+      throw error;
     }
-
-    const mpOrder = await mercadoPagoService.createOrder({
-      externalReference,
-      description: data.description,
-      amount: data.amount,
-      payer,
-      items: [{
-        title: data.description,
-        description: `Fatura: ${data.description} - Unidade ${unit.block || ''}${unit.number}`,
-        quantity: 1,
-        unit_price: data.amount.toFixed(2),
-      }],
-      notificationUrl: webhookUrl,
-      expirationDays: 30,
-    });
-
-    const paymentData = mercadoPagoService.extractPaymentData(mpOrder);
-
-    const invoice = await invoiceRepository.create({
-      description: data.description,
-      amount: data.amount,
-      dueDate,
-      status: 'PENDING',
-      type,
-      referenceMonth,
-      userId: data.userId,
-      unitId: data.unitId,
-      mpOrderId: mpOrder.id,
-      mpPaymentId: paymentData.paymentId,
-      mpPreferenceId: mpOrder.preference_id,
-      mpStatus: paymentData.status,
-      mpStatusDetail: paymentData.statusDetail,
-      mpQrCode: paymentData.qrCode,
-      mpQrCodeBase64: paymentData.qrCodeBase64,
-      mpBoletoUrl: paymentData.boletoUrl,
-      mpResponse: JSON.stringify(mpOrder),
-    });
-
-    return {
-      ...invoice,
-      paymentData: {
-        qrCode: paymentData.qrCode,
-        qrCodeBase64: paymentData.qrCodeBase64,
-        boletoUrl: paymentData.boletoUrl,
-        mpOrderId: mpOrder.id,
-        mpStatus: paymentData.status,
-      },
-    };
   },
 
-  async createBatch(data: CreateBatchInvoiceData, baseUrl: string, webhookUrl: string) {
-    if (!data.description || !data.amount || !data.dueDate || !data.userIds || data.userIds.length === 0) {
-      throw new Error('Descrição, valor, data de vencimento e lista de usuários são obrigatórios.');
+  async create(data: unknown, key: unknown, actor: PaymentActor) {
+    const operation = await this.createOperation(data, key, actor, false);
+    const invoice = operation.invoices[0]!;
+    if (invoice.paymentAttempt?.state === 'QUEUED') {
+      try { await paymentService.issue(invoice.paymentAttempt.id); }
+      catch (error) { if (!(error instanceof PaymentError && error.code === 'PAYMENT_BUSY')) throw error; }
     }
-
-    if (data.amount <= 0) {
-      throw new Error('O valor deve ser maior que zero.');
-    }
-
-    const dueDate = new Date(data.dueDate);
-    if (isNaN(dueDate.getTime())) {
-      throw new Error('Data de vencimento inválida.');
-    }
-
-    const type = data.type || 'MONTHLY_FEE';
-    if (!VALID_TYPES.has(type)) {
-      throw new Error(`Tipo inválido. Use: ${Array.from(VALID_TYPES).join(', ')}`);
-    }
-
-    const referenceMonth = data.referenceMonth ? new Date(data.referenceMonth) : null;
-    if (referenceMonth && isNaN(referenceMonth.getTime())) {
-      throw new Error('Mês de referência inválido.');
-    }
-
-    const results = {
-      created: [] as any[],
-      errors: [] as { userId: string; error: string }[],
-    };
-
-    for (const userId of data.userIds) {
-      try {
-        const user = await userRepository.findById(userId);
-        if (!user) {
-          results.errors.push({ userId, error: 'Usuário não encontrado.' });
-          continue;
-        }
-
-        if (!user.unitId) {
-          results.errors.push({ userId, error: 'Usuário não possui unidade associada.' });
-          continue;
-        }
-
-        const unit = await unitRepository.findById(user.unitId);
-        if (!unit) {
-          results.errors.push({ userId, error: 'Unidade do usuário não encontrada.' });
-          continue;
-        }
-
-        const invoice = await this.create({
-          description: data.description,
-          amount: data.amount,
-          dueDate,
-          userId,
-          unitId: user.unitId!,
-          type,
-          referenceMonth: referenceMonth ?? undefined,
-        }, baseUrl, webhookUrl);
-
-        results.created.push(invoice);
-      } catch (error: any) {
-        results.errors.push({ userId, error: error.message });
-      }
-    }
-
-    return results;
+    return publicInvoice((await invoiceRepository.findById(invoice.id))!);
   },
 
-  async getById(id: string, requestingUserId: string, requestingUserRole: string) {
+  async createBatch(data: unknown, key: unknown, actor: PaymentActor) {
+    const operation = await this.createOperation(data, key, actor, true);
+    return { operationId: operation.id, created: operation.invoices.map(publicInvoice), errors: [] };
+  },
+
+  async getById(id: string, actor: PaymentActor) {
     const invoice = await invoiceRepository.findById(id);
-    if (!invoice) {
-      throw new Error('Fatura não encontrada.');
-    }
-
-    const hasAccess = await this.checkAccess(invoice, requestingUserId, requestingUserRole);
-    if (!hasAccess) {
-      throw new Error('Acesso negado a esta fatura.');
-    }
-
-    return invoice;
+    if (!invoice) throw new PaymentError(404, 'Fatura não encontrada.');
+    if (!canManageInvoices(actor) && invoice.userId !== actor.id) throw new PaymentError(403, 'Acesso negado a esta fatura.');
+    return publicInvoice(invoice);
   },
 
-  async getByMpOrderId(mpOrderId: string) {
-    return await invoiceRepository.findByMpOrderId(mpOrderId);
+  async listForUser(userId: string, filters?: InvoiceFilters) {
+    const result = await invoiceRepository.findByUserId(userId, validateFilters(filters));
+    return { ...result, data: result.data.map(publicInvoice) };
   },
 
-  async getByMpPaymentId(mpPaymentId: string) {
-    return await invoiceRepository.findByMpPaymentId(mpPaymentId);
+  async listForUnit(unitId: string, filters?: InvoiceFilters) {
+    const result = await invoiceRepository.findByUnitId(unitId, validateFilters(filters));
+    return { ...result, data: result.data.map(publicInvoice) };
   },
 
-  async listForUser(userId: string, filters?: {
-    status?: string;
-    type?: string;
-    startDate?: Date;
-    endDate?: Date;
-    page?: number;
-    limit?: number;
-  }) {
-    if (filters?.status && !VALID_STATUSES.has(filters.status)) {
-      throw new Error(`Status inválido. Use: ${Array.from(VALID_STATUSES).join(', ')}`);
-    }
-
-    return await invoiceRepository.findByUserId(userId, filters);
+  async listAll(filters?: InvoiceFilters) {
+    const result = await invoiceRepository.findAll(validateFilters(filters));
+    return { ...result, data: result.data.map(publicInvoice) };
   },
 
-  async listForUnit(unitId: string, filters?: {
-    status?: string;
-    type?: string;
-    startDate?: Date;
-    endDate?: Date;
-    page?: number;
-    limit?: number;
-  }) {
-    if (filters?.status && !VALID_STATUSES.has(filters.status)) {
-      throw new Error(`Status inválido. Use: ${Array.from(VALID_STATUSES).join(', ')}`);
-    }
-
-    return await invoiceRepository.findByUnitId(unitId, filters);
-  },
-
-  async listAll(filters?: {
-    status?: string;
-    type?: string;
-    userId?: string;
-    unitId?: string;
-    startDate?: Date;
-    endDate?: Date;
-    page?: number;
-    limit?: number;
-  }) {
-    if (filters?.status && !VALID_STATUSES.has(filters.status)) {
-      throw new Error(`Status inválido. Use: ${Array.from(VALID_STATUSES).join(', ')}`);
-    }
-
-    return await invoiceRepository.findAll(filters);
-  },
-
-  async updateStatus(id: string, status: string, requestingUserId: string, requestingUserRole: string) {
-    if (!VALID_STATUSES.has(status)) {
-      throw new Error(`Status inválido. Use: ${Array.from(VALID_STATUSES).join(', ')}`);
-    }
-
+  async updateStatus(id: string, status: unknown, actor: PaymentActor, reason: unknown) {
+    if (!canManageInvoices(actor)) throw new PaymentError(403, 'Acesso negado.');
+    if (status !== 'PAID' && status !== 'CANCELLED') throw new PaymentError(400, 'Alteração manual permite apenas PAID ou CANCELLED.');
+    const justification = requiredText(reason, 'Justificativa', 1000);
     const invoice = await invoiceRepository.findById(id);
-    if (!invoice) {
-      throw new Error('Fatura não encontrada.');
-    }
-
-    const hasAccess = await this.checkAccess(invoice, requestingUserId, requestingUserRole, true);
-    if (!hasAccess) {
-      throw new Error('Acesso negado para alterar esta fatura.');
-    }
-
-    const updateData: any = { status };
-    if (status === 'PAID') {
-      updateData.paidAt = new Date();
-    }
-
-    return await invoiceRepository.update(id, updateData);
+    if (!invoice) throw new PaymentError(404, 'Fatura não encontrada.');
+    if (invoice.paymentAttempt) await paymentService.manualChange(invoice.paymentAttempt.id, status, actor, justification);
+    else await paymentRepository.auditManualWithoutAttempt({ invoiceId: id, version: invoice.version, actorId: actor.id, status, reason: justification });
+    return this.getById(id, actor);
   },
 
-  async updateFromMercadoPago(mpOrderId: string, mpOrder: any) {
-    const paymentData = mercadoPagoService.extractPaymentData(mpOrder);
-    const newStatus = mercadoPagoService.mapPaymentStatus(paymentData.status, paymentData.statusDetail);
-
-    const updateData: any = {
-      mpStatus: paymentData.status,
-      mpStatusDetail: paymentData.statusDetail,
-      mpResponse: JSON.stringify(mpOrder),
-      mpPaymentId: paymentData.paymentId,
-    };
-
-    // Só atualiza QR/boleto se vieram na resposta (evita sobrescrever com null)
-    if (paymentData.qrCode) updateData.mpQrCode = paymentData.qrCode;
-    if (paymentData.qrCodeBase64) updateData.mpQrCodeBase64 = paymentData.qrCodeBase64;
-    if (paymentData.boletoUrl) updateData.mpBoletoUrl = paymentData.boletoUrl;
-
-    if (newStatus === 'PAID') {
-      updateData.status = 'PAID';
-      updateData.paidAt = new Date();
-    } else if (['REJECTED', 'CANCELLED', 'EXPIRED'].includes(newStatus)) {
-      updateData.status = newStatus;
-    }
-
-    return await invoiceRepository.updateByMpOrderId(mpOrderId, updateData);
+  async cancel(id: string, actor: PaymentActor, reason: unknown) {
+    return this.updateStatus(id, 'CANCELLED', actor, reason);
   },
 
-  async cancel(id: string, requestingUserId: string, requestingUserRole: string) {
+  async reconcile(id: string, actor: PaymentActor, reason: unknown) {
+    if (!canManageInvoices(actor)) throw new PaymentError(403, 'Acesso negado.');
     const invoice = await invoiceRepository.findById(id);
-    if (!invoice) {
-      throw new Error('Fatura não encontrada.');
-    }
-
-    const hasAccess = await this.checkAccess(invoice, requestingUserId, requestingUserRole, true);
-    if (!hasAccess) {
-      throw new Error('Acesso negado para cancelar esta fatura.');
-    }
-
-    if (invoice.status === 'PAID') {
-      throw new Error('Não é possível cancelar uma fatura já paga.');
-    }
-
-    return await invoiceRepository.update(id, { status: 'CANCELLED' });
+    if (!invoice) throw new PaymentError(404, 'Fatura não encontrada.');
+    const justification = requiredText(reason, 'Justificativa', 1000);
+    const attempt = invoice.paymentAttempt ?? await paymentService.adoptLegacy(invoice, actor, justification);
+    await paymentService.reconcile(attempt.id, actor, justification);
+    return this.getById(id, actor);
   },
 
-  async getOverdueInvoices() {
-    return await invoiceRepository.getOverdueInvoices();
+  async retry(id: string, actor: PaymentActor, reason: unknown) {
+    if (!canManageInvoices(actor)) throw new PaymentError(403, 'Acesso negado.');
+    const invoice = await invoiceRepository.findById(id);
+    if (!invoice) throw new PaymentError(404, 'Fatura não encontrada.');
+    if (!invoice.paymentAttempt) throw new PaymentError(409, 'Fatura legada exige conferência dos registros no provedor.', 'LEGACY_REVIEW');
+    await paymentService.retry(invoice.paymentAttempt.id, actor, requiredText(reason, 'Justificativa', 1000));
+    return this.getById(id, actor);
+  },
+
+  async health(actor: PaymentActor) {
+    if (!canManageInvoices(actor)) throw new PaymentError(403, 'Acesso negado.');
+    return paymentRepository.health();
+  },
+
+  async audit(id: string, actor: PaymentActor) {
+    if (!canManageInvoices(actor)) throw new PaymentError(403, 'Acesso negado.');
+    await this.getById(id, actor);
+    return paymentRepository.audits(id);
   },
 
   async getUserStats(userId: string) {
     const [total, pending, paid, overdue, totalAmount, pendingAmount] = await Promise.all([
-      invoiceRepository.countByUser(userId),
-      invoiceRepository.countByUser(userId, 'PENDING'),
-      invoiceRepository.countByUser(userId, 'PAID'),
-      invoiceRepository.countByUser(userId, 'OVERDUE'),
-      invoiceRepository.sumAmountByUser(userId),
-      invoiceRepository.sumAmountByUser(userId, 'PENDING'),
+      invoiceRepository.countByUser(userId), invoiceRepository.countByUser(userId, 'PENDING'),
+      invoiceRepository.countByUser(userId, 'PAID'), invoiceRepository.countByUser(userId, 'OVERDUE'),
+      invoiceRepository.sumAmountByUser(userId), invoiceRepository.sumAmountByUser(userId, 'PENDING'),
     ]);
-
-    return {
-      total,
-      pending,
-      paid,
-      overdue,
-      totalAmount,
-      pendingAmount,
-    };
+    return { total, pending, paid, overdue, totalAmount, pendingAmount };
   },
-
-  async getUnitStats(unitId: string) {
-    return await invoiceRepository.getStatsByUnit(unitId);
-  },
-
-  async checkAccess(invoice: any, userId: string, userRole: string, isAdminAction = false) {
-    if (['ADMIN', 'FUNCIONARIO'].includes(userRole)) {
-      return true;
-    }
-
-    if (userRole === 'SYNDIC' || invoice.user?.isSyndic) {
-      return true;
-    }
-
-    if (invoice.userId === userId) {
-      return !isAdminAction;
-    }
-
-    return false;
-  },
+  getUnitStats(unitId: string) { return invoiceRepository.getStatsByUnit(unitId); },
 };

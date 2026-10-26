@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { invoiceController } from '../controllers/invoiceController';
-import { authMiddleware, AuthRequest } from '../middlewares/authMiddleware';
+import { authMiddleware } from '../middlewares/authMiddleware';
 import { authorizeRole } from '../middlewares/roleMiddleware';
 
 const router = Router();
@@ -12,6 +12,7 @@ router.post('/webhook', invoiceController.webhook);
 router.use(authMiddleware);
 
 router.get('/stats', invoiceController.getUserStats);
+router.get('/payments/health', authorizeRole(['ADMIN', 'FUNCIONARIO', 'SYNDIC']), invoiceController.health);
 
 router.get('/', invoiceController.listForUser);
 
@@ -26,6 +27,9 @@ router.get('/unit/:unitId/stats', authorizeRole(['ADMIN', 'FUNCIONARIO', 'SYNDIC
 router.get('/all', authorizeRole(['ADMIN', 'FUNCIONARIO']), invoiceController.listAll);
 
 router.get('/:id', invoiceController.getById);
+router.get('/:id/audit', authorizeRole(['ADMIN', 'FUNCIONARIO', 'SYNDIC']), invoiceController.audit);
+router.post('/:id/reconcile', authorizeRole(['ADMIN', 'FUNCIONARIO', 'SYNDIC']), invoiceController.reconcile);
+router.post('/:id/retry', authorizeRole(['ADMIN', 'FUNCIONARIO', 'SYNDIC']), invoiceController.retry);
 
 router.put('/:id/status', authorizeRole(['ADMIN', 'FUNCIONARIO', 'SYNDIC']), invoiceController.updateStatus);
 

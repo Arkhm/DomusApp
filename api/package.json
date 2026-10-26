@@ -4,9 +4,14 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "test": "tsx --test tests/*.test.ts",
     "dev": "tsx watch src/server.ts",
-    "check:security": "node scripts/security-check.mjs"
+    "check:security": "node scripts/security-check.mjs",
+    "typecheck": "tsc --noEmit",
+    "payments:worker": "tsx src/workers/paymentWorker.ts",
+    "start": "tsx src/server.ts",
+    "db:deploy": "prisma migrate deploy",
+    "payments:verify": "node --env-file=../.env --import tsx scripts/verify-mercado-pago.ts"
   },
   "keywords": [],
   "author": "",
