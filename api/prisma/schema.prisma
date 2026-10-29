@@ -28,6 +28,7 @@ model User {
   votings         Voting[] @relation("VotingAuthor")
   noticeReads     NoticeRead[]
   pets            Pet[]
+  invoices        Invoice[]
 }
 
 model Unit {
@@ -40,10 +41,10 @@ model Unit {
   updatedAt   DateTime @updatedAt
 
   residents   User[]
-
   notices     Notice[] @relation("NoticeTargetUnit")
   vehicles    Vehicle[]
   events      Event[]  @relation("EventTargetUnit")
+  invoices    Invoice[]
 }
 
 model Notice {
@@ -51,14 +52,12 @@ model Notice {
   title        String
   content      String   @db.Text
   targetType   String   @default("ALL")
-
   status       String   @default("PUBLISHED") 
   priority     String   @default("NORMAL")    
 
   targetUnitId String?
   targetUnit   Unit?    @relation("NoticeTargetUnit", fields: [targetUnitId], references: [id])
 
-  // Autor do aviso
   authorId     String
   author       User     @relation("NoticeAuthor", fields: [authorId], references: [id])
 
@@ -144,4 +143,120 @@ model Pet {
   owner     User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+model Invoice {
+  id            String       @id @default(uuid())
+  description   String
+  amount        Decimal      @db.Decimal(10, 2)
+  dueDate       DateTime
+  status        String       @default("PENDING") // PENDING, PAID, OVERDUE, CANCELLED, EXPIRED
+  type          String       @default("MONTHLY_FEE") // MONTHLY_FEE, EXTRAORDINARY, FINE, OTHER
+  referenceMonth DateTime?   // Mês de referência para taxas mensais
+
+  // Dados do Mercado Pago
+  mpOrderId     String?      @unique
+  mpPaymentId   String?      @unique
+  mpPreferenceId String?
+  mpStatus      String?      // Status retornado pelo MP (pending, approved, rejected, etc.)
+  mpStatusDetail String?
+  mpQrCode      String?      @db.Text
+  mpQrCodeBase64 String?    @db.Text // QR Code em base64 (muito grande para VARCHAR)
+  mpBoletoUrl   String?      // URL do boleto
+  mpResponse    String?      @db.LongText
+
+  paymentSource String?
+  requiresReview Boolean    @default(false)
+  version       Int         @default(0)
+  operationId   String?
+  operation     PaymentOperation? @relation(fields: [operationId], references: [id])
+  paymentAttempt PaymentAttempt?
+  audits        InvoiceAudit[]
+
+  // Relacionamentos
+  userId        String
+  user          User         @relation(fields: [userId], references: [id])
+  unitId        String
+  unit          Unit         @relation(fields: [unitId], references: [id])
+
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+  paidAt        DateTime?
+
+  @@index([userId])
+  @@index([unitId])
+  @@index([status])
+  @@index([dueDate])
+  @@index([referenceMonth])
+}
+
+model PaymentOperation {
+  id          String    @id @default(uuid())
+  keyHash     String    @unique @db.Char(64)
+  requestHash String    @db.Char(64)
+  actorId     String
+  kind        String
+  createdAt   DateTime  @default(now())
+  invoices    Invoice[]
+}
+
+model PaymentAttempt {
+  id                String   @id @default(uuid())
+  invoiceId         String   @unique
+  invoice           Invoice  @relation(fields: [invoiceId], references: [id])
+  externalReference String   @unique
+  idempotencyKey    String   @unique
+  amount            Decimal  @db.Decimal(10, 2)
+  environment       String
+  sellerId          String
+  requestPayload    Json
+  state             String   @default("QUEUED")
+  orderId           String?  @unique
+  providerUpdatedAt DateTime?
+  providerVersion   Int?
+  expiresAt         DateTime?
+  ticketUrl         String?  @db.Text
+  retryCount        Int      @default(0)
+  retryAt           DateTime @default(now())
+  lockedUntil       DateTime?
+  lockToken         String?
+  lastErrorCode     String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@index([state, retryAt])
+}
+
+model PaymentWebhook {
+  id            String   @id @default(uuid())
+  fingerprint   String   @unique @db.Char(64)
+  orderId       String
+  environment   String
+  sellerId      String
+  state         String   @default("PENDING")
+  retryCount    Int      @default(0)
+  retryAt       DateTime @default(now())
+  lockedUntil   DateTime?
+  lockToken     String?
+  lastErrorCode String?
+  createdAt     DateTime @default(now())
+  processedAt   DateTime?
+
+  @@index([state, retryAt])
+}
+
+model InvoiceAudit {
+  id         String   @id @default(uuid())
+  invoiceId  String
+  invoice    Invoice  @relation(fields: [invoiceId], references: [id])
+  actorId    String?
+  source     String
+  action     String
+  reason     String?  @db.Text
+  fromStatus String
+  toStatus   String
+  amount     Decimal? @db.Decimal(10, 2)
+  createdAt  DateTime @default(now())
+
+  @@index([invoiceId, createdAt])
 }
