@@ -1,3 +1,4 @@
+import { idParamsSchema } from '../schemas/common';
     import { Router } from 'express';
     import { noticeController } from '../controllers/noticeController';
     import { authMiddleware } from '../middlewares/authMiddleware';
@@ -13,10 +14,10 @@
     router.get('/', noticeController.list);
 
     // Qualquer pessoa logada pode marcar como lido (só registra para si)
-    router.post('/:id/read', noticeController.markRead);
+    router.post('/:id/read', validate(idParamsSchema, 'params'), noticeController.markRead);
 
     // ADMIN e SYNDIC podem CRIAR ou DELETAR avisos
     router.post('/', authorizeRole(['ADMIN', 'SYNDIC']), validate(createNoticeSchema), noticeController.create);
-    router.delete('/:id', authorizeRole(['ADMIN', 'SYNDIC']), noticeController.delete);
+    router.delete('/:id', authorizeRole(['ADMIN', 'SYNDIC']), validate(idParamsSchema, 'params'), noticeController.delete);
 
     export default router;

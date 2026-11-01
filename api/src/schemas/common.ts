@@ -16,3 +16,6 @@ export const upperCaseEnum = (values: readonly string[], message: string) =>
     .string()
     .transform((v) => v.toUpperCase())
     .refine((v) => values.includes(v), message);
+
+export const idParamsSchema = z.object({ id: z.string().uuid() });
+export const searchQuerySchema = z.object({ search: z.string().trim().max(191).optional() });

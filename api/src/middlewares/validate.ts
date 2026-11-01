@@ -12,14 +12,14 @@ const formatError = (error: ZodError) => {
   return { message, fieldErrors: error.flatten().fieldErrors };
 };
 
-// Valida e sanitiza `req.body` contra um schema Zod antes de chegar no
+// Valida e sanitiza body, params ou query contra um schema Zod antes de chegar no
 // controller. Campos fora do schema são descartados silenciosamente — Zod
 // ignora chaves desconhecidas por padrão em `z.object()` — o que também
 // fecha uma brecha de mass assignment: sem isso, qualquer campo enviado no
 // body seguia direto para o Service e, de lá, para o Prisma.
 export const validate =
-  (schema: ZodType) => (req: Request, res: Response, next: NextFunction) => {
-    const result = schema.safeParse(req.body);
+  (schema: ZodType, target: 'body' | 'params' | 'query' = 'body') => (req: Request, res: Response, next: NextFunction) => {
+    const result = schema.safeParse(req[target]);
 
     if (!result.success) {
       const { message, fieldErrors } = formatError(result.error);
@@ -27,6 +27,8 @@ export const validate =
       return;
     }
 
-    req.body = result.data;
+    // Express 5 exposes query through a getter; keep the sanitized value on this request.
+    if (target === 'query') Object.defineProperty(req, 'query', { value: result.data, configurable: true });
+    else Object.assign(req, { [target]: result.data });
     next();
   };
