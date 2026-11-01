@@ -4,7 +4,7 @@ import { authMiddleware } from '../middlewares/authMiddleware';
 import { authorizeRole } from '../middlewares/roleMiddleware';
 import { forgotPasswordLimiter, loginLimiter } from '../middlewares/rateLimitMiddleware';
 import { validate } from '../middlewares/validate';
-import { loginSchema, registerSchema } from '../schemas/authSchema';
+import { loginSchema, registerSchema, forgotPasswordSchema, resetPasswordSchema } from '../schemas/authSchema';
 
 const router = Router();
 
@@ -18,8 +18,8 @@ router.post('/login', loginLimiter, validate(loginSchema), authController.login)
 router.post('/logout', authController.logout);
 
 // RF-007 — recuperação de senha.
-router.post('/forgot-password', forgotPasswordLimiter, authController.forgotPassword);
-router.post('/reset-password', authController.resetPassword);
+router.post('/forgot-password', forgotPasswordLimiter, validate(forgotPasswordSchema), authController.forgotPassword);
+router.post('/reset-password', loginLimiter, validate(resetPasswordSchema), authController.resetPassword);
 
 // Rotas Protegidas
 router.get('/me', authMiddleware, authController.me);

@@ -70,7 +70,7 @@ export const authController = {
     try {
       await authService.forgotPassword(email);
     } catch (error) {
-      console.error('[forgotPassword] falha ao processar solicitação:', error);
+      console.error('[forgotPassword] falha ao processar solicitação.');
     }
 
     res.status(200).json({

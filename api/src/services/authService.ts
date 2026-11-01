@@ -144,15 +144,13 @@ export const authService = {
 
     const user = await userRepository.findByResetTokenHash(hashResetToken(token));
 
-    if (!user || !user.resetTokenExpiry || user.resetTokenExpiry.getTime() < Date.now()) {
+    if (!user || !user.resetTokenExpiry || user.resetTokenExpiry.getTime() <= Date.now()) {
       throw new Error('Token inválido ou expirado.');
     }
 
     const hashedPassword = await bcrypt.hash(newPassword, 10);
-    await userRepository.update(user.id, {
-      password: hashedPassword,
-      resetToken: null,
-      resetTokenExpiry: null,
-    });
+    // Conditional update prevents two concurrent requests from consuming the same token.
+    const consumed = await userRepository.consumeResetToken(user.id, hashResetToken(token), hashedPassword);
+    if (!consumed) throw new Error('Token inválido ou expirado.');
   }
 };

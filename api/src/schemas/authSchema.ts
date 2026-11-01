@@ -3,7 +3,7 @@ import { requiredString } from './common';
 
 export const loginSchema = z.object({
   email: requiredString('E-mail é obrigatório.').email('E-mail inválido.'),
-  password: requiredString('Senha é obrigatória.'),
+  password: z.string().min(1, 'Senha é obrigatória.'),
 });
 
 // Usado por /auth/register e /auth/register-admin — ambas criam um usuário
@@ -13,5 +13,11 @@ export const loginSchema = z.object({
 export const registerSchema = z.object({
   name: requiredString('Nome deve ter pelo menos 2 caracteres.').min(2, 'Nome deve ter pelo menos 2 caracteres.').max(100),
   email: requiredString('E-mail é obrigatório.').email('E-mail inválido.'),
-  password: requiredString('Senha deve ter pelo menos 8 caracteres.').min(8, 'Senha deve ter pelo menos 8 caracteres.'),
+  password: z.string().min(8).refine(v => Buffer.byteLength(v, 'utf8') <= 72, 'Senha deve ter no maximo 72 bytes.'),
+});
+
+export const forgotPasswordSchema = z.object({ email: z.string().trim().email().max(191) });
+export const resetPasswordSchema = z.object({
+  token: z.string().uuid(),
+  newPassword: registerSchema.shape.password,
 });

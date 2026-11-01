@@ -19,6 +19,7 @@ async function buildTransporter() {
     });
   }
 
+  if (process.env.NODE_ENV === 'production') throw new Error('SMTP_HOST obrigatório em produção.');
   const testAccount = await nodemailer.createTestAccount();
   console.warn(
     '[mailer] SMTP_HOST não configurado — usando conta de teste Ethereal (nenhum e-mail real é enviado).',
