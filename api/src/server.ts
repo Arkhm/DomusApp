@@ -1,6 +1,7 @@
 // Carrega o .env antes de qualquer leitura de process.env neste módulo
 // (CORS, cookie e rate limit são configurados a partir dele).
 import 'dotenv/config';
+import { validateAuthSecrets } from './lib/authTokens';
 import express, { NextFunction, Request, Response } from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
@@ -15,6 +16,7 @@ import vehicleRoutes from './routes/vehicleRoutes';
 import petRoutes from './routes/petRoutes';
 import invoiceRoutes from './routes/invoiceRoutes';
 
+validateAuthSecrets();
 const app = express();
 
 // Atrás de proxy (Railway/Render/nginx) o IP real vem em X-Forwarded-For.

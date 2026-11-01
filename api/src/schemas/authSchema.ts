@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { requiredString } from './common';
 
 export const loginSchema = z.object({
+  client: z.literal('mobile').optional(),
   email: requiredString('E-mail é obrigatório.').email('E-mail inválido.'),
   password: z.string().min(1, 'Senha é obrigatória.'),
 });
@@ -21,3 +22,8 @@ export const resetPasswordSchema = z.object({
   token: z.string().uuid(),
   newPassword: registerSchema.shape.password,
 });
+
+export const refreshSchema = z.object({
+  client: z.literal('mobile').optional(),
+  refreshToken: z.string().min(1).max(4096).optional(),
+}).default({});

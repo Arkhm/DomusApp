@@ -33,7 +33,7 @@ const baseUserFields = {
   name: requiredString('Nome deve ter pelo menos 2 caracteres.').min(2, 'Nome deve ter pelo menos 2 caracteres.').max(100),
   email: requiredString('E-mail é obrigatório.').email('E-mail inválido.'),
   phone: phoneField,
-  password: requiredString('Senha deve ter pelo menos 8 caracteres.').min(8, 'Senha deve ter pelo menos 8 caracteres.'),
+  password: z.string().min(8).refine(v => Buffer.byteLength(v, 'utf8') <= 72, 'Senha deve ter no maximo 72 bytes.'),
   role: upperCaseEnum(
     ['ADMIN', 'FUNCIONARIO', 'MORADOR'],
     'Cargo inválido. Use ADMIN, FUNCIONARIO ou MORADOR.',

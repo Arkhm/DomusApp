@@ -107,6 +107,7 @@ export interface CondoEvent {
 export interface LoginResponse {
   user: User;
   token: string;
+  refreshToken: string;
 }
 
 /** Payload do JWT, devolvido por `GET /users/me` dentro de `perfil`. */

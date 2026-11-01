@@ -1,15 +1,11 @@
 import bcrypt from 'bcryptjs';
-import jwt from 'jsonwebtoken';
+import { createAuthTokens, verifyAccessToken, verifyRefreshToken } from '../lib/authTokens';
 import { userRepository } from '../repositories/userRepository';
 import { hasPanelAccess } from '../lib/access';
 import { generateResetToken, hashResetToken, RESET_TOKEN_TTL_MS } from '../lib/resetToken';
 import { sendPasswordResetEmail } from '../lib/mailer';
 import { sanitizeUser } from '../lib/sanitizeUser';
 
-const JWT_SECRET = process.env.JWT_SECRET;
-if (!JWT_SECRET) {
-  throw new Error("ERRO: JWT_SECRET não está definido no arquivo .env");
-}
 
 // Tipagem
 interface RegisterDTO {
@@ -41,6 +37,24 @@ const createUserLogic = async (data: RegisterDTO, assignedRole: string) => {
 };
 
 export const authService = {
+  async refresh(refreshToken: string) {
+    const payload = verifyRefreshToken(refreshToken);
+    const user = await userRepository.findById(payload.sub);
+    if (!user || user.status !== 'ACTIVE' || user.tokenVersion !== payload.tokenVersion) {
+      throw new Error('Refresh token inválido ou revogado.');
+    }
+    // shortcut: refresh reutilizavel ate expirar ou ate tokenVersion mudar, trocar por tabela de sessoes com deteccao de reuso se precisar revogar sessao individual.
+    return createAuthTokens(user);
+  },
+
+  async logout(token?: string) {
+    if (!token) return;
+    let userId: string;
+    try { userId = verifyAccessToken(token).id; }
+    catch { return; } // Logout must still clear cookies after expiration.
+    await userRepository.revokeTokens(userId);
+  },
+
   
   async register(data: RegisterDTO) {
     // Registro público sempre será MORADOR
@@ -58,7 +72,7 @@ export const authService = {
     }
 
     const user = await userRepository.findByEmail(email);
-    if (!user) {
+    if (!user || user.status !== 'ACTIVE') {
       throw new Error('Credenciais inválidas.');
     }
 
@@ -72,17 +86,9 @@ export const authService = {
     //   throw new Error('Sua conta não tem acesso ao painel administrativo.');
     // }
 
-    const token = jwt.sign(
-      {
-        id: user.id,
-        role: user.role,
-        isSyndic: user.isSyndic
-      },
-      JWT_SECRET,
-      { expiresIn: '1d' }
-    );
+    const tokens = createAuthTokens(user);
 
-    return { user: sanitizeUser(user), token };
+    return { user: sanitizeUser(user), ...tokens };
   },
 
   // Reidrata a sessão a partir do id que veio no token do cookie. Revalida o

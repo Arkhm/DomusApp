@@ -57,5 +57,6 @@ export const secureStorage = {
 
 export const STORAGE_KEYS = {
   token: 'domusapp.token',
+  refreshToken: 'domusapp.refreshToken',
   user: 'domusapp.user',
 } as const;

@@ -14,6 +14,7 @@ import {
   fetchSessionProfile,
   login as loginRequest,
   withResolvedUnit,
+  logout as logoutRequest,
 } from '../services/authService';
 import type { User } from '../types';
 
@@ -54,6 +55,7 @@ export function AuthProvider({ children }: { children: ReactNode }): React.JSX.E
   const clearSession = useCallback(async () => {
     await Promise.all([
       secureStorage.remove(STORAGE_KEYS.token),
+      secureStorage.remove(STORAGE_KEYS.refreshToken),
       secureStorage.remove(STORAGE_KEYS.user),
     ]);
     if (isMounted.current) setUser(null);
@@ -98,16 +100,17 @@ export function AuthProvider({ children }: { children: ReactNode }): React.JSX.E
     };
   }, [clearSession]);
 
-  // Um 401 em qualquer requisição encerra a sessão.
+  // Falha na renovação de sessão limpa o estado autenticado.
   useEffect(() => onUnauthorized(() => void clearSession()), [clearSession]);
 
   const signIn = useCallback<AuthContextValue['signIn']>(async (email, password) => {
     setIsAuthenticating(true);
     try {
-      const { user: loggedUser, token } = await loginRequest(email, password);
+      const { user: loggedUser, token, refreshToken } = await loginRequest(email, password);
 
       await Promise.all([
         secureStorage.set(STORAGE_KEYS.token, token),
+        secureStorage.set(STORAGE_KEYS.refreshToken, refreshToken),
         secureStorage.set(STORAGE_KEYS.user, JSON.stringify(loggedUser)),
       ]);
 
@@ -122,7 +125,8 @@ export function AuthProvider({ children }: { children: ReactNode }): React.JSX.E
   }, []);
 
   const signOut = useCallback(async () => {
-    await clearSession();
+    try { await logoutRequest(); }
+    finally { await clearSession(); }
   }, [clearSession]);
 
   const value = useMemo<AuthContextValue>(

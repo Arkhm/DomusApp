@@ -4,7 +4,7 @@ import { authMiddleware } from '../middlewares/authMiddleware';
 import { authorizeRole } from '../middlewares/roleMiddleware';
 import { forgotPasswordLimiter, loginLimiter } from '../middlewares/rateLimitMiddleware';
 import { validate } from '../middlewares/validate';
-import { loginSchema, registerSchema, forgotPasswordSchema, resetPasswordSchema } from '../schemas/authSchema';
+import { loginSchema, registerSchema, forgotPasswordSchema, resetPasswordSchema, refreshSchema } from '../schemas/authSchema';
 
 const router = Router();
 
@@ -16,6 +16,7 @@ router.post('/login', loginLimiter, validate(loginSchema), authController.login)
 // Logout é público de propósito: derrubar o cookie precisa funcionar mesmo com
 // token já expirado, senão a sessão morta ficaria presa no browser.
 router.post('/logout', authController.logout);
+router.post('/refresh', loginLimiter, validate(refreshSchema), authController.refresh);
 
 // RF-007 — recuperação de senha.
 router.post('/forgot-password', forgotPasswordLimiter, validate(forgotPasswordSchema), authController.forgotPassword);
