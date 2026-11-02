@@ -179,8 +179,7 @@ test('avisos: HTTP e repository com MySQL isolado', { skip: process.env.RUN_DB_I
   });
 
   for (const [name, notice] of [['outra unidade', fixtures.other], ['rascunho', fixtures.draft]] as const) {
-    await t.test(`leitura deve rejeitar aviso de ${name}`,
-      { todo: 'noticeService.markAsRead não verifica status nem destinatários antes do upsert.' }, async () => {
+    await t.test(`leitura deve rejeitar aviso de ${name}`, async () => {
         const result = await request(app).post(`/notices/${notice.id}/read`).set('Authorization', resident);
         assert.equal(result.status, 403);
         assert.equal(await prisma.noticeRead.count({ where: { noticeId: notice.id, userId: users[1]!.id } }), 0);

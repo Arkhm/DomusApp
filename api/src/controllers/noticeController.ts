@@ -53,7 +53,7 @@ export const noticeController = {
       const result = await noticeService.markAsRead(id, userId);
       res.status(200).json(result);
     } catch (error: any) {
-      res.status(400).json({ error: error.message });
+      res.status(error.statusCode ?? 400).json({ error: error.message });
     }
   }
 };
