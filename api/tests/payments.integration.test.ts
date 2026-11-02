@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { randomUUID, createHmac } from 'node:crypto';
 import express from 'express';
-import jwt from 'jsonwebtoken';
+import { createAuthTokens } from '../src/lib/authTokens';
 import { prisma } from '../src/lib/prisma';
 import { invoiceService } from '../src/services/invoiceService';
 import { paymentService } from '../src/services/paymentService';
@@ -45,6 +45,7 @@ test('pagamentos com MySQL isolado', { skip: !enabled }, async t => {
   process.env.MERCADO_PAGO_SELLER_ID = sellerId;
   process.env.MERCADO_PAGO_WEBHOOK_SECRET = 'integration-test-secret';
   process.env.JWT_SECRET = 'integration-test-jwt';
+  process.env.JWT_REFRESH_SECRET = 'integration-test-refresh-jwt';
   const unit = await prisma.unit.create({ data: { number: prefix, type: 'APARTMENT' } });
   const user = await prisma.user.create({ data: { name: 'Morador Teste', email: `${prefix}@example.com`, cpf: prefix,
     password: 'unused-test-hash', unitId: unit.id } });
@@ -278,7 +279,7 @@ test('pagamentos com MySQL isolado', { skip: !enabled }, async t => {
     await new Promise<void>(resolve => server.once('listening', resolve));
     const address = server.address() as { port: number };
     const base = `http://127.0.0.1:${address.port}/invoices`;
-    const token = jwt.sign(actor, process.env.JWT_SECRET!);
+    const token = createAuthTokens({ ...actor, tokenVersion: 0 }).token;
     const headers = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' };
     try {
       assert.equal((await fetch(base)).status, 401);
