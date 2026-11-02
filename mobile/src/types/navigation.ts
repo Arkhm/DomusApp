@@ -12,6 +12,7 @@ export type MainTabParamList = {
 
 export type RootStackParamList = {
   Login: undefined;
+  Ocorrencias: undefined;
   Main: NavigatorScreenParams<MainTabParamList> | undefined;
   /** Tela "Em breve" para módulos que ainda não têm implementação. */
   EmBreve: { title: string; description?: string };

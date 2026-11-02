@@ -18,18 +18,12 @@ export interface AppModule {
   label: string;
   icon: IoniconName;
   apiStatus: ModuleApiStatus;
+  screen?: 'Reservas' | 'Ocorrencias';
   /** O que ainda falta — exibido na tela "Em breve". */
   pendingNote: string;
 }
 
-/**
- * Grid de acesso rápido da Home.
- *
- * TODO(API): apenas `/notices`, `/events`, `/votings`, `/units` e `/users`
- * existem hoje. Cobranças, reservas, acessos, encomendas, ocorrências,
- * documentos, achados e perdidos, multas, visitantes, notificações,
- * pagamentos e histórico ainda não têm rota no backend.
- */
+/** Grid de acesso rápido da Home; módulos com `screen` abrem uma tela real. */
 export const APP_MODULES: readonly AppModule[] = [
   {
     id: 'comunicados',
@@ -49,8 +43,9 @@ export const APP_MODULES: readonly AppModule[] = [
     id: 'reservas',
     label: 'Reservas',
     icon: 'calendar-outline',
-    apiStatus: 'missing',
-    pendingNote: 'A API ainda não tem /reservations nem modelo de área comum.',
+    apiStatus: 'ready',
+    screen: 'Reservas',
+    pendingNote: 'Consulte suas reservas, solicite uma área ativa e cancele reservas futuras.',
   },
   {
     id: 'acessos',
@@ -70,8 +65,9 @@ export const APP_MODULES: readonly AppModule[] = [
     id: 'ocorrencias',
     label: 'Ocorrências',
     icon: 'alert-circle-outline',
-    apiStatus: 'missing',
-    pendingNote: 'A API ainda não tem /occurrences.',
+    apiStatus: 'ready',
+    screen: 'Ocorrencias',
+    pendingNote: 'Registre ocorrências e acompanhe o status e a resposta da administração.',
   },
   {
     id: 'votacoes',

@@ -117,3 +117,55 @@ export interface SessionProfile {
   iat?: number;
   exp?: number;
 }
+
+
+export interface CommonArea {
+  id: string;
+  name: string;
+  description: string | null;
+  capacity: number | null;
+  rules: string | null;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type ReservationStatus = 'PENDING' | 'APPROVED' | 'REJECTED' | 'CANCELLED';
+export interface ReservationInput {
+  commonAreaId: string;
+  date: string;
+  startTime: string;
+  endTime: string;
+}
+export interface Reservation {
+  id: string;
+  date: string;
+  startTime: string;
+  endTime: string;
+  status: ReservationStatus;
+  rejectionReason: string | null;
+  createdAt: string;
+  commonArea: Pick<CommonArea, 'id' | 'name'>;
+  user: { id: string; name: string; unit: Pick<Unit, 'id' | 'block' | 'number'> | null };
+}
+
+export type IncidentCategory = 'BARULHO' | 'MANUTENCAO' | 'SEGURANCA' | 'LIMPEZA' | 'OUTRO';
+export type IncidentStatus = 'OPEN' | 'IN_PROGRESS' | 'RESOLVED' | 'CLOSED';
+export interface IncidentInput {
+  title: string;
+  description: string;
+  category: IncidentCategory;
+}
+export interface Incident {
+  id: string;
+  title: string;
+  description: string;
+  category: IncidentCategory;
+  status: IncidentStatus;
+  response: string | null;
+  respondedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+  author: { id: string; name: string };
+  unit: Pick<Unit, 'id' | 'block' | 'number'> | null;
+}

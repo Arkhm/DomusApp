@@ -7,6 +7,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { LoginScreen } from '../screens/LoginScreen';
 import { HomeScreen } from '../screens/HomeScreen';
 import { ProfileScreen } from '../screens/ProfileScreen';
+import { ReservationsScreen } from '../screens/ReservationsScreen';
+import { IncidentsScreen } from '../screens/IncidentsScreen';
 import { ComingSoonScreen, TabPlaceholder } from '../screens/ComingSoonScreen';
 import { useAuth } from '../contexts/AuthContext';
 import { colors, fontFamily, layout, spacing, typography } from '../theme';
@@ -32,15 +34,6 @@ const navigationTheme: Theme = {
     heavy: { fontFamily: fontFamily.bold, fontWeight: '700' },
   },
 };
-
-function ReservationsScreen(): React.JSX.Element {
-  return (
-    <TabPlaceholder
-      title="Reservas"
-      description="A API ainda não expõe /reservations nem um modelo de área comum. A aba fica reservada para a próxima entrega."
-    />
-  );
-}
 
 function AccessScreen(): React.JSX.Element {
   return (
@@ -111,20 +104,22 @@ export function AppNavigator(): React.JSX.Element {
 
   return (
     <NavigationContainer theme={navigationTheme}>
-      <Stack.Navigator>
+      <Stack.Navigator screenOptions={{
+        headerBackTitle: 'Voltar',
+        headerTintColor: colors.textOnBrand,
+        headerTitleStyle: styles.headerTitle,
+        headerStyle: styles.header,
+        headerShadowVisible: false,
+      }}>
         {user ? (
           <>
             <Stack.Screen name="Main" component={MainTabs} options={{ headerShown: false }} />
+            <Stack.Screen name="Ocorrencias" component={IncidentsScreen} options={{ title: 'Ocorrências' }} />
             <Stack.Screen
               name="EmBreve"
               component={ComingSoonScreen}
               options={({ route }) => ({
                 title: route.params.title,
-                headerBackTitle: 'Voltar',
-                headerTintColor: colors.textOnBrand,
-                headerTitleStyle: styles.headerTitle,
-                headerStyle: styles.header,
-                headerShadowVisible: false,
               })}
             />
           </>

@@ -71,8 +71,14 @@ export function HomeScreen(): React.JSX.Element {
   }
 
   function openModule(module: AppModule): void {
-    // Nenhum módulo tem tela própria nesta entrega: todos caem no placeholder,
-    // que explica o que falta do lado da API.
+    if (module.screen === 'Reservas') {
+      navigation.navigate('Main', { screen: 'Reservas' });
+      return;
+    }
+    if (module.screen === 'Ocorrencias') {
+      navigation.navigate('Ocorrencias');
+      return;
+    }
     navigation.navigate('EmBreve', {
       title: module.label,
       description: module.pendingNote,
@@ -180,7 +186,7 @@ export function HomeScreen(): React.JSX.Element {
                   label={module.label}
                   icon={module.icon}
                   onPress={() => openModule(module)}
-                  isComingSoon
+                  isComingSoon={!module.screen}
                 />
               </View>
             ))}

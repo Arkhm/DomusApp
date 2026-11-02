@@ -3,9 +3,9 @@
 App do morador do DomusApp, em Expo + React Native + TypeScript.
 Consome a API REST do monorepo (`../api`).
 
-Esta rodada entrega **duas telas navegáveis e funcionais**: **Login** e **Home
-(dashboard)**. Os demais módulos aparecem no grid e levam a um placeholder
-"Em breve" que explica exatamente o que falta do lado da API.
+Esta rodada entrega Login, Home (dashboard), Reservas e Ocorrências. Os demais
+módulos aparecem no grid e levam a um placeholder "Em breve" que explica o que
+ainda falta do lado da API.
 
 ---
 
@@ -19,8 +19,8 @@ Esta rodada entrega **duas telas navegáveis e funcionais**: **Login** e **Home
 | Sessão restaurada ao abrir o app | ✅ valida via `GET /users/me` |
 | Home com saudação + identificação do morador | ✅ |
 | Resumo do topo (comunicados e próximo evento) | ✅ `GET /notices` + `GET /events` |
-| Grid com os 15 módulos | ✅ (todos apontam para "Em breve") |
-| Bottom tabs: Início / Reservas / Acessos / Encomendas / Perfil | ✅ (3 abas são placeholders) |
+| Grid com os 15 módulos | ✅ (Reservas e Ocorrências prontas; demais em "Em breve") |
+| Bottom tabs: Início / Reservas / Acessos / Encomendas / Perfil | ✅ (Acessos e Encomendas são placeholders) |
 | Comportamento com a API fora do ar | ✅ banner de erro + "Tentar de novo" |
 | Design tokens centralizados, fonte Inter, alvo 390×844 | ✅ |
 
@@ -177,22 +177,38 @@ publicados" em vez de inventar um número de não lidos.
 
 ### 4. Módulos sem endpoint na API
 
-Existem hoje: `/auth`, `/users`, `/notices`, `/units`, `/events`, `/votings`.
+Existem hoje: `/auth`, `/users`, `/notices`, `/units`, `/events`, `/votings`,
+`/common-areas`, `/reservations` e `/incidents`.
 
-**Não existem** (o enunciado do projeto os cita, mas não há rota nem modelo no
-`schema.prisma`): `/charges`, `/reservations`, `/visitors`, `/packages`,
-`/notifications`, `/occurrences`, `/permissions`, além de documentos, multas,
-achados e perdidos, pagamentos e histórico.
+**Reservas e Ocorrências estão prontas no mobile:**
+
+- Reservas: lista das próprias reservas com status e motivo de rejeição; nova
+  solicitação com área ativa; cancelamento de PENDING/APPROVED futura com confirmação.
+  Datas `YYYY-MM-DD` e horários `HH:mm` são validados no fuso de Brasília (UTC-03 fixo),
+  sem dependências novas. Erros da API, inclusive conflito 409, aparecem na tela.
+- Ocorrências: lista das próprias ocorrências com categoria, status e resposta da
+  administração; registro com título (até 200), descrição e categoria.
+  Autor e unidade vêm da API, nunca do formulário.
+- Reservas abre pela aba e pelo cartão da Home; Ocorrências abre pelo cartão da Home.
+  Contas de síndico também veem apenas os próprios registros neste canal.
+
+Os testes de validação rodam em `mobile/` com
+`node --test src/utils/residentForms.test.cjs`, usando o runner nativo do Node e o
+TypeScript já instalado. A checagem de tipos continua com `npx tsc --noEmit`.
+A integração em aparelho e as notificações de mudança de status ficam de fora desta entrega.
+
+**Ainda não existem**: `/charges`, `/visitors`, `/packages`, `/notifications`,
+`/permissions`, além de documentos, multas, achados e perdidos, pagamentos e histórico.
 
 `GET /votings` já é liberado para morador e `POST /votings/:id/votes` registra
 um voto por unidade. Falta a tela de votações no app.
 
-Cada cartão do grid leva ao placeholder com a nota correspondente
+Os demais cartões do grid levam ao placeholder com a nota correspondente
 (`src/config/modules.ts`).
 
 ### 5. Outros TODOs do app
 
-- Telas próprias de Comunicados, Reservas, Acessos e Encomendas.
+- Telas próprias de Comunicados, Acessos e Encomendas.
 - Push notifications.
 - No target **web** o token cai em `localStorage`, porque `expo-secure-store`
   não existe no browser (`src/services/secureStorage.ts`). O alvo de entrega é
