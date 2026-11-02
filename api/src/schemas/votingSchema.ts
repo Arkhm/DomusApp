@@ -23,3 +23,7 @@ export const createVotingSchema = z
     message: 'A data de início deve ser anterior à data de término.',
     path: ['endDate'],
   });
+
+export const castVoteSchema = z.object({
+  optionId: z.string({ error: 'Opção é obrigatória.' }).uuid('Opção inválida.'),
+});

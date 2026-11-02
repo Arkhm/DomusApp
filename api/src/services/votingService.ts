@@ -1,4 +1,7 @@
+import { Prisma } from '@prisma/client';
 import { votingRepository } from '../repositories/votingRepository';
+import { userRepository } from '../repositories/userRepository';
+import { HttpError } from '../lib/httpError';
 
 export const votingService = {
   async create(data: {
@@ -31,6 +34,9 @@ export const votingService = {
     if (startDate >= endDate) {
       throw new Error('A data de início deve ser anterior à data de término.');
     }
+    if (endDate <= new Date()) {
+      throw new Error('A data de término deve estar no futuro.');
+    }
 
     if (!Array.isArray(data.options) || data.options.length < 2) {
       throw new Error('A votação deve conter pelo menos duas opções.');
@@ -54,6 +60,40 @@ export const votingService = {
 
   async list() {
     return await votingRepository.findAll();
+  },
+
+  async vote(votingId: string, optionId: string, userId: string) {
+    const user = await userRepository.findById(userId);
+    if (!user || user.role !== 'MORADOR' || !user.unitId) {
+      throw new HttpError(403, 'Apenas moradores com unidade podem votar.');
+    }
+
+    const voting = await votingRepository.findById(votingId);
+    if (!voting) {
+      throw new HttpError(404, 'Votação não encontrada.');
+    }
+
+    // Limites inclusivos, como o getVotingStatus do web.
+    const now = new Date();
+    if (now < voting.startDate) {
+      throw new Error('A votação ainda não começou.');
+    }
+    if (now > voting.endDate) {
+      throw new Error('A votação já foi encerrada.');
+    }
+    if (!voting.options.some((option) => option.id === optionId)) {
+      throw new Error('Opção inválida para esta votação.');
+    }
+
+    try {
+      await votingRepository.castVote({ votingId, optionId, unitId: user.unitId, userId });
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+        throw new HttpError(409, 'Sua unidade já votou nesta votação.');
+      }
+      throw error;
+    }
+    return { message: 'Voto registrado com sucesso.' };
   },
 
   async delete(id: string) {

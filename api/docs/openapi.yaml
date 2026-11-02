@@ -647,7 +647,7 @@ paths:
       tags:
         - votings
       summary: Listar votações
-      description: "Perfis permitidos: ADMIN, FUNCIONARIO, SYNDIC. SYNDIC corresponde ao atributo isSyndic."
+      description: "Perfis permitidos: ADMIN, FUNCIONARIO, MORADOR (inclui a síndica)."
       responses:
         "200":
           description: Operação concluída.
@@ -705,12 +705,52 @@ paths:
           $ref: "#/components/responses/403"
         "500":
           $ref: "#/components/responses/500"
+  /votings/{id}/votes:
+    post:
+      tags:
+        - votings
+      summary: Registrar o voto da unidade do morador
+      description: "Perfil permitido: MORADOR com unidade. Um voto por unidade em cada votação, aceito só entre o início e o término (inclusive)."
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - optionId
+              properties:
+                optionId:
+                  type: string
+                  format: uuid
+      responses:
+        "201":
+          description: Voto registrado.
+        "400":
+          $ref: "#/components/responses/400"
+        "401":
+          $ref: "#/components/responses/401"
+        "403":
+          $ref: "#/components/responses/403"
+        "404":
+          $ref: "#/components/responses/404"
+        "409":
+          $ref: "#/components/responses/409"
+        "500":
+          $ref: "#/components/responses/500"
   /notices/{id}/read:
     post:
       tags:
         - notices
       summary: Marcar aviso como lido para a pessoa autenticada
-      description: ""
+      description: "Morador só marca avisos publicados para todos ou para a própria unidade (403 nos demais)."
       parameters:
         - name: id
           in: path
@@ -2167,50 +2207,18 @@ components:
           nullable: true
   responses:
     "400":
-      description: Entrada inválida ou regra de negócio não atendida.
-      content:
-        application/json:
-          schema:
-            $ref: "#/components/schemas/Error"
+          $ref: "#/components/responses/400"
     "401":
-      description: Credenciais, sessão ou assinatura de webhook inválidas.
-      content:
-        application/json:
-          schema:
-            $ref: "#/components/schemas/Error"
+          $ref: "#/components/responses/401"
     "403":
-      description: Origem ou perfil sem permissão.
-      content:
-        application/json:
-          schema:
-            $ref: "#/components/schemas/Error"
+          $ref: "#/components/responses/403"
     "404":
-      description: Recurso não encontrado.
-      content:
-        application/json:
-          schema:
-            $ref: "#/components/schemas/Error"
+          $ref: "#/components/responses/404"
     "409":
-      description: Conflito de estado, idempotência ou conciliação.
-      content:
-        application/json:
-          schema:
-            $ref: "#/components/schemas/Error"
+          $ref: "#/components/responses/409"
     "429":
-      description: Limite de tentativas excedido. Aguarde Retry-After.
-      content:
-        application/json:
-          schema:
-            $ref: "#/components/schemas/Error"
+          $ref: "#/components/responses/429"
     "500":
-      description: Falha interna.
-      content:
-        application/json:
-          schema:
-            $ref: "#/components/schemas/Error"
+          $ref: "#/components/responses/500"
     "503":
-      description: Serviço ou provedor indisponível.
-      content:
-        application/json:
-          schema:
-            $ref: "#/components/schemas/Error"
+          $ref: "#/components/responses/503"

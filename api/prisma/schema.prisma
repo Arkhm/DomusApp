@@ -34,6 +34,7 @@ model User {
   events          Event[]  @relation("EventAuthor")
   votings         Voting[] @relation("VotingAuthor")
   noticeReads     NoticeRead[]
+  votingVotes     VotingVote[]
   pets            Pet[]
   invoices        Invoice[]
 }
@@ -52,6 +53,7 @@ model Unit {
   vehicles    Vehicle[]
   events      Event[]  @relation("EventTargetUnit")
   invoices    Invoice[]
+  votingVotes VotingVote[]
 }
 
 model Notice {
@@ -117,6 +119,7 @@ model Voting {
   authorId    String
   author      User           @relation("VotingAuthor", fields: [authorId], references: [id])
   options     VotingOption[]
+  ballots     VotingVote[]
   createdAt   DateTime       @default(now())
   updatedAt   DateTime       @updatedAt
 }
@@ -127,7 +130,28 @@ model VotingOption {
   votingId  String
   voting    Voting   @relation(fields: [votingId], references: [id], onDelete: Cascade)
   votes     Int      @default(0)
+  ballots   VotingVote[]
   createdAt DateTime @default(now())
+}
+
+// Um voto por unidade em cada votação (@@unique), como numa assembleia de
+// condomínio. `VotingOption.votes` continua sendo o total exibido e é
+// incrementado na mesma transação que cria este registro. `userId` guarda
+// quem votou pela unidade e vira null se o usuário for removido, sem apagar
+// o voto.
+model VotingVote {
+  id        String       @id @default(uuid())
+  votingId  String
+  voting    Voting       @relation(fields: [votingId], references: [id], onDelete: Cascade)
+  optionId  String
+  option    VotingOption @relation(fields: [optionId], references: [id], onDelete: Cascade)
+  unitId    String
+  unit      Unit         @relation(fields: [unitId], references: [id], onDelete: Cascade)
+  userId    String?
+  user      User?        @relation(fields: [userId], references: [id], onDelete: SetNull)
+  createdAt DateTime     @default(now())
+
+  @@unique([votingId, unitId])
 }
 
 model Vehicle {

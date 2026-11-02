@@ -7,6 +7,8 @@ import { createAuthTokens } from '../src/lib/authTokens';
 import { prisma } from '../src/lib/prisma';
 import { votingService } from '../src/services/votingService';
 import { votingRepository } from '../src/repositories/votingRepository';
+import { userRepository } from '../src/repositories/userRepository';
+import { Prisma } from '@prisma/client';
 
 const enabled = process.env.RUN_DB_INTEGRATION === 'true';
 const input = () => ({
@@ -42,9 +44,7 @@ test('votações: validações do serviço', async t => {
       assert.equal(persist.mock.callCount(), 0);
     });
   }
-  await t.test('recusa criar votação com período já encerrado', {
-    todo: 'votingService.create aceita início e término no passado quando início < término.',
-  }, async t => {
+  await t.test('recusa criar votação com período já encerrado', async t => {
     t.mock.method(votingRepository, 'create', async (data: Parameters<typeof votingRepository.create>[0]) => data as any);
     await assert.rejects(() => votingService.create({
       ...input(), startDate: '2000-01-01', endDate: '2000-01-02',
@@ -66,14 +66,61 @@ test('votações: status conforme as datas e limites inclusivos', async () => {
     assert.equal(getVotingStatus(voting as Parameters<typeof getVotingStatus>[0], new Date(now!)), expected);
   }
 });
-test('votações: recusa voto duplicado do mesmo morador', {
-  todo: 'Não existe endpoint de voto nem vínculo voto/usuário: VotingOption armazena apenas o total votes.',
-});
-test('votações: recusa voto antes do início', {
-  todo: 'Não existe operação de voto no backend para validar o início da janela.',
-});
-test('votações: recusa voto após o encerramento', {
-  todo: 'Não existe operação de voto no backend para validar o término da janela.',
+test('votações: regras do voto no serviço', async t => {
+  const optionId = randomUUID();
+  const resident = { id: randomUUID(), role: 'MORADOR', unitId: randomUUID() };
+  const votingAt = (start: number, end: number) => ({
+    id: randomUUID(), startDate: new Date(Date.now() + start), endDate: new Date(Date.now() + end),
+    options: [{ id: optionId }],
+  });
+  const arrange = (t: any, voting: unknown, user: unknown = resident) => {
+    t.mock.method(userRepository, 'findById', async () => user);
+    t.mock.method(votingRepository, 'findById', async () => voting);
+    return t.mock.method(votingRepository, 'castVote', async () => ({}));
+  };
+
+  await t.test('registra o voto da unidade dentro do período', async t => {
+    const cast = arrange(t, votingAt(-60_000, 60_000));
+    assert.match((await votingService.vote(randomUUID(), optionId, resident.id)).message, /registrado/);
+    assert.equal(cast.mock.calls[0]!.arguments[0].unitId, resident.unitId);
+  });
+  for (const [name, voting, message] of [
+    ['antes do início', votingAt(60_000, 120_000), /ainda não começou/],
+    ['após o encerramento', votingAt(-120_000, -60_000), /já foi encerrada/],
+  ] as const) {
+    await t.test(`recusa voto ${name}`, async t => {
+      const cast = arrange(t, voting);
+      await assert.rejects(() => votingService.vote(voting.id, optionId, resident.id), message);
+      assert.equal(cast.mock.callCount(), 0);
+    });
+  }
+  await t.test('recusa opção de outra votação', async t => {
+    arrange(t, votingAt(-60_000, 60_000));
+    await assert.rejects(() => votingService.vote(randomUUID(), randomUUID(), resident.id), /Opção inválida/);
+  });
+  for (const [name, user] of [
+    ['usuário inexistente', null], ['funcionário', { ...resident, role: 'FUNCIONARIO' }],
+    ['morador sem unidade', { ...resident, unitId: null }],
+  ] as const) {
+    await t.test(`recusa ${name} com 403`, async t => {
+      arrange(t, votingAt(-60_000, 60_000), user);
+      await assert.rejects(() => votingService.vote(randomUUID(), optionId, resident.id),
+        (error: any) => error.statusCode === 403);
+    });
+  }
+  await t.test('votação inexistente retorna 404', async t => {
+    arrange(t, null);
+    await assert.rejects(() => votingService.vote(randomUUID(), optionId, resident.id),
+      (error: any) => error.statusCode === 404);
+  });
+  await t.test('recusa voto duplicado da mesma unidade com 409', async t => {
+    const cast = arrange(t, votingAt(-60_000, 60_000));
+    cast.mock.mockImplementation(async () => {
+      throw new Prisma.PrismaClientKnownRequestError('duplicado', { code: 'P2002', clientVersion: 'teste' });
+    });
+    await assert.rejects(() => votingService.vote(randomUUID(), optionId, resident.id),
+      (error: any) => error.statusCode === 409 && /já votou/.test(error.message));
+  });
 });
 
 test('votações: HTTP e repositório com MySQL isolado', { skip: !enabled }, async t => {
@@ -83,28 +130,34 @@ test('votações: HTTP e repositório com MySQL isolado', { skip: !enabled }, as
   const residentId = randomUUID();
   const syndicId = randomUUID();
   const employeeId = randomUUID();
-  const ids = [adminId, residentId, syndicId, employeeId];
+  const neighborId = randomUUID();
+  const unitId = randomUUID();
+  const ids = [adminId, residentId, syndicId, employeeId, neighborId];
   t.after(async () => {
     try {
       await prisma.voting.deleteMany({ where: { authorId: { in: ids } } });
       await prisma.user.deleteMany({ where: { id: { in: ids } } });
+      await prisma.unit.deleteMany({ where: { id: unitId } });
     } finally { await prisma.$disconnect(); }
   });
+  await prisma.unit.create({ data: { id: unitId, block: `votacoes-${suffix}`, number: '1' } });
+  // residentId e neighborId moram na mesma unidade; a síndica fica sem unidade.
   await prisma.user.createMany({ data: ids.map((id, index) => ({
     id, name: 'Pessoa das votações', email: `${index}-votacoes-${suffix}@example.com`,
     cpf: `${index}-${suffix}`, password: 'hash-apenas-para-teste',
     role: index === 0 ? 'ADMIN' : index === 3 ? 'FUNCIONARIO' : 'MORADOR', isSyndic: index === 2,
+    unitId: id === residentId || id === neighborId ? unitId : null,
   })) });
   const admin = bearer(adminId, 'ADMIN');
   const resident = bearer(residentId);
   const syndic = bearer(syndicId, 'MORADOR', true);
   const employee = bearer(employeeId, 'FUNCIONARIO');
+  const neighbor = bearer(neighborId);
 
-  await t.test('sem token retorna 401; morador comum recebe 403', async () => {
+  await t.test('sem token retorna 401; morador comum lista, mas recebe 403 ao criar ou remover', async () => {
     for (const auth of [undefined, resident]) {
       const status = auth ? 403 : 401;
       const calls = [
-        request(app).get('/votings'),
         request(app).post('/votings').send(input()),
         request(app).delete(`/votings/${randomUUID()}`),
       ];
@@ -113,6 +166,28 @@ test('votações: HTTP e repositório com MySQL isolado', { skip: !enabled }, as
         await call.expect(status);
       }
     }
+    await request(app).get('/votings').expect(401);
+    await request(app).get('/votings').set('Authorization', resident).expect(200);
+    await request(app).post(`/votings/${randomUUID()}/votes`).send({ optionId: randomUUID() }).expect(401);
+  });
+  await t.test('morador vota uma vez por unidade e o total da opção sobe', async () => {
+    const created = await votingRepository.create({
+      title: 'Votação aberta', description: 'Em andamento', authorId: adminId, options: ['Sim', 'Não'],
+      startDate: new Date(Date.now() - 60_000), endDate: new Date(Date.now() + 60_000),
+    });
+    const [yes, no] = created.options;
+    const path = `/votings/${created.id}/votes`;
+    await request(app).post(path).set('Authorization', resident).send({ optionId: 'x' }).expect(400);
+    await request(app).post(path).set('Authorization', employee).send({ optionId: yes!.id }).expect(403);
+    await request(app).post(path).set('Authorization', syndic).send({ optionId: yes!.id }).expect(403);
+    await request(app).post(path).set('Authorization', resident).send({ optionId: yes!.id }).expect(201);
+    const duplicate = await request(app).post(path).set('Authorization', neighbor).send({ optionId: no!.id }).expect(409);
+    assert.match(duplicate.body.error, /já votou/);
+    const stored = await votingRepository.findById(created.id);
+    assert.deepEqual(stored?.options.map(option => option.votes), [1, 0]);
+    assert.equal(await prisma.votingVote.count({ where: { votingId: created.id, unitId } }), 1);
+    await request(app).post(`/votings/${randomUUID()}/votes`).set('Authorization', resident)
+      .send({ optionId: yes!.id }).expect(404);
   });
   await t.test('HTTP rejeita datas inválidas, invertidas e opções insuficientes', async () => {
     for (const patch of [

@@ -184,8 +184,8 @@ Existem hoje: `/auth`, `/users`, `/notices`, `/units`, `/events`, `/votings`.
 `/notifications`, `/occurrences`, `/permissions`, além de documentos, multas,
 achados e perdidos, pagamentos e histórico.
 
-`GET /votings` existe, mas hoje só `ADMIN`/`FUNCIONARIO` podem listar — falta
-liberar para morador e criar o endpoint de registro de voto.
+`GET /votings` já é liberado para morador e `POST /votings/:id/votes` registra
+um voto por unidade. Falta a tela de votações no app.
 
 Cada cartão do grid leva ao placeholder com a nota correspondente
 (`src/config/modules.ts`).
