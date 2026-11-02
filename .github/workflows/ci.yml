@@ -1,0 +1,100 @@
+name: Qualidade
+on:
+  pull_request:
+  push:
+    branches: [develop, main]
+permissions:
+  contents: read
+jobs:
+  api:
+    name: API — tipos e cobertura com MySQL
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: teste-ci-mysql
+          MYSQL_DATABASE: domusapp_test
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -pteste-ci-mysql --silent"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=30
+    env:
+      NODE_ENV: test
+      DATABASE_HOST: 127.0.0.1
+      DATABASE_PORT: '3306'
+      DATABASE_USER: root
+      DATABASE_PASSWORD: teste-ci-mysql
+      DATABASE_NAME: domusapp_test
+      DATABASE_URL: mysql://root:teste-ci-mysql@127.0.0.1:3306/domusapp_test
+      JWT_SECRET: segredo-acesso-ficticio-exclusivo-ci
+      JWT_REFRESH_SECRET: segredo-refresh-ficticio-exclusivo-ci
+      MERCADO_PAGO_ACCESS_TOKEN: token-ficticio-provedor-mockado-ci
+      MERCADO_PAGO_SELLER_ID: '123'
+      MERCADO_PAGO_SANDBOX: 'true'
+      MERCADO_PAGO_WEBHOOK_SECRET: assinatura-ficticia-exclusiva-ci
+      RUN_DB_INTEGRATION: 'true'
+      RUN_PAYMENT_INTEGRATION: 'true'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: |
+            api/package-lock.json
+            web/package-lock.json
+            mobile/package-lock.json
+      - name: Instalar dependências da API e dos clientes usados nos testes
+        run: |
+          npm ci --prefix api
+          npm ci --prefix web
+          npm ci --prefix mobile
+      - name: Gerar Prisma Client
+        working-directory: api
+        run: npx prisma generate
+      - name: Aplicar migrações no banco de teste
+        working-directory: api
+        run: npx prisma migrate deploy
+      - name: Verificar tipos
+        working-directory: api
+        run: npm run typecheck
+      - name: Executar testes e exigir 70% de linhas
+        working-directory: api
+        run: npm run test:coverage
+  web:
+    name: Web — build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: npm ci
+      - run: npm run build
+  mobile:
+    name: Mobile — tipos
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: mobile
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+      - run: npm ci
+      - run: npx tsc --noEmit
