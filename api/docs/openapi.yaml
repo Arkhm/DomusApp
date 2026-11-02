@@ -710,7 +710,8 @@ paths:
       tags:
         - votings
       summary: Registrar o voto da unidade do morador
-      description: "Perfil permitido: MORADOR com unidade. Um voto por unidade em cada votação, aceito só entre o início e o término (inclusive)."
+      description: "Perfil permitido: MORADOR com unidade. Um voto por unidade em cada votação, aceito só entre o início e o
+        término (inclusive)."
       parameters:
         - name: id
           in: path
@@ -1600,6 +1601,426 @@ paths:
             application/yaml:
               schema:
                 type: string
+  /common-areas:
+    get:
+      tags:
+        - common-areas
+      summary: Listar áreas comuns
+      description: Qualquer autenticado. Painel recebe todas; morador recebe só as ativas.
+      responses:
+        "200":
+          description: Áreas ordenadas por nome.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/CommonArea"
+        "401":
+          $ref: "#/components/responses/401"
+        "500":
+          $ref: "#/components/responses/500"
+    post:
+      tags:
+        - common-areas
+      summary: Criar área comum
+      description: "Perfil permitido: ADMIN."
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CommonAreaCreate"
+      responses:
+        "201":
+          description: Área criada.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CommonArea"
+        "400":
+          $ref: "#/components/responses/400"
+        "401":
+          $ref: "#/components/responses/401"
+        "403":
+          $ref: "#/components/responses/403"
+        "500":
+          $ref: "#/components/responses/500"
+  /common-areas/{id}:
+    put:
+      tags:
+        - common-areas
+      summary: Editar área comum
+      description: "Perfil permitido: ADMIN. Campos opcionais, mas pelo menos um é obrigatório."
+      parameters: &a1
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CommonAreaUpdate"
+      responses:
+        "200":
+          description: Área atualizada.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CommonArea"
+        "400":
+          $ref: "#/components/responses/400"
+        "401":
+          $ref: "#/components/responses/401"
+        "403":
+          $ref: "#/components/responses/403"
+        "404":
+          $ref: "#/components/responses/404"
+        "500":
+          $ref: "#/components/responses/500"
+    delete:
+      tags:
+        - common-areas
+      summary: Remover área comum
+      description: "Perfil permitido: ADMIN. Recusada (400) se houver reserva pendente ou aprovada de hoje em diante; nesse
+        caso, desative a área."
+      parameters: *a1
+      responses:
+        "200":
+          description: Área removida.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Message"
+        "400":
+          $ref: "#/components/responses/400"
+        "401":
+          $ref: "#/components/responses/401"
+        "403":
+          $ref: "#/components/responses/403"
+        "404":
+          $ref: "#/components/responses/404"
+        "500":
+          $ref: "#/components/responses/500"
+  /reservations:
+    get:
+      tags:
+        - reservations
+      summary: Listar reservas
+      description: Morador recebe só as próprias; painel (ADMIN, FUNCIONARIO, síndica) recebe todas.
+      parameters:
+        - name: status
+          in: query
+          required: false
+          schema:
+            type: string
+            enum:
+              - PENDING
+              - APPROVED
+              - REJECTED
+              - CANCELLED
+        - name: commonAreaId
+          in: query
+          required: false
+          schema:
+            type: string
+            format: uuid
+        - name: from
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date
+        - name: to
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date
+      responses:
+        "200":
+          description: Reservas, das mais recentes para as mais antigas.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Reservation"
+        "400":
+          $ref: "#/components/responses/400"
+        "401":
+          $ref: "#/components/responses/401"
+        "500":
+          $ref: "#/components/responses/500"
+    post:
+      tags:
+        - reservations
+      summary: Solicitar reserva
+      description: "Perfil permitido: MORADOR (inclui a síndica). Horários em Brasília (UTC-03:00). Cria como PENDING; 409 se
+        colidir com reserva aprovada."
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReservationCreate"
+      responses:
+        "201":
+          description: Reserva criada como PENDING.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Reservation"
+        "400":
+          $ref: "#/components/responses/400"
+        "401":
+          $ref: "#/components/responses/401"
+        "403":
+          $ref: "#/components/responses/403"
+        "404":
+          $ref: "#/components/responses/404"
+        "409":
+          $ref: "#/components/responses/409"
+        "500":
+          $ref: "#/components/responses/500"
+  /reservations/{id}/approve:
+    put:
+      tags:
+        - reservations
+      summary: Aprovar reserva
+      description: "Perfis permitidos: ADMIN e síndica. Só PENDING e ainda não iniciada; 409 se já houver aprovada no mesmo
+        horário."
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Reserva aprovada.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Reservation"
+        "400":
+          $ref: "#/components/responses/400"
+        "401":
+          $ref: "#/components/responses/401"
+        "403":
+          $ref: "#/components/responses/403"
+        "404":
+          $ref: "#/components/responses/404"
+        "409":
+          $ref: "#/components/responses/409"
+        "500":
+          $ref: "#/components/responses/500"
+  /reservations/{id}/reject:
+    put:
+      tags:
+        - reservations
+      summary: Rejeitar reserva
+      description: "Perfis permitidos: ADMIN e síndica. Só PENDING."
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                reason:
+                  type: string
+                  maxLength: 500
+      responses:
+        "200":
+          description: Reserva rejeitada.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Reservation"
+        "400":
+          $ref: "#/components/responses/400"
+        "401":
+          $ref: "#/components/responses/401"
+        "403":
+          $ref: "#/components/responses/403"
+        "404":
+          $ref: "#/components/responses/404"
+        "500":
+          $ref: "#/components/responses/500"
+  /reservations/{id}:
+    delete:
+      tags:
+        - reservations
+      summary: Cancelar reserva
+      description: Só o morador dono. Muda para CANCELLED (não apaga); só PENDING ou APPROVED ainda não iniciada.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Reserva cancelada.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Reservation"
+        "400":
+          $ref: "#/components/responses/400"
+        "401":
+          $ref: "#/components/responses/401"
+        "403":
+          $ref: "#/components/responses/403"
+        "404":
+          $ref: "#/components/responses/404"
+        "500":
+          $ref: "#/components/responses/500"
+  /incidents:
+    get:
+      tags:
+        - incidents
+      summary: Listar ocorrências
+      description: Morador recebe só as próprias; painel recebe todas.
+      parameters:
+        - name: status
+          in: query
+          required: false
+          schema:
+            type: string
+            enum:
+              - OPEN
+              - IN_PROGRESS
+              - RESOLVED
+              - CLOSED
+        - name: category
+          in: query
+          required: false
+          schema:
+            type: string
+            enum:
+              - BARULHO
+              - MANUTENCAO
+              - SEGURANCA
+              - LIMPEZA
+              - OUTRO
+      responses:
+        "200":
+          description: Ocorrências, das mais recentes para as mais antigas.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Incident"
+        "400":
+          $ref: "#/components/responses/400"
+        "401":
+          $ref: "#/components/responses/401"
+        "403":
+          $ref: "#/components/responses/403"
+        "500":
+          $ref: "#/components/responses/500"
+    post:
+      tags:
+        - incidents
+      summary: Registrar ocorrência
+      description: "Perfil permitido: MORADOR com unidade (inclui a síndica). A unidade vem do usuário autenticado, nunca do body."
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/IncidentCreate"
+      responses:
+        "201":
+          description: Ocorrência registrada como OPEN.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Incident"
+        "400":
+          $ref: "#/components/responses/400"
+        "401":
+          $ref: "#/components/responses/401"
+        "403":
+          $ref: "#/components/responses/403"
+        "500":
+          $ref: "#/components/responses/500"
+  /incidents/{id}:
+    get:
+      tags:
+        - incidents
+      summary: Consultar ocorrência
+      description: Mesma visibilidade da listagem; ocorrência de outro morador responde 404.
+      parameters: &a2
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Ocorrência.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Incident"
+        "400":
+          $ref: "#/components/responses/400"
+        "401":
+          $ref: "#/components/responses/401"
+        "403":
+          $ref: "#/components/responses/403"
+        "404":
+          $ref: "#/components/responses/404"
+        "500":
+          $ref: "#/components/responses/500"
+    put:
+      tags:
+        - incidents
+      summary: Atualizar status ou responder ocorrência
+      description: "Perfis permitidos: ADMIN, FUNCIONARIO e síndica. Enviar response grava respondedAt; ocorrência CLOSED não
+        muda mais (400)."
+      parameters: *a2
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/IncidentUpdate"
+      responses:
+        "200":
+          description: Ocorrência atualizada.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Incident"
+        "400":
+          $ref: "#/components/responses/400"
+        "401":
+          $ref: "#/components/responses/401"
+        "403":
+          $ref: "#/components/responses/403"
+        "404":
+          $ref: "#/components/responses/404"
+        "500":
+          $ref: "#/components/responses/500"
 components:
   securitySchemes:
     cookieAuth:
@@ -2205,20 +2626,247 @@ components:
           type: string
           format: date-time
           nullable: true
+    CommonAreaCreate:
+      type: object
+      required:
+        - name
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+        description:
+          type: string
+          nullable: true
+        capacity:
+          type: integer
+          minimum: 1
+          nullable: true
+        rules:
+          type: string
+          nullable: true
+        isActive:
+          type: boolean
+    CommonAreaUpdate:
+      type: object
+      minProperties: 1
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+        description:
+          type: string
+          nullable: true
+        capacity:
+          type: integer
+          minimum: 1
+          nullable: true
+        rules:
+          type: string
+          nullable: true
+        isActive:
+          type: boolean
+    CommonArea:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+        description:
+          type: string
+          nullable: true
+        capacity:
+          type: integer
+          minimum: 1
+          nullable: true
+        rules:
+          type: string
+          nullable: true
+        isActive:
+          type: boolean
+        createdAt: &a3
+          type: string
+          format: date-time
+        updatedAt: *a3
+    ReservationCreate:
+      type: object
+      required:
+        - commonAreaId
+        - date
+        - startTime
+        - endTime
+      properties:
+        commonAreaId:
+          type: string
+          format: uuid
+        date:
+          type: string
+          format: date
+          example: 2026-12-20
+        startTime:
+          type: string
+          pattern: ^([01]\d|2[0-3]):[0-5]\d$
+          example: 14:00
+        endTime:
+          type: string
+          pattern: ^([01]\d|2[0-3]):[0-5]\d$
+          example: 22:00
+    Reservation:
+      type: object
+      properties:
+        id: &a4
+          type: string
+          format: uuid
+        date:
+          type: string
+          format: date-time
+          description: Meia-noite UTC do dia reservado.
+        startTime:
+          type: string
+        endTime:
+          type: string
+        status:
+          type: string
+          enum:
+            - PENDING
+            - APPROVED
+            - REJECTED
+            - CANCELLED
+        rejectionReason:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        commonArea:
+          type: object
+          properties:
+            id: *a4
+            name:
+              type: string
+        user:
+          type: object
+          properties:
+            id: *a4
+            name:
+              type: string
+            unit:
+              type: object
+              nullable: true
+              properties:
+                id: *a4
+                block:
+                  type: string
+                  nullable: true
+                number:
+                  type: string
+    IncidentCreate:
+      type: object
+      required:
+        - title
+        - description
+        - category
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 200
+        description:
+          type: string
+          minLength: 1
+        category:
+          type: string
+          enum:
+            - BARULHO
+            - MANUTENCAO
+            - SEGURANCA
+            - LIMPEZA
+            - OUTRO
+    IncidentUpdate:
+      type: object
+      minProperties: 1
+      properties:
+        status:
+          type: string
+          enum:
+            - OPEN
+            - IN_PROGRESS
+            - RESOLVED
+            - CLOSED
+        response:
+          type: string
+          maxLength: 2000
+    Incident:
+      type: object
+      properties:
+        id: &a6
+          type: string
+          format: uuid
+        title:
+          type: string
+        description:
+          type: string
+        category:
+          type: string
+          enum:
+            - BARULHO
+            - MANUTENCAO
+            - SEGURANCA
+            - LIMPEZA
+            - OUTRO
+        status:
+          type: string
+          enum:
+            - OPEN
+            - IN_PROGRESS
+            - RESOLVED
+            - CLOSED
+        response:
+          type: string
+          nullable: true
+        respondedAt:
+          type: string
+          format: date-time
+          nullable: true
+        createdAt: &a5
+          type: string
+          format: date-time
+        updatedAt: *a5
+        author:
+          type: object
+          properties:
+            id: *a6
+            name:
+              type: string
+        unit:
+          type: object
+          nullable: true
+          properties:
+            id: *a6
+            block:
+              type: string
+              nullable: true
+            number:
+              type: string
   responses:
     "400":
-          $ref: "#/components/responses/400"
+      $ref: "#/components/responses/400"
     "401":
-          $ref: "#/components/responses/401"
+      $ref: "#/components/responses/401"
     "403":
-          $ref: "#/components/responses/403"
+      $ref: "#/components/responses/403"
     "404":
-          $ref: "#/components/responses/404"
+      $ref: "#/components/responses/404"
     "409":
-          $ref: "#/components/responses/409"
+      $ref: "#/components/responses/409"
     "429":
-          $ref: "#/components/responses/429"
+      $ref: "#/components/responses/429"
     "500":
-          $ref: "#/components/responses/500"
+      $ref: "#/components/responses/500"
     "503":
-          $ref: "#/components/responses/503"
+      $ref: "#/components/responses/503"

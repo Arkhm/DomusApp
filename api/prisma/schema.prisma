@@ -35,6 +35,8 @@ model User {
   votings         Voting[] @relation("VotingAuthor")
   noticeReads     NoticeRead[]
   votingVotes     VotingVote[]
+  reservations    Reservation[]
+  incidents       Incident[]   @relation("IncidentAuthor")
   pets            Pet[]
   invoices        Invoice[]
 }
@@ -54,6 +56,7 @@ model Unit {
   events      Event[]  @relation("EventTargetUnit")
   invoices    Invoice[]
   votingVotes VotingVote[]
+  incidents   Incident[]
 }
 
 model Notice {
@@ -290,4 +293,79 @@ model InvoiceAudit {
   createdAt  DateTime @default(now())
 
   @@index([invoiceId, createdAt])
+}
+
+// RF-014 — áreas comuns do condomínio (salão de festas, churrasqueira...).
+model CommonArea {
+  id           String        @id @default(uuid())
+  name         String
+  description  String?       @db.Text
+  capacity     Int?
+  rules        String?       @db.Text
+  isActive     Boolean       @default(true)
+  reservations Reservation[]
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+}
+
+enum ReservationStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
+// RF-015 — reserva de área comum. `date` guarda o dia (00:00 UTC) e o
+// horário fica em startTime/endTime no formato "HH:mm", como no plano.
+model Reservation {
+  id              String            @id @default(uuid())
+  date            DateTime
+  startTime       String
+  endTime         String
+  status          ReservationStatus @default(PENDING)
+  rejectionReason String?
+  userId          String
+  user            User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  commonAreaId    String
+  commonArea      CommonArea        @relation(fields: [commonAreaId], references: [id], onDelete: Cascade)
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  @@index([commonAreaId, date])
+  @@index([userId])
+}
+
+enum IncidentCategory {
+  BARULHO
+  MANUTENCAO
+  SEGURANCA
+  LIMPEZA
+  OUTRO
+}
+
+enum IncidentStatus {
+  OPEN
+  IN_PROGRESS
+  RESOLVED
+  CLOSED
+}
+
+// RF-019 — ocorrências registradas por moradores e respondidas pela gestão.
+model Incident {
+  id          String           @id @default(uuid())
+  title       String
+  description String           @db.Text
+  category    IncidentCategory
+  status      IncidentStatus   @default(OPEN)
+  response    String?          @db.Text
+  respondedAt DateTime?
+  authorId    String
+  author      User             @relation("IncidentAuthor", fields: [authorId], references: [id], onDelete: Cascade)
+  unitId      String?
+  unit        Unit?            @relation(fields: [unitId], references: [id], onDelete: SetNull)
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  @@index([authorId])
+  @@index([status])
 }
