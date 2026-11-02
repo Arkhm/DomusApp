@@ -10,6 +10,9 @@ import Dashboard from '../pages/Dashboard';
 import UnitsList from '../pages/Units/UnitsList';
 import EventsList from '../pages/Events/EventsList';
 import VotingsList from '../pages/Votings/VotingsList';
+import CommonAreasList from '../pages/CommonAreas/CommonAreasList';
+import ReservationsList from '../pages/Reservations/ReservationsList';
+import IncidentsList from '../pages/Incidents/IncidentsList';
 
 export default function AppRoutes() {
     const { isAuthenticated, isLoading } = useAuth();
@@ -43,6 +46,9 @@ export default function AppRoutes() {
                 <Route path="/comunicados" element={<NoticesList />} />
                 <Route path="/eventos" element={<EventsList />} />
                 <Route path="/votacoes" element={<VotingsList />} />
+                <Route path="/areas-comuns" element={<CommonAreasList />} />
+                <Route path="/reservas" element={<ReservationsList />} />
+                <Route path="/ocorrencias" element={<IncidentsList />} />
             </Route>
 
             <Route path="*" element={<Navigate to={isAuthenticated ? '/dashboard' : '/login'} replace />} />
