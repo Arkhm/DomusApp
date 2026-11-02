@@ -123,6 +123,8 @@ O painel web é **administrativo** — só estas pessoas conseguem logar:
 
 **Quem pode mutar (criar/excluir):** apenas `ADMIN`. Síndica e funcionário acessam em **modo leitura** — veem tudo (inclusive rascunhos e contadores de leitura), mas não têm botões de "Novo X" nem ícones de lixeira.
 
+Exceções dos módulos de atendimento: a síndica também aprova e rejeita reservas, e funcionário e síndica atualizam e respondem ocorrências (veja abaixo).
+
 ---
 
 ## 👤 Credenciais (geradas no seed)
@@ -167,6 +169,14 @@ cd api && npm run check:security
 - Gabriel Francisco Vaz Azevedo
 - João Marcelo Conceição Sousa
 - Juliano Aparecido Bernardo Quirino Junior
+
+## Áreas comuns, reservas e ocorrências
+
+- **Áreas comuns (RF-014)** — `/common-areas`. `ADMIN` cria, edita, ativa/desativa e remove; o morador só vê as áreas ativas. Área com reserva pendente ou aprovada de hoje em diante não pode ser removida: desative-a.
+- **Reservas (RF-015)** — `/reservations`. O morador solicita (`PENDING`) e cancela as próprias; `ADMIN` e síndica aprovam ou rejeitam. Datas `YYYY-MM-DD` e horários `HH:mm` no fuso de Brasília. Não há reserva no passado nem duas aprovadas no mesmo horário da mesma área: a checagem trava a área no banco, então duas aprovações simultâneas não passam juntas (409).
+- **Ocorrências (RF-019)** — `/incidents`. O morador registra (a unidade vem do cadastro dele) e acompanha as próprias; `ADMIN`, funcionário e síndica mudam o status e respondem. Ocorrência encerrada (`CLOSED`) não muda mais. O aviso ao morador quando o status muda fica para o módulo de notificações.
+
+No painel web: **Áreas comuns**, **Reservas** e **Ocorrências** no menu lateral. No app mobile: **Reservas** e **Ocorrências** na Home do morador. Contrato completo no Swagger.
 
 ## Pagamentos
 
