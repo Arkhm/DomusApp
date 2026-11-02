@@ -1,3 +1,4 @@
+import { logger } from '../lib/logger';
 import { PaymentAttempt, Invoice, Prisma } from '@prisma/client';
 import { paymentRepository } from '../repositories/paymentRepository';
 import { PaymentActor, PaymentError, canManageInvoices, hash, money, paymentConfig, requiredText } from '../lib/paymentDomain';
@@ -93,7 +94,7 @@ export const paymentService = {
       ...(review ? { invoice: { requiresReview: true }, audit: { source: 'SYSTEM', action: 'REVIEW_REQUIRED',
         reason: errorCode(error), fromStatus: attempt.invoice.status, toStatus: attempt.invoice.status } } : {}),
     });
-    console.error('payment_processing_failed', { attemptId: attempt.id, code: errorCode(error), review });
+    logger.error({ attemptId: attempt.id, code: errorCode(error), review }, 'Falha ao processar pagamento.');
   },
 
   async issue(attemptId: string) {
@@ -203,7 +204,7 @@ export const paymentService = {
       const count = event.retryCount + (busy ? 0 : 1);
       await paymentRepository.finishWebhook(event.id, event.lockToken!, { state: count >= 12 ? 'REVIEW' : 'PENDING',
         retryCount: count, retryAt: new Date(Date.now() + retryDelay(count, error)), lastErrorCode: errorCode(error) });
-      console.error('payment_webhook_failed', { webhookId: event.id, code: errorCode(error), review: count >= 12 });
+      logger.error({ webhookId: event.id, code: errorCode(error), review: count >= 12 }, 'Falha ao processar webhook de pagamento.');
     }
   },
 

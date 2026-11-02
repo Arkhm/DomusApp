@@ -1,0 +1,2216 @@
+openapi: 3.0.3
+info:
+  title: DomusApp API
+  version: 1.0.0
+  description: "Contrato centralizado das rotas. Autenticação por cookie httpOnly ou Bearer como alternativas. Para cookie
+    web, faça login: o navegador não permite definir o cookie manualmente no Authorize. Entradas passam pelos schemas
+    Zod e regras dos serviços."
+servers:
+  - url: /
+security:
+  - cookieAuth: []
+  - bearerAuth: []
+paths:
+  /api/status:
+    get:
+      tags:
+        - Sistema
+      summary: Consultar disponibilidade da API
+      description: ""
+      security: []
+      responses:
+        "200":
+          description: Operação concluída.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  timestamp:
+                    type: string
+                    format: date-time
+  /auth/register:
+    post:
+      tags:
+        - auth
+      summary: Registrar usuário
+      description: O modelo de banco exige CPF, mas a entrada atual não recebe esse campo; cadastro pode responder 400.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Register"
+      responses:
+        "201":
+          description: Operação concluída.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "400":
+          $ref: "#/components/responses/400"
+        "500":
+          $ref: "#/components/responses/500"
+  /auth/register-admin:
+    post:
+      tags:
+        - auth
+      summary: Criar administrador
+      description: "Perfis permitidos: ADMIN. SYNDIC corresponde ao atributo isSyndic."
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Register"
+      responses:
+        "201":
+          description: Operação concluída.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "400":
+          $ref: "#/components/responses/400"
+        "401":
+          $ref: "#/components/responses/401"
+        "403":
+          $ref: "#/components/responses/403"
+        "500":
+          $ref: "#/components/responses/500"
+  /auth/login:
+    post:
+      tags:
+        - auth
+      summary: Iniciar sessão
+      description: Web recebe cookies httpOnly domusapp_token e domusapp_refresh; client=mobile recebe também token e
+        refreshToken. Morador sem isSyndic não acessa o painel.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Login"
+      responses:
+        "200":
+          description: Operação concluída.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Session"
+        "400":
+          $ref: "#/components/responses/400"
+        "401":
+          $ref: "#/components/responses/401"
+        "429":
+          $ref: "#/components/responses/429"
+        "500":
+          $ref: "#/components/responses/500"
+  /auth/logout:
+    post:
+      tags:
+        - auth
+      summary: Encerrar e revogar sessão
+      description: Pública para permitir remover cookies mesmo após expiração.
+      security: []
+      responses:
+        "200":
+          description: Operação concluída.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Message"
+        "503":
+          $ref: "#/components/responses/503"
+  /auth/refresh:
+    post:
+      tags:
+        - auth
+      summary: Renovar sessão
+      description: ""
+      security: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Refresh"
+      responses:
+        "200":
+          description: Operação concluída.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Message"
+        "400":
+          $ref: "#/components/responses/400"
+        "401":
+          $ref: "#/components/responses/401"
+        "429":
+          $ref: "#/components/responses/429"
+        "500":
+          $ref: "#/components/responses/500"
+  /auth/forgot-password:
+    post:
+      tags:
+        - auth
+      summary: Solicitar recuperação de senha
+      description: ""
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ForgotPassword"
+      responses:
+        "200":
+          description: Operação concluída.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Message"
+        "400":
+          $ref: "#/components/responses/400"
+        "429":
+          $ref: "#/components/responses/429"
+  /auth/reset-password:
+    post:
+      tags:
+        - auth
+      summary: Redefinir senha
+      description: ""
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ResetPassword"
+      responses:
+        "200":
+          description: Operação concluída.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Message"
+        "400":
+          $ref: "#/components/responses/400"
+        "429":
+          $ref: "#/components/responses/429"
+        "500":
+          $ref: "#/components/responses/500"
+  /auth/me:
+    get:
+      tags:
+        - auth
+      summary: Consultar usuário da sessão
+      description: ""
+      responses:
+        "200":
+          description: Operação concluída.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  user:
+                    $ref: "#/components/schemas/User"
+        "400":
+          $ref: "#/components/responses/400"
+        "401":
+          $ref: "#/components/responses/401"
+        "403":
+          $ref: "#/components/responses/403"
+        "500":
+          $ref: "#/components/responses/500"
+  /users/me:
+    get:
+      tags:
+        - users
+      summary: Consultar perfil do token
+      description: ""
+      responses:
+        "200":
+          description: Operação concluída.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  perfil:
+                    $ref: "#/components/schemas/User"
+        "400":
+          $ref: "#/components/responses/400"
+        "401":
+          $ref: "#/components/responses/401"
+        "403":
+          $ref: "#/components/responses/403"
+        "500":
+          $ref: "#/components/responses/500"
+  /users:
+    get:
+      tags:
+        - users
+      summary: Listar e buscar usuários
+      description: "Perfis permitidos: ADMIN, FUNCIONARIO. SYNDIC corresponde ao atributo isSyndic."
+      parameters:
+        - name: search
+          in: query
+          required: false
+          schema:
+            type: string
+            maxLength: 191
+      responses:
+        "200":
+          description: Operação concluída.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/User"
+        "400":
+          $ref: "#/components/responses/400"
+        "401":
+          $ref: "#/components/responses/401"
+        "403":
+          $ref: "#/components/responses/403"
+        "500":
+          $ref: "#/components/responses/500"
+    post:
+      tags:
+        - users
+      summary: Criar usuário
+      description: "Perfis permitidos: ADMIN. SYNDIC corresponde ao atributo isSyndic."
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UserCreate"
+      responses:
+        "201":
+          description: Operação concluída.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "400":
+          $ref: "#/components/responses/400"
+        "401":
+          $ref: "#/components/responses/401"
+        "403":
+          $ref: "#/components/responses/403"
+        "500":
+          $ref: "#/components/responses/500"
+  /users/{id}:
+    get:
+      tags:
+        - users
+      summary: Buscar usuário
+      description: "Perfis permitidos: ADMIN, FUNCIONARIO. SYNDIC corresponde ao atributo isSyndic."
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Operação concluída.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "400":
+          $ref: "#/components/responses/400"
+        "401":
+          $ref: "#/components/responses/401"
+        "403":
+          $ref: "#/components/responses/403"
+        "404":
+          $ref: "#/components/responses/404"
+        "500":
+          $ref: "#/components/responses/500"
+    put:
+      tags:
+        - users
+      summary: Atualizar usuário
+      description: "Perfis permitidos: ADMIN. SYNDIC corresponde ao atributo isSyndic."
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UserUpdate"
+      responses:
+        "200":
+          description: Operação concluída.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "400":
+          $ref: "#/components/responses/400"
+        "401":
+          $ref: "#/components/responses/401"
+        "403":
+          $ref: "#/components/responses/403"
+        "500":
+          $ref: "#/components/responses/500"
+    delete:
+      tags:
+        - users
+      summary: Excluir usuário
+      description: "Perfis permitidos: ADMIN. SYNDIC corresponde ao atributo isSyndic."
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Operação concluída.
+        "400":
+          $ref: "#/components/responses/400"
+        "401":
+          $ref: "#/components/responses/401"
+        "403":
+          $ref: "#/components/responses/403"
+        "500":
+          $ref: "#/components/responses/500"
+  /units:
+    get:
+      tags:
+        - units
+      summary: Listar unidades
+      description: "Perfis permitidos: ADMIN, FUNCIONARIO. SYNDIC corresponde ao atributo isSyndic."
+      responses:
+        "200":
+          description: Operação concluída.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: string
+                      format: uuid
+                    type:
+                      type: string
+                      enum:
+                        - APARTMENT
+                        - HOUSE
+                    block:
+                      type: string
+                      maxLength: 50
+                    number:
+                      type: string
+                      minLength: 1
+                      maxLength: 20
+                    parkingSpots:
+                      oneOf:
+                        - type: integer
+                          minimum: 0
+                          maximum: 20
+                        - type: string
+                          pattern: ^([0-9]|1[0-9]|20)$
+        "400":
+          $ref: "#/components/responses/400"
+        "401":
+          $ref: "#/components/responses/401"
+        "403":
+          $ref: "#/components/responses/403"
+        "500":
+          $ref: "#/components/responses/500"
+    post:
+      tags:
+        - units
+      summary: Criar unidade
+      description: "Perfis permitidos: ADMIN. SYNDIC corresponde ao atributo isSyndic."
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UnitCreate"
+      responses:
+        "201":
+          description: Operação concluída.
+        "400":
+          $ref: "#/components/responses/400"
+        "401":
+          $ref: "#/components/responses/401"
+        "403":
+          $ref: "#/components/responses/403"
+        "500":
+          $ref: "#/components/responses/500"
+  /units/{id}:
+    put:
+      tags:
+        - units
+      summary: Atualizar unidade
+      description: "Perfis permitidos: ADMIN. SYNDIC corresponde ao atributo isSyndic."
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UnitUpdate"
+      responses:
+        "200":
+          description: Operação concluída.
+        "400":
+          $ref: "#/components/responses/400"
+        "401":
+          $ref: "#/components/responses/401"
+        "403":
+          $ref: "#/components/responses/403"
+        "500":
+          $ref: "#/components/responses/500"
+    delete:
+      tags:
+        - units
+      summary: Excluir unidade
+      description: "Perfis permitidos: ADMIN. SYNDIC corresponde ao atributo isSyndic."
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Operação concluída.
+        "400":
+          $ref: "#/components/responses/400"
+        "401":
+          $ref: "#/components/responses/401"
+        "403":
+          $ref: "#/components/responses/403"
+        "500":
+          $ref: "#/components/responses/500"
+  /notices:
+    get:
+      tags:
+        - notices
+      summary: Listar avisos
+      description: ""
+      responses:
+        "200":
+          description: Operação concluída.
+        "400":
+          $ref: "#/components/responses/400"
+        "401":
+          $ref: "#/components/responses/401"
+        "403":
+          $ref: "#/components/responses/403"
+        "500":
+          $ref: "#/components/responses/500"
+    post:
+      tags:
+        - notices
+      summary: Criar registro em avisos
+      description: "Perfis permitidos: ADMIN, SYNDIC. SYNDIC corresponde ao atributo isSyndic."
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/NoticeCreate"
+      responses:
+        "201":
+          description: Operação concluída.
+        "400":
+          $ref: "#/components/responses/400"
+        "401":
+          $ref: "#/components/responses/401"
+        "403":
+          $ref: "#/components/responses/403"
+        "500":
+          $ref: "#/components/responses/500"
+  /notices/{id}:
+    delete:
+      tags:
+        - notices
+      summary: Excluir registro de avisos
+      description: "Perfis permitidos: ADMIN, SYNDIC. SYNDIC corresponde ao atributo isSyndic."
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Operação concluída.
+        "400":
+          $ref: "#/components/responses/400"
+        "401":
+          $ref: "#/components/responses/401"
+        "403":
+          $ref: "#/components/responses/403"
+        "500":
+          $ref: "#/components/responses/500"
+  /events:
+    get:
+      tags:
+        - events
+      summary: Listar eventos
+      description: ""
+      responses:
+        "200":
+          description: Operação concluída.
+        "400":
+          $ref: "#/components/responses/400"
+        "401":
+          $ref: "#/components/responses/401"
+        "403":
+          $ref: "#/components/responses/403"
+        "500":
+          $ref: "#/components/responses/500"
+    post:
+      tags:
+        - events
+      summary: Criar registro em eventos
+      description: "Perfis permitidos: ADMIN, SYNDIC. SYNDIC corresponde ao atributo isSyndic."
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EventCreate"
+      responses:
+        "201":
+          description: Operação concluída.
+        "400":
+          $ref: "#/components/responses/400"
+        "401":
+          $ref: "#/components/responses/401"
+        "403":
+          $ref: "#/components/responses/403"
+        "500":
+          $ref: "#/components/responses/500"
+  /events/{id}:
+    delete:
+      tags:
+        - events
+      summary: Excluir registro de eventos
+      description: "Perfis permitidos: ADMIN, SYNDIC. SYNDIC corresponde ao atributo isSyndic."
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Operação concluída.
+        "400":
+          $ref: "#/components/responses/400"
+        "401":
+          $ref: "#/components/responses/401"
+        "403":
+          $ref: "#/components/responses/403"
+        "500":
+          $ref: "#/components/responses/500"
+  /votings:
+    get:
+      tags:
+        - votings
+      summary: Listar votações
+      description: "Perfis permitidos: ADMIN, FUNCIONARIO, SYNDIC. SYNDIC corresponde ao atributo isSyndic."
+      responses:
+        "200":
+          description: Operação concluída.
+        "400":
+          $ref: "#/components/responses/400"
+        "401":
+          $ref: "#/components/responses/401"
+        "403":
+          $ref: "#/components/responses/403"
+        "500":
+          $ref: "#/components/responses/500"
+    post:
+      tags:
+        - votings
+      summary: Criar registro em votações
+      description: "Perfis permitidos: ADMIN, SYNDIC. SYNDIC corresponde ao atributo isSyndic."
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/VotingCreate"
+      responses:
+        "201":
+          description: Operação concluída.
+        "400":
+          $ref: "#/components/responses/400"
+        "401":
+          $ref: "#/components/responses/401"
+        "403":
+          $ref: "#/components/responses/403"
+        "500":
+          $ref: "#/components/responses/500"
+  /votings/{id}:
+    delete:
+      tags:
+        - votings
+      summary: Excluir registro de votações
+      description: "Perfis permitidos: ADMIN, SYNDIC. SYNDIC corresponde ao atributo isSyndic."
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Operação concluída.
+        "400":
+          $ref: "#/components/responses/400"
+        "401":
+          $ref: "#/components/responses/401"
+        "403":
+          $ref: "#/components/responses/403"
+        "500":
+          $ref: "#/components/responses/500"
+  /notices/{id}/read:
+    post:
+      tags:
+        - notices
+      summary: Marcar aviso como lido para a pessoa autenticada
+      description: ""
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Operação concluída.
+        "400":
+          $ref: "#/components/responses/400"
+        "401":
+          $ref: "#/components/responses/401"
+        "403":
+          $ref: "#/components/responses/403"
+        "500":
+          $ref: "#/components/responses/500"
+  /vehicles:
+    get:
+      tags:
+        - vehicles
+      summary: Listar veículos
+      description: "Perfis permitidos: ADMIN, FUNCIONARIO. SYNDIC corresponde ao atributo isSyndic."
+      parameters:
+        - name: plate
+          in: query
+          required: false
+          schema:
+            type: string
+            maxLength: 20
+      responses:
+        "200":
+          description: Operação concluída.
+        "400":
+          $ref: "#/components/responses/400"
+        "401":
+          $ref: "#/components/responses/401"
+        "403":
+          $ref: "#/components/responses/403"
+        "500":
+          $ref: "#/components/responses/500"
+    post:
+      tags:
+        - vehicles
+      summary: Cadastrar registro em veículos
+      description: "Perfis permitidos: MORADOR. SYNDIC corresponde ao atributo isSyndic."
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/VehicleCreate"
+      responses:
+        "201":
+          description: Operação concluída.
+        "400":
+          $ref: "#/components/responses/400"
+        "401":
+          $ref: "#/components/responses/401"
+        "403":
+          $ref: "#/components/responses/403"
+        "500":
+          $ref: "#/components/responses/500"
+  /vehicles/me:
+    get:
+      tags:
+        - vehicles
+      summary: Listar meus veículos
+      description: "Perfis permitidos: MORADOR. SYNDIC corresponde ao atributo isSyndic."
+      responses:
+        "200":
+          description: Operação concluída.
+        "400":
+          $ref: "#/components/responses/400"
+        "401":
+          $ref: "#/components/responses/401"
+        "403":
+          $ref: "#/components/responses/403"
+        "500":
+          $ref: "#/components/responses/500"
+  /vehicles/{id}:
+    delete:
+      tags:
+        - vehicles
+      summary: Excluir registro de veículos
+      description: "Morador só pode excluir seus próprios registros. Perfis permitidos: ADMIN, MORADOR. SYNDIC corresponde ao
+        atributo isSyndic."
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Operação concluída.
+        "400":
+          $ref: "#/components/responses/400"
+        "401":
+          $ref: "#/components/responses/401"
+        "403":
+          $ref: "#/components/responses/403"
+        "500":
+          $ref: "#/components/responses/500"
+  /pets:
+    get:
+      tags:
+        - pets
+      summary: Listar animais
+      description: "Perfis permitidos: ADMIN, FUNCIONARIO. SYNDIC corresponde ao atributo isSyndic."
+      responses:
+        "200":
+          description: Operação concluída.
+        "400":
+          $ref: "#/components/responses/400"
+        "401":
+          $ref: "#/components/responses/401"
+        "403":
+          $ref: "#/components/responses/403"
+        "500":
+          $ref: "#/components/responses/500"
+    post:
+      tags:
+        - pets
+      summary: Cadastrar registro em animais
+      description: "Perfis permitidos: MORADOR. SYNDIC corresponde ao atributo isSyndic."
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PetCreate"
+      responses:
+        "201":
+          description: Operação concluída.
+        "400":
+          $ref: "#/components/responses/400"
+        "401":
+          $ref: "#/components/responses/401"
+        "403":
+          $ref: "#/components/responses/403"
+        "500":
+          $ref: "#/components/responses/500"
+  /pets/me:
+    get:
+      tags:
+        - pets
+      summary: Listar meus animais
+      description: "Perfis permitidos: MORADOR. SYNDIC corresponde ao atributo isSyndic."
+      responses:
+        "200":
+          description: Operação concluída.
+        "400":
+          $ref: "#/components/responses/400"
+        "401":
+          $ref: "#/components/responses/401"
+        "403":
+          $ref: "#/components/responses/403"
+        "500":
+          $ref: "#/components/responses/500"
+  /pets/{id}:
+    delete:
+      tags:
+        - pets
+      summary: Excluir registro de animais
+      description: "Morador só pode excluir seus próprios registros. Perfis permitidos: ADMIN, MORADOR. SYNDIC corresponde ao
+        atributo isSyndic."
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Operação concluída.
+        "400":
+          $ref: "#/components/responses/400"
+        "401":
+          $ref: "#/components/responses/401"
+        "403":
+          $ref: "#/components/responses/403"
+        "500":
+          $ref: "#/components/responses/500"
+  /invoices/webhook:
+    post:
+      tags:
+        - invoices
+      summary: Receber webhook de Order do Mercado Pago
+      description: Assinatura HMAC validada pelo servidor, com proteção contra replay e divergência de conta/ambiente. Sem JWT.
+      security: []
+      parameters:
+        - name: x-signature
+          in: header
+          required: true
+          schema:
+            type: string
+        - name: x-request-id
+          in: header
+          required: true
+          schema:
+            type: string
+        - name: data.id
+          in: query
+          required: false
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Webhook"
+      responses:
+        "200":
+          description: Operação concluída.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  received:
+                    type: boolean
+        "400":
+          $ref: "#/components/responses/400"
+        "401":
+          $ref: "#/components/responses/401"
+        "409":
+          $ref: "#/components/responses/409"
+        "500":
+          $ref: "#/components/responses/500"
+        "503":
+          $ref: "#/components/responses/503"
+  /invoices:
+    get:
+      tags:
+        - invoices
+      summary: Listar minhas faturas
+      description: Lista paginada com dados Pix conforme estado da emissão.
+      parameters:
+        - name: status
+          in: query
+          required: false
+          schema:
+            type: string
+            enum:
+              - PENDING
+              - PAID
+              - OVERDUE
+              - CANCELLED
+              - EXPIRED
+              - REJECTED
+              - REFUNDED
+              - CHARGED_BACK
+              - PARTIALLY_REFUNDED
+        - name: type
+          in: query
+          required: false
+          schema:
+            type: string
+            enum:
+              - MONTHLY_FEE
+              - EXTRAORDINARY
+              - FINE
+              - OTHER
+        - name: startDate
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date-time
+        - name: endDate
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date-time
+        - name: page
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100000
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+      responses:
+        "200":
+          description: Operação concluída.
+        "400":
+          $ref: "#/components/responses/400"
+        "401":
+          $ref: "#/components/responses/401"
+        "403":
+          $ref: "#/components/responses/403"
+        "500":
+          $ref: "#/components/responses/500"
+    post:
+      tags:
+        - invoices
+      summary: Criar cobrança Pix
+      description: "Perfis permitidos: ADMIN, FUNCIONARIO, SYNDIC. SYNDIC corresponde ao atributo isSyndic."
+      parameters:
+        - name: Idempotency-Key
+          in: header
+          required: true
+          schema:
+            type: string
+            pattern: ^[A-Za-z0-9_-]{16,128}$
+          description: Reutilize a chave e o mesmo conteúdo nas tentativas da mesma operação.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/InvoiceCreate"
+      responses:
+        "201":
+          description: Cobrança já emitida ou recuperada por idempotência.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Invoice"
+        "202":
+          description: Operação aceita para processamento assíncrono.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Invoice"
+        "400":
+          $ref: "#/components/responses/400"
+        "401":
+          $ref: "#/components/responses/401"
+        "403":
+          $ref: "#/components/responses/403"
+        "404":
+          $ref: "#/components/responses/404"
+        "409":
+          $ref: "#/components/responses/409"
+        "500":
+          $ref: "#/components/responses/500"
+        "503":
+          $ref: "#/components/responses/503"
+  /invoices/batch:
+    post:
+      tags:
+        - invoices
+      summary: Criar cobranças em lote
+      description: "Perfis permitidos: ADMIN, FUNCIONARIO, SYNDIC. SYNDIC corresponde ao atributo isSyndic."
+      parameters:
+        - name: Idempotency-Key
+          in: header
+          required: true
+          schema:
+            type: string
+            pattern: ^[A-Za-z0-9_-]{16,128}$
+          description: Reutilize a chave e o mesmo conteúdo nas tentativas da mesma operação.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/InvoiceBatch"
+      responses:
+        "202":
+          description: Operação aceita para processamento assíncrono.
+        "400":
+          $ref: "#/components/responses/400"
+        "401":
+          $ref: "#/components/responses/401"
+        "403":
+          $ref: "#/components/responses/403"
+        "404":
+          $ref: "#/components/responses/404"
+        "409":
+          $ref: "#/components/responses/409"
+        "500":
+          $ref: "#/components/responses/500"
+        "503":
+          $ref: "#/components/responses/503"
+  /invoices/stats:
+    get:
+      tags:
+        - invoices
+      summary: Consultar estatísticas das minhas faturas
+      description: ""
+      responses:
+        "200":
+          description: Operação concluída.
+        "400":
+          $ref: "#/components/responses/400"
+        "401":
+          $ref: "#/components/responses/401"
+        "403":
+          $ref: "#/components/responses/403"
+        "500":
+          $ref: "#/components/responses/500"
+  /invoices/payments/health:
+    get:
+      tags:
+        - invoices
+      summary: Consultar saúde operacional dos pagamentos
+      description: "Perfis permitidos: ADMIN, FUNCIONARIO, SYNDIC. SYNDIC corresponde ao atributo isSyndic."
+      responses:
+        "200":
+          description: Operação concluída.
+        "400":
+          $ref: "#/components/responses/400"
+        "401":
+          $ref: "#/components/responses/401"
+        "403":
+          $ref: "#/components/responses/403"
+        "404":
+          $ref: "#/components/responses/404"
+        "409":
+          $ref: "#/components/responses/409"
+        "500":
+          $ref: "#/components/responses/500"
+        "503":
+          $ref: "#/components/responses/503"
+  /invoices/all:
+    get:
+      tags:
+        - invoices
+      summary: Listar todas as faturas
+      description: "Perfis permitidos: ADMIN, FUNCIONARIO. SYNDIC corresponde ao atributo isSyndic."
+      parameters:
+        - name: status
+          in: query
+          required: false
+          schema:
+            type: string
+            enum:
+              - PENDING
+              - PAID
+              - OVERDUE
+              - CANCELLED
+              - EXPIRED
+              - REJECTED
+              - REFUNDED
+              - CHARGED_BACK
+              - PARTIALLY_REFUNDED
+        - name: type
+          in: query
+          required: false
+          schema:
+            type: string
+            enum:
+              - MONTHLY_FEE
+              - EXTRAORDINARY
+              - FINE
+              - OTHER
+        - name: startDate
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date-time
+        - name: endDate
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date-time
+        - name: page
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100000
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+        - name: userId
+          in: query
+          required: false
+          schema:
+            type: string
+            format: uuid
+        - name: unitId
+          in: query
+          required: false
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Operação concluída.
+        "400":
+          $ref: "#/components/responses/400"
+        "401":
+          $ref: "#/components/responses/401"
+        "403":
+          $ref: "#/components/responses/403"
+        "500":
+          $ref: "#/components/responses/500"
+  /invoices/unit/{unitId}:
+    get:
+      tags:
+        - invoices
+      summary: Listar faturas da unidade
+      description: "Perfis permitidos: ADMIN, FUNCIONARIO, SYNDIC. SYNDIC corresponde ao atributo isSyndic."
+      parameters:
+        - name: status
+          in: query
+          required: false
+          schema:
+            type: string
+            enum:
+              - PENDING
+              - PAID
+              - OVERDUE
+              - CANCELLED
+              - EXPIRED
+              - REJECTED
+              - REFUNDED
+              - CHARGED_BACK
+              - PARTIALLY_REFUNDED
+        - name: type
+          in: query
+          required: false
+          schema:
+            type: string
+            enum:
+              - MONTHLY_FEE
+              - EXTRAORDINARY
+              - FINE
+              - OTHER
+        - name: startDate
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date-time
+        - name: endDate
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date-time
+        - name: page
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100000
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+        - name: unitId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Operação concluída.
+        "400":
+          $ref: "#/components/responses/400"
+        "401":
+          $ref: "#/components/responses/401"
+        "403":
+          $ref: "#/components/responses/403"
+        "500":
+          $ref: "#/components/responses/500"
+  /invoices/unit/{unitId}/stats:
+    get:
+      tags:
+        - invoices
+      summary: Consultar estatísticas da unidade
+      description: "Perfis permitidos: ADMIN, FUNCIONARIO, SYNDIC. SYNDIC corresponde ao atributo isSyndic."
+      parameters:
+        - name: unitId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Operação concluída.
+        "400":
+          $ref: "#/components/responses/400"
+        "401":
+          $ref: "#/components/responses/401"
+        "403":
+          $ref: "#/components/responses/403"
+        "500":
+          $ref: "#/components/responses/500"
+  /invoices/{id}:
+    get:
+      tags:
+        - invoices
+      summary: Consultar fatura e dados Pix
+      description: Morador só pode consultar sua própria fatura.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Operação concluída.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Invoice"
+        "400":
+          $ref: "#/components/responses/400"
+        "401":
+          $ref: "#/components/responses/401"
+        "403":
+          $ref: "#/components/responses/403"
+        "404":
+          $ref: "#/components/responses/404"
+        "409":
+          $ref: "#/components/responses/409"
+        "500":
+          $ref: "#/components/responses/500"
+        "503":
+          $ref: "#/components/responses/503"
+    delete:
+      tags:
+        - invoices
+      summary: Cancelar fatura preservando auditoria
+      description: "Perfis permitidos: ADMIN, FUNCIONARIO, SYNDIC. SYNDIC corresponde ao atributo isSyndic."
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/InvoiceReason"
+      responses:
+        "200":
+          description: Operação concluída.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Invoice"
+        "400":
+          $ref: "#/components/responses/400"
+        "401":
+          $ref: "#/components/responses/401"
+        "403":
+          $ref: "#/components/responses/403"
+        "404":
+          $ref: "#/components/responses/404"
+        "409":
+          $ref: "#/components/responses/409"
+        "500":
+          $ref: "#/components/responses/500"
+        "503":
+          $ref: "#/components/responses/503"
+  /invoices/{id}/audit:
+    get:
+      tags:
+        - invoices
+      summary: Consultar auditoria da fatura
+      description: "Perfis permitidos: ADMIN, FUNCIONARIO, SYNDIC. SYNDIC corresponde ao atributo isSyndic."
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Operação concluída.
+        "400":
+          $ref: "#/components/responses/400"
+        "401":
+          $ref: "#/components/responses/401"
+        "403":
+          $ref: "#/components/responses/403"
+        "404":
+          $ref: "#/components/responses/404"
+        "409":
+          $ref: "#/components/responses/409"
+        "500":
+          $ref: "#/components/responses/500"
+        "503":
+          $ref: "#/components/responses/503"
+  /invoices/{id}/reconcile:
+    post:
+      tags:
+        - invoices
+      summary: Conciliar fatura com o provedor
+      description: "Perfis permitidos: ADMIN, FUNCIONARIO, SYNDIC. SYNDIC corresponde ao atributo isSyndic."
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/InvoiceReason"
+      responses:
+        "200":
+          description: Operação concluída.
+        "400":
+          $ref: "#/components/responses/400"
+        "401":
+          $ref: "#/components/responses/401"
+        "403":
+          $ref: "#/components/responses/403"
+        "404":
+          $ref: "#/components/responses/404"
+        "409":
+          $ref: "#/components/responses/409"
+        "500":
+          $ref: "#/components/responses/500"
+        "503":
+          $ref: "#/components/responses/503"
+  /invoices/{id}/retry:
+    post:
+      tags:
+        - invoices
+      summary: Reagendar emissão da fatura
+      description: "Perfis permitidos: ADMIN, FUNCIONARIO, SYNDIC. SYNDIC corresponde ao atributo isSyndic."
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/InvoiceReason"
+      responses:
+        "202":
+          description: Operação aceita para processamento assíncrono.
+        "400":
+          $ref: "#/components/responses/400"
+        "401":
+          $ref: "#/components/responses/401"
+        "403":
+          $ref: "#/components/responses/403"
+        "404":
+          $ref: "#/components/responses/404"
+        "409":
+          $ref: "#/components/responses/409"
+        "500":
+          $ref: "#/components/responses/500"
+        "503":
+          $ref: "#/components/responses/503"
+  /invoices/{id}/status:
+    put:
+      tags:
+        - invoices
+      summary: Registrar baixa ou cancelamento manual
+      description: "Perfis permitidos: ADMIN, FUNCIONARIO, SYNDIC. SYNDIC corresponde ao atributo isSyndic."
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/InvoiceStatus"
+      responses:
+        "200":
+          description: Operação concluída.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Invoice"
+        "400":
+          $ref: "#/components/responses/400"
+        "401":
+          $ref: "#/components/responses/401"
+        "403":
+          $ref: "#/components/responses/403"
+        "404":
+          $ref: "#/components/responses/404"
+        "409":
+          $ref: "#/components/responses/409"
+        "500":
+          $ref: "#/components/responses/500"
+        "503":
+          $ref: "#/components/responses/503"
+  /api/docs:
+    get:
+      tags:
+        - Sistema
+      summary: Abrir documentação Swagger UI
+      description: ""
+      security: []
+      responses:
+        "200":
+          description: Página HTML do Swagger UI em /api/docs/.
+        "301":
+          description: Redirecionamento para /api/docs/.
+  /api/docs/openapi.yaml:
+    get:
+      tags:
+        - Sistema
+      summary: Obter contrato OpenAPI em YAML
+      description: ""
+      security: []
+      responses:
+        "200":
+          description: Contrato centralizado.
+          content:
+            application/yaml:
+              schema:
+                type: string
+components:
+  securitySchemes:
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: domusapp_token
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+        code:
+          type: string
+        errors:
+          type: object
+          additionalProperties:
+            type: array
+            items:
+              type: string
+      required:
+        - error
+    Message:
+      type: object
+      properties:
+        message:
+          type: string
+      required:
+        - message
+    Login:
+      type: object
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          format: password
+        client:
+          type: string
+          enum:
+            - mobile
+      required:
+        - email
+        - password
+    Register:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 2
+          maxLength: 100
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          format: password
+          minLength: 8
+          description: De 8 caracteres a 72 bytes UTF-8. Nunca registrar em logs.
+      required:
+        - name
+        - email
+        - password
+    Refresh:
+      type: object
+      properties:
+        client:
+          type: string
+          enum:
+            - mobile
+        refreshToken:
+          type: string
+          maxLength: 4096
+          description: Mobile; web usa cookie httpOnly domusapp_refresh.
+    ForgotPassword:
+      type: object
+      properties:
+        email:
+          type: string
+          format: email
+          maxLength: 191
+      required:
+        - email
+    ResetPassword:
+      type: object
+      properties:
+        token:
+          type: string
+          format: uuid
+        newPassword:
+          type: string
+          format: password
+          minLength: 8
+          description: De 8 caracteres a 72 bytes UTF-8. Nunca registrar em logs.
+      required:
+        - token
+        - newPassword
+    UserCreate:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 2
+          maxLength: 100
+        email:
+          type: string
+          format: email
+        cpf:
+          type: string
+          description: CPF válido; pontuação removida.
+        phone:
+          type: string
+          description: Vazio ou 10/11 dígitos com DDD.
+        password:
+          type: string
+          format: password
+          minLength: 8
+          description: De 8 caracteres a 72 bytes UTF-8. Nunca registrar em logs.
+        role:
+          type: string
+          enum:
+            - ADMIN
+            - FUNCIONARIO
+            - MORADOR
+        unitId:
+          type: string
+          format: uuid
+          nullable: true
+        status:
+          type: string
+          enum:
+            - ACTIVE
+            - INACTIVE
+        isSyndic:
+          type: boolean
+        isCouncilMember:
+          type: boolean
+      required:
+        - name
+        - email
+        - cpf
+        - password
+      description: MORADOR precisa de unidade válida conforme regra do serviço.
+    UserUpdate:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 2
+          maxLength: 100
+        email:
+          type: string
+          format: email
+        cpf:
+          type: string
+          description: CPF válido; pontuação removida.
+        phone:
+          type: string
+          description: Vazio ou 10/11 dígitos com DDD.
+        password:
+          type: string
+          format: password
+          minLength: 8
+          description: De 8 caracteres a 72 bytes UTF-8. Nunca registrar em logs.
+        role:
+          type: string
+          enum:
+            - ADMIN
+            - FUNCIONARIO
+            - MORADOR
+        unitId:
+          type: string
+          format: uuid
+          nullable: true
+        status:
+          type: string
+          enum:
+            - ACTIVE
+            - INACTIVE
+        isSyndic:
+          type: boolean
+        isCouncilMember:
+          type: boolean
+    UnitCreate:
+      type: object
+      properties:
+        type:
+          type: string
+          enum:
+            - APARTMENT
+            - HOUSE
+        block:
+          type: string
+          maxLength: 50
+        number:
+          type: string
+          minLength: 1
+          maxLength: 20
+        parkingSpots:
+          oneOf:
+            - type: integer
+              minimum: 0
+              maximum: 20
+            - type: string
+              pattern: ^([0-9]|1[0-9]|20)$
+      required:
+        - number
+    UnitUpdate:
+      type: object
+      properties:
+        type:
+          type: string
+          enum:
+            - APARTMENT
+            - HOUSE
+        block:
+          type: string
+          maxLength: 50
+        number:
+          type: string
+          minLength: 1
+          maxLength: 20
+        parkingSpots:
+          oneOf:
+            - type: integer
+              minimum: 0
+              maximum: 20
+            - type: string
+              pattern: ^([0-9]|1[0-9]|20)$
+    NoticeCreate:
+      type: object
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 200
+        content:
+          type: string
+          minLength: 1
+        targetType:
+          type: string
+          enum:
+            - ALL
+            - UNIT
+        targetUnitId:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum:
+            - DRAFT
+            - PUBLISHED
+        priority:
+          type: string
+          enum:
+            - NORMAL
+            - URGENT
+      required:
+        - title
+        - content
+      description: targetUnitId é obrigatório quando targetType=UNIT.
+    EventCreate:
+      type: object
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 200
+        content:
+          type: string
+          minLength: 1
+        eventDate:
+          type: string
+          format: date-time
+        location:
+          type: string
+          maxLength: 200
+        targetType:
+          type: string
+          enum:
+            - ALL
+            - UNIT
+        targetUnitId:
+          type: string
+          format: uuid
+        category:
+          type: string
+          enum:
+            - ASSEMBLEIA
+            - CONFRATERNIZACAO
+            - MANUTENCAO
+            - REUNIAO
+            - OUTRO
+        capacity:
+          type: integer
+          minimum: 1
+          nullable: true
+        status:
+          type: string
+          enum:
+            - DRAFT
+            - PUBLISHED
+            - CANCELLED
+      required:
+        - title
+        - content
+        - eventDate
+      description: targetUnitId é obrigatório quando targetType=UNIT.
+    VotingCreate:
+      type: object
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 200
+        description:
+          type: string
+          minLength: 1
+        startDate:
+          type: string
+          format: date-time
+        endDate:
+          type: string
+          format: date-time
+        options:
+          type: array
+          items:
+            type: string
+            minLength: 1
+          minItems: 2
+      required:
+        - title
+        - description
+        - startDate
+        - endDate
+        - options
+      description: endDate deve ser posterior a startDate.
+    VehicleCreate:
+      type: object
+      properties:
+        plate:
+          type: string
+          description: Placa brasileira antiga ou Mercosul; normalizada sem pontuação e em maiúsculas.
+        model:
+          type: string
+          minLength: 1
+          maxLength: 191
+        color:
+          type: string
+          maxLength: 191
+      required:
+        - plate
+        - model
+    PetCreate:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 191
+        species:
+          type: string
+          enum:
+            - CACHORRO
+            - GATO
+            - PASSARO
+            - OUTRO
+        size:
+          type: string
+          enum:
+            - PEQUENO
+            - MEDIO
+            - GRANDE
+      required:
+        - name
+        - species
+        - size
+    InvoiceCreate:
+      type: object
+      properties:
+        description:
+          type: string
+          minLength: 1
+          maxLength: 191
+        amount:
+          oneOf:
+            - type: string
+              pattern: ^[0-9]+(\.[0-9]{1,2})?$
+            - type: number
+              minimum: 0.01
+          description: Valor positivo com até duas casas decimais.
+        dueDate:
+          type: string
+          format: date-time
+        type:
+          type: string
+          enum:
+            - MONTHLY_FEE
+            - EXTRAORDINARY
+            - FINE
+            - OTHER
+        referenceMonth:
+          type: string
+          format: date-time
+          nullable: true
+        userId:
+          type: string
+          format: uuid
+        unitId:
+          type: string
+          format: uuid
+      required:
+        - description
+        - amount
+        - dueDate
+        - userId
+        - unitId
+    InvoiceBatch:
+      type: object
+      properties:
+        description:
+          type: string
+          minLength: 1
+          maxLength: 191
+        amount:
+          oneOf:
+            - type: string
+              pattern: ^[0-9]+(\.[0-9]{1,2})?$
+            - type: number
+              minimum: 0.01
+          description: Valor positivo com até duas casas decimais.
+        dueDate:
+          type: string
+          format: date-time
+        type:
+          type: string
+          enum:
+            - MONTHLY_FEE
+            - EXTRAORDINARY
+            - FINE
+            - OTHER
+        referenceMonth:
+          type: string
+          format: date-time
+          nullable: true
+        userIds:
+          type: array
+          items:
+            type: string
+            format: uuid
+          minItems: 1
+          maxItems: 100
+          uniqueItems: true
+      required:
+        - description
+        - amount
+        - dueDate
+        - userIds
+    InvoiceReason:
+      type: object
+      properties:
+        reason:
+          type: string
+          minLength: 1
+          maxLength: 191
+    InvoiceStatus:
+      type: object
+      properties:
+        status:
+          type: string
+          enum:
+            - PAID
+            - CANCELLED
+        reason:
+          type: string
+          minLength: 1
+          maxLength: 191
+      required:
+        - status
+    Webhook:
+      type: object
+      properties:
+        type:
+          type: string
+        data:
+          type: object
+          properties:
+            id:
+              oneOf:
+                - type: string
+                - type: integer
+                  minimum: 0
+        user_id:
+          oneOf:
+            - type: string
+            - type: integer
+              minimum: 0
+        live_mode:
+          type: boolean
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        email:
+          type: string
+          format: email
+        role:
+          type: string
+          enum:
+            - ADMIN
+            - FUNCIONARIO
+            - MORADOR
+        status:
+          type: string
+          enum:
+            - ACTIVE
+            - INACTIVE
+        unitId:
+          type: string
+          format: uuid
+          nullable: true
+        isSyndic:
+          type: boolean
+        isCouncilMember:
+          type: boolean
+    Session:
+      type: object
+      properties:
+        user:
+          $ref: "#/components/schemas/User"
+        token:
+          type: string
+          description: Somente client=mobile.
+        refreshToken:
+          type: string
+          description: Somente client=mobile.
+    Invoice:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        description:
+          type: string
+          minLength: 1
+          maxLength: 191
+        amount:
+          oneOf:
+            - type: string
+              pattern: ^[0-9]+(\.[0-9]{1,2})?$
+            - type: number
+              minimum: 0.01
+          description: Valor positivo com até duas casas decimais.
+        dueDate:
+          type: string
+          format: date-time
+        type:
+          type: string
+          enum:
+            - MONTHLY_FEE
+            - EXTRAORDINARY
+            - FINE
+            - OTHER
+        referenceMonth:
+          type: string
+          format: date-time
+          nullable: true
+        userId:
+          type: string
+          format: uuid
+        unitId:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum:
+            - PENDING
+            - PAID
+            - OVERDUE
+            - CANCELLED
+            - EXPIRED
+            - REJECTED
+            - REFUNDED
+            - CHARGED_BACK
+            - PARTIALLY_REFUNDED
+        issuanceStatus:
+          type: string
+        requiresReview:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+        paidAt:
+          type: string
+          format: date-time
+          nullable: true
+  responses:
+    "400":
+      description: Entrada inválida ou regra de negócio não atendida.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    "401":
+      description: Credenciais, sessão ou assinatura de webhook inválidas.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    "403":
+      description: Origem ou perfil sem permissão.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    "404":
+      description: Recurso não encontrado.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    "409":
+      description: Conflito de estado, idempotência ou conciliação.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    "429":
+      description: Limite de tentativas excedido. Aguarde Retry-After.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    "500":
+      description: Falha interna.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    "503":
+      description: Serviço ou provedor indisponível.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"

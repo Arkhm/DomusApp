@@ -1,10 +1,9 @@
+import { logger } from './logger';
 import nodemailer from 'nodemailer';
 
 // Com SMTP_HOST definido, usa o servidor real do .env. Sem isso (dev sem
 // credenciais de e-mail configuradas), cria uma caixa de teste descartável no
-// Ethereal na primeira solicitação — nada chega a ninguém de verdade, mas o
-// link de preview aparece no log da API, então o fluxo dá pra testar de ponta
-// a ponta sem depender de nenhum provedor de e-mail.
+// Ethereal na primeira solicitação. O preview é registrado apenas para e-mails de teste.
 let transporterPromise: ReturnType<typeof buildTransporter> | null = null;
 
 async function buildTransporter() {
@@ -21,9 +20,7 @@ async function buildTransporter() {
 
   if (process.env.NODE_ENV === 'production') throw new Error('SMTP_HOST obrigatório em produção.');
   const testAccount = await nodemailer.createTestAccount();
-  console.warn(
-    '[mailer] SMTP_HOST não configurado — usando conta de teste Ethereal (nenhum e-mail real é enviado).',
-  );
+  logger.warn({ provider: 'ethereal' }, 'SMTP não configurado; usando caixa de teste sem envio real.');
   return nodemailer.createTransport({
     host: 'smtp.ethereal.email',
     port: 587,
@@ -50,6 +47,6 @@ export async function sendPasswordResetEmail(to: string, resetUrl: string): Prom
 
   const previewUrl = nodemailer.getTestMessageUrl(info);
   if (previewUrl) {
-    console.log(`[mailer] Preview do e-mail (Ethereal): ${previewUrl}`);
+    logger.info({ previewUrl }, 'Preview do e-mail de teste no Ethereal.');
   }
 }

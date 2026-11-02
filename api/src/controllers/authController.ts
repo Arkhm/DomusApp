@@ -1,3 +1,4 @@
+import { logger } from '../lib/logger';
 import { Request, Response } from 'express';
 import { authService } from '../services/authService';
 import { clearAuthCookie, setAuthCookie, clearRefreshCookie, setRefreshCookie, REFRESH_COOKIE } from '../lib/authCookie';
@@ -90,7 +91,7 @@ export const authController = {
 
     // Respond before database/SMTP work so delivery latency cannot reveal account existence.
     void authService.forgotPassword(email).catch(() => {
-      console.error('[forgotPassword] falha ao processar solicitação.');
+      logger.error({ code: 'PASSWORD_RESET_FAILED' }, 'Falha ao processar recuperação de senha.');
     });
 
     res.status(200).json({
