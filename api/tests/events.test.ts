@@ -51,9 +51,7 @@ test('eventos: validações do serviço', async t => {
     assert.equal(persist.mock.callCount(), 1);
   });
 
-  await t.test('recusa capacidade fracionária no serviço', {
-    todo: 'eventService.create verifica apenas tipo e mínimo; 1.5 chega ao repositório, embora a capacidade deva ser inteira.',
-  }, async t => {
+  await t.test('recusa capacidade fracionária no serviço', async t => {
     t.mock.method(eventRepository, 'create', async (data: Parameters<typeof eventRepository.create>[0]) => data);
     await assert.rejects(() => eventService.create({ ...input(), capacity: 1.5 }), /Capacidade/);
   });

@@ -83,8 +83,12 @@ export const userService = {
       }
     }
 
-    if (data.role === 'MORADOR' && data.unitId === null) {
-        throw new Error('Um morador não pode ficar sem unidade.');
+    // RNE-003 vale para o estado final do usuário, não só para o body: um PUT
+    // com apenas `{ unitId: null }` também tiraria o morador da unidade.
+    const finalRole = data.role ?? user.role;
+    const finalUnitId = data.unitId !== undefined ? data.unitId : user.unitId;
+    if ((data.role !== undefined || data.unitId !== undefined) && finalRole === 'MORADOR' && !finalUnitId) {
+      throw new Error('Um morador não pode ficar sem unidade.');
     }
 
     if (data.role && data.role !== 'MORADOR') {

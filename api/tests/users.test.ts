@@ -213,8 +213,7 @@ test('usuários: HTTP e repository com MySQL isolado', { skip: process.env.RUN_D
     assert.equal((await userRepository.findById(createdId))?.password, 'nova-senha-hash');
   });
 
-  await t.test('RNE-003: edição sem role também deve impedir remoção de unidade de morador',
-    { todo: 'userService.update só verifica unitId null quando role MORADOR vem no body.' }, async () => {
+  await t.test('RNE-003: edição sem role também deve impedir remoção de unidade de morador', async () => {
       const resident = await prisma.user.create({ data: cadastro() });
       const result = await request(app).put(`/users/${resident.id}`).set('Authorization', authorization).send({ unitId: null });
       assert.equal(result.status, 400);

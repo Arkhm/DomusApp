@@ -43,7 +43,7 @@ export const eventService = {
     if (data.status && !VALID_STATUS.has(data.status)) {
       throw new Error('Status inválido. Use DRAFT, PUBLISHED ou CANCELLED.');
     }
-    if (data.capacity != null && (typeof data.capacity !== 'number' || data.capacity < 1)) {
+    if (data.capacity != null && (!Number.isInteger(data.capacity) || data.capacity < 1)) {
       throw new Error('Capacidade deve ser um número inteiro maior que zero (ou ausente).');
     }
 
