@@ -81,6 +81,33 @@ test('logout incrementa tokenVersion e revoga refresh de todas as sessões', asy
   await authService.logout('invalid'); assert.equal(update.mock.callCount(), 1);
 });
 
+test('logout revoga access expirado assinado, mas rejeita adulteração, issuer e audience inválidos', async t => {
+  const user = { ...baseUser };
+  const original = prisma.user.update;
+  t.after(() => { prisma.user.update = original; });
+  const update = t.mock.fn(async ({ where, data }: any) => {
+    assert.equal(where.id, user.id); assert.deepEqual(data.tokenVersion, { increment: 1 });
+    user.tokenVersion++; return user;
+  });
+  prisma.user.update = update as any;
+  const claims = { id: user.id, role: user.role, isSyndic: user.isSyndic };
+  const options = { issuer: 'domusapp', audience: 'domusapp:access', expiresIn: -1 };
+  const expired = jwt.sign(claims, process.env.JWT_SECRET!, options);
+  assert.throws(() => tokens.verifyAccessToken(expired), /expired/);
+  const parts = expired.split('.');
+  parts[2] = (parts[2]![0] === 'a' ? 'b' : 'a') + parts[2]!.slice(1);
+  const invalidTokens = [parts.join('.'),
+    jwt.sign(claims, process.env.JWT_SECRET!, { ...options, issuer: 'other' }),
+    jwt.sign(claims, process.env.JWT_SECRET!, { ...options, audience: 'other' })];
+  for (const token of [expired, ...invalidTokens]) {
+    const res = response();
+    res.cookies.set('domusapp_token', {}); res.cookies.set('domusapp_refresh', {});
+    await authController.logout({ headers: { authorization: `Bearer ${token}` } } as Request, res as unknown as Response);
+    assert.equal(res.statusCode, 200); assert.equal(res.cookies.size, 0);
+    assert.equal(update.mock.callCount(), 1); assert.equal(user.tokenVersion, baseUser.tokenVersion + 1);
+  }
+});
+
 test('forgot salva só hash com validade de 1h e não envia e-mail inexistente', async t => {
   process.env.SMTP_HOST = 'unit.invalid';
   const user = { ...baseUser }; let sent = ''; let updates = 0;

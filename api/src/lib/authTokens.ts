@@ -25,9 +25,10 @@ export function createAuthTokens(user: TokenUser) {
     }),
   };
 }
-export function verifyAccessToken(token: string) {
+export function verifyAccessToken(token: string, options: { ignoreExpiration?: boolean } = {}) {
   const { accessSecret } = validateAuthSecrets();
-  const payload = jwt.verify(token, accessSecret, { algorithms: ['HS256'], issuer, audience: accessAudience });
+  const payload = jwt.verify(token, accessSecret, { algorithms: ['HS256'], issuer, audience: accessAudience,
+    ignoreExpiration: options.ignoreExpiration ?? false });
   if (typeof payload === 'string' || typeof payload.id !== 'string' || typeof payload.role !== 'string') {
     throw new Error('Token inválido.');
   }

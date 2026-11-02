@@ -50,8 +50,8 @@ export const authService = {
   async logout(token?: string) {
     if (!token) return;
     let userId: string;
-    try { userId = verifyAccessToken(token).id; }
-    catch { return; } // Logout must still clear cookies after expiration.
+    try { userId = verifyAccessToken(token, { ignoreExpiration: true }).id; }
+    catch { return; } // Invalid signatures or claims cannot identify a session to revoke.
     await userRepository.revokeTokens(userId);
   },
 
