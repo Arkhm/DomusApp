@@ -22,6 +22,16 @@ export const votingController = {
     }
   },
 
+  async vote(req: AuthRequest, res: Response) {
+    try {
+      const { id } = req.params;
+      const result = await votingService.vote(id as string, req.body.optionId, req.user!.id);
+      res.status(201).json(result);
+    } catch (error: any) {
+      res.status(400).json({ error: error.message });
+    }
+  },
+
   async delete(req: AuthRequest, res: Response) {
     try {
       const { id } = req.params;

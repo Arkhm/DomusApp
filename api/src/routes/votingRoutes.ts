@@ -9,6 +9,8 @@ router.use(authMiddleware);
 
 router.get('/', authorizeRole(['ADMIN', 'FUNCIONARIO', 'SYNDIC']), votingController.list);
 
+router.post('/:id/vote', votingController.vote);
+
 router.post('/', authorizeRole(['ADMIN', 'SYNDIC']), votingController.create);
 router.delete('/:id', authorizeRole(['ADMIN', 'SYNDIC']), votingController.delete);
 
