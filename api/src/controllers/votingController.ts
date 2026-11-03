@@ -15,7 +15,7 @@ export const votingController = {
 
   async list(req: AuthRequest, res: Response) {
     try {
-      const votings = await votingService.list();
+      const votings = await votingService.list(req.user!.id);
       res.status(200).json(votings);
     } catch (error: any) {
       res.status(400).json({ error: error.message });

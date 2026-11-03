@@ -60,6 +60,13 @@ export const votingRepository = {
     });
   },
 
+  findVotesByUser: async (userId: string) => {
+    return await prisma.votingVote.findMany({
+      where: { userId },
+      select: { votingId: true, optionId: true }
+    });
+  },
+
   changeVote: async (data: { id: string; fromOptionId: string; toOptionId: string }) => {
     return await prisma.$transaction(async (tx) => {
       const { count } = await tx.votingVote.updateMany({

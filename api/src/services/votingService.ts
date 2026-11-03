@@ -1,6 +1,7 @@
 import { Prisma } from '@prisma/client';
 import { votingRepository } from '../repositories/votingRepository';
 import { userRepository } from '../repositories/userRepository';
+import { hasPanelAccess } from '../lib/access';
 
 export const votingService = {
   async create(data: {
@@ -54,8 +55,38 @@ export const votingService = {
     });
   },
 
-  async list() {
-    return await votingRepository.findAll();
+  async list(userId: string) {
+    const [user, votings, myVotes] = await Promise.all([
+      userRepository.findById(userId),
+      votingRepository.findAll(),
+      votingRepository.findVotesByUser(userId)
+    ]);
+
+    if (!user) {
+      throw new Error('Usuário não encontrado.');
+    }
+
+    const chosen = new Map(myVotes.map((vote) => [vote.votingId, vote.optionId]));
+    const panel = hasPanelAccess(user);
+    const now = new Date();
+
+    return votings.map((voting) => {
+      let status = 'OPEN';
+      if (now < voting.startDate) status = 'SCHEDULED';
+      else if (now >= voting.endDate) status = 'CLOSED';
+
+      const myOptionId = chosen.get(voting.id) ?? null;
+
+      return {
+        ...voting,
+        status,
+        hasVoted: myOptionId !== null,
+        myOptionId,
+        options: panel || status === 'CLOSED'
+          ? voting.options
+          : voting.options.map(({ votes, ...option }) => option)
+      };
+    });
   },
 
   async delete(id: string) {
@@ -74,12 +105,16 @@ export const votingService = {
       throw new Error('Opção é obrigatória.');
     }
 
-    const user = await userRepository.findById(userId);
+    const [user, voting, previous] = await Promise.all([
+      userRepository.findById(userId),
+      votingRepository.findById(votingId),
+      votingRepository.findVote(votingId, userId)
+    ]);
+
     if (!user || user.role !== 'MORADOR' || user.status !== 'ACTIVE') {
       throw new Error('Somente moradores ativos podem votar.');
     }
 
-    const voting = await votingRepository.findById(votingId);
     if (!voting) {
       throw new Error('Votação não encontrada.');
     }
@@ -95,8 +130,6 @@ export const votingService = {
     if (!voting.options.some((option) => option.id === optionId)) {
       throw new Error('Opção inválida para esta votação.');
     }
-
-    const previous = await votingRepository.findVote(votingId, userId);
 
     if (previous) {
       if (previous.optionId === optionId) {
