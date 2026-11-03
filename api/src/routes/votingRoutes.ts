@@ -7,7 +7,9 @@ const router = Router();
 
 router.use(authMiddleware);
 
-router.get('/', authorizeRole(['ADMIN', 'FUNCIONARIO', 'SYNDIC']), votingController.list);
+router.get('/', authorizeRole(['ADMIN', 'FUNCIONARIO', 'SYNDIC', 'MORADOR']), votingController.list);
+
+router.post('/:id/vote', authorizeRole(['MORADOR']), votingController.vote);
 
 router.post('/', authorizeRole(['ADMIN', 'SYNDIC']), votingController.create);
 router.delete('/:id', authorizeRole(['ADMIN', 'SYNDIC']), votingController.delete);

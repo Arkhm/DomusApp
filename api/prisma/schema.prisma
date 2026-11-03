@@ -27,6 +27,7 @@ model User {
   events          Event[]  @relation("EventAuthor")
   votings         Voting[] @relation("VotingAuthor")
   noticeReads     NoticeRead[]
+  votingVotes     VotingVote[]
   pets            Pet[]
   invoices        Invoice[]
 }
@@ -110,17 +111,34 @@ model Voting {
   authorId    String
   author      User           @relation("VotingAuthor", fields: [authorId], references: [id])
   options     VotingOption[]
+  ballots     VotingVote[]
   createdAt   DateTime       @default(now())
   updatedAt   DateTime       @updatedAt
 }
 
 model VotingOption {
-  id        String   @id @default(uuid())
+  id        String       @id @default(uuid())
   text      String
   votingId  String
-  voting    Voting   @relation(fields: [votingId], references: [id], onDelete: Cascade)
-  votes     Int      @default(0)
-  createdAt DateTime @default(now())
+  voting    Voting       @relation(fields: [votingId], references: [id], onDelete: Cascade)
+  votes     Int          @default(0)
+  ballots   VotingVote[]
+  createdAt DateTime     @default(now())
+}
+
+model VotingVote {
+  id        String       @id @default(uuid())
+  votingId  String
+  voting    Voting       @relation(fields: [votingId], references: [id], onDelete: Cascade)
+  optionId  String
+  option    VotingOption @relation(fields: [optionId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime     @default(now())
+
+  @@unique([votingId, userId])
+  @@index([optionId])
+  @@index([userId])
 }
 
 model Vehicle {
