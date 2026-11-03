@@ -9,31 +9,66 @@ services:
       - MYSQL_DATABASE=${DATABASE_NAME}
     volumes:
       - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "MYSQL_PWD=$$MYSQL_ROOT_PASSWORD mysqladmin ping -h 127.0.0.1 -uroot --silent"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
 
   api:
     build: ./api
     container_name: domusapp_api
     ports:
       - "${API_PORT}:${API_PORT}"
-    volumes:
+    volumes: &api_volumes
       - ./api:/usr/src/app
-      - /usr/src/app/node_modules
-    environment:
-      - PORT=${API_PORT}
-      - DATABASE_URL=${DATABASE_URL}
-      - DATABASE_HOST=${DATABASE_HOST}   
-      - DATABASE_USER=${DATABASE_USER}     
-      - DATABASE_PASSWORD=${DATABASE_PASSWORD}
-      - DATABASE_NAME=${DATABASE_NAME}
-      - JWT_SECRET=${JWT_SECRET}
-      - NODE_ENV=${NODE_ENV:-development}
-      - ALLOWED_ORIGIN=${ALLOWED_ORIGIN:-http://localhost:5173}
-      - COOKIE_SECURE=${COOKIE_SECURE:-}
-      - COOKIE_SAMESITE=${COOKIE_SAMESITE:-}
-      - TRUST_PROXY=${TRUST_PROXY:-}
+      - api_node_modules:/usr/src/app/node_modules
+    environment: &api_environment
+      PORT: ${API_PORT}
+      DATABASE_URL: ${DATABASE_URL}
+      DATABASE_HOST: ${DATABASE_HOST}
+      DATABASE_PORT: ${DATABASE_PORT:-3306}
+      DATABASE_USER: ${DATABASE_USER}
+      DATABASE_PASSWORD: ${DATABASE_PASSWORD}
+      DATABASE_NAME: ${DATABASE_NAME}
+      JWT_SECRET: ${JWT_SECRET}
+      NODE_ENV: ${NODE_ENV:-development}
+      ALLOWED_ORIGIN: ${ALLOWED_ORIGIN:-http://localhost:5173}
+      MERCADO_PAGO_ACCESS_TOKEN: ${MERCADO_PAGO_ACCESS_TOKEN}
+      MERCADO_PAGO_SELLER_ID: ${MERCADO_PAGO_SELLER_ID}
+      MERCADO_PAGO_SANDBOX: ${MERCADO_PAGO_SANDBOX}
+      MERCADO_PAGO_WEBHOOK_SECRET: ${MERCADO_PAGO_WEBHOOK_SECRET:-}
+      MERCADO_PAGO_WEBHOOK_URL: ${MERCADO_PAGO_WEBHOOK_URL:-}
+      COOKIE_SECURE: ${COOKIE_SECURE:-}
+      COOKIE_SAMESITE: ${COOKIE_SAMESITE:-}
+      TRUST_PROXY: ${TRUST_PROXY:-}
     command: npm run dev
     depends_on:
-      - db
+      db:
+        condition: service_healthy
+
+  migrations:
+    profiles: ["migrations"]
+    build: ./api
+    volumes: *api_volumes
+    environment: *api_environment
+    command: sh -c "npx prisma generate && npm run db:deploy"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  payment-worker:
+    build: ./api
+    volumes: *api_volumes
+    environment: *api_environment
+    command: npm run payments:worker
+    restart: unless-stopped
+    stop_grace_period: 60s
+    depends_on:
+      db:
+        condition: service_healthy
+      api:
+        condition: service_started
 
   web:
     build: ./web
@@ -50,3 +85,4 @@ services:
 
 volumes:
   mysql_data:
+  api_node_modules:

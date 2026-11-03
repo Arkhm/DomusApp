@@ -56,34 +56,36 @@ cd DomusApp
 cp .env.example .env
 ```
 
-Abra o `.env` e preencha `DATABASE_PASSWORD` com uma senha de sua escolha.
+Abra o `.env`, preencha `DATABASE_PASSWORD`, mantenha `DATABASE_URL` sincronizada e gere um `JWT_SECRET` próprio (`openssl rand -hex 32`). Não sobrescreva um `.env` existente com suas credenciais. O único modelo versionado é `.env.example`.
 
-O `.env.example` também traz as variáveis de segurança. Em desenvolvimento os padrões já servem; em produção, ajuste:
+O `.env.example` reúne as variáveis de banco, autenticação, pagamentos e ferramentas. Os campos de segredo devem ser preenchidos mesmo em desenvolvimento. Em produção, ajuste também:
 
 | Variável | Para que serve |
 |---|---|
-| `JWT_SECRET` | Assina o token de sessão. **Use um segredo próprio**, nunca o do `.env.example`. |
+| `JWT_SECRET` | Assina o token de sessão; gere um segredo próprio. O exemplo deixa esse campo vazio. |
 | `ALLOWED_ORIGIN` | Origens autorizadas a chamar a API (separadas por vírgula). Qualquer outra recebe `403`. |
 | `NODE_ENV` | Em `production`, o cookie de sessão passa a exigir HTTPS (`secure`). |
 | `COOKIE_SAMESITE` | `strict` por padrão. Só mude para `none` se API e front ficarem em domínios diferentes — e aí `COOKIE_SECURE=true` é obrigatório. |
-| `TRUST_PROXY` | Quantos proxies confiar no `X-Forwarded-For`. Necessário atrás de Railway/Render/nginx para o rate limiter enxergar o IP real. |
+| `TRUST_PROXY` | Redes/endereços dos proxies confiáveis, por exemplo `loopback` para proxy local. Permite interpretar o IP encaminhado sem confiar em toda a internet. |
 
-**3. Suba os contêineres:**
+**3. Confira o banco e suba os contêineres:**
+
+O fluxo local usa `db push`; o serviço `migrations` é opcional. Confira a estratégia de banco em [report.md](report.md#2-containers-e-inicialização).
 
 ```bash
-docker compose up -d
+docker compose up -d --build
 ```
 
-**4. Aplique as migrations versionadas e popule o banco:**
+**4. Prepare um banco local novo:**
 
 ```bash
-docker compose exec api npx prisma migrate deploy
-docker compose exec api npx prisma generate
+docker compose exec api npx prisma db push
 docker compose exec api npx prisma db seed
-docker compose restart api
+docker compose exec api npx prisma generate
+docker compose restart api payment-worker
 ```
 
-> **Por que `migrate deploy` em vez de `db push`?** As migrations vivem em `api/prisma/migrations/` e documentam todo o histórico do schema. `db push` cria o schema direto e ignora isso — o time inteiro precisa usar `migrate deploy` pra ficar consistente.
+Execute o seed apenas uma vez no banco limpo. Ele pode acrescentar unidades quando repetido. A inicialização normal não apaga volumes nem recria dados.
 
 **5. Acesse a aplicação:**
 
@@ -97,32 +99,15 @@ docker compose restart api
 
 ## 🔄 Após puxar mudanças (`git pull`)
 
-Sempre que sincronizar com a `main`, rode este fluxo dentro da pasta do projeto:
+Depois de sincronizar o código, confira as alterações de ambiente e migrações:
 
 ```bash
 git pull
-docker compose up -d
-docker compose exec api npx prisma migrate deploy   # aplica migrations novas (se houver)
-docker compose exec api npx prisma generate          # regenera o Prisma Client
-docker compose restart api                           # reinicia a API com o client novo
+docker compose up -d --build
+docker compose logs --tail=100 api payment-worker
 ```
 
-### ⚠️ Pegadinha do `docker compose down`
-
-O `docker compose down` **descarta o volume anônimo** `/usr/src/app/node_modules` do container da API (mesmo sem `-v`). Isso significa que o Prisma Client volta ao estado da imagem do build (provavelmente desatualizado).
-
-**Sintoma:** erro `Cannot read properties of undefined (reading 'findMany')` em qualquer endpoint.
-
-**Fix:** sempre rode `prisma generate` depois de um `down + up`:
-
-```bash
-docker compose down
-docker compose up -d
-docker compose exec api npx prisma generate          # ← obrigatório
-docker compose restart api
-```
-
-> Migrations não precisam ser reaplicadas — elas vivem no volume nomeado do MySQL, que persiste através de `down`.
+Ao alterar o schema local, execute `docker compose exec api npx prisma db push`, `docker compose exec api npx prisma generate` e reinicie API e worker. Não repita o seed. O volume `api_node_modules` é compartilhado, e os volumes persistem em `docker compose down` sem `-v`. O perfil opcional `migrations` mantém o caminho de migrações versionadas; consulte o relatório antes de trocar de estratégia.
 
 ---
 
@@ -182,3 +167,7 @@ cd api && npm run check:security
 - Gabriel Francisco Vaz Azevedo
 - João Marcelo Conceição Sousa
 - Juliano Aparecido Bernardo Quirino Junior
+
+## Pagamentos
+
+A referência técnica da integração Pix também está em [api/docs/mercado-pago.md](api/docs/mercado-pago.md).
