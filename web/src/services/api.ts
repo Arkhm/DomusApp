@@ -7,7 +7,7 @@ const api = axios.create({
 });
 
 const PUBLIC_PATHS = ['/login', '/esqueci-senha', '/redefinir-senha'];
-const NO_REFRESH = ['/auth/login', '/auth/register', '/auth/register-admin', '/auth/logout',
+const NO_REFRESH = ['/auth/login', '/auth/logout',
     '/auth/refresh', '/auth/forgot-password', '/auth/reset-password'];
 let refreshPromise: Promise<unknown> | null = null;
 let logoutPromise: Promise<void> | null = null;

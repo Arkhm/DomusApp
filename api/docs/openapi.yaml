@@ -31,57 +31,6 @@ paths:
                   timestamp:
                     type: string
                     format: date-time
-  /auth/register:
-    post:
-      tags:
-        - auth
-      summary: Registrar usuário
-      description: O modelo de banco exige CPF, mas a entrada atual não recebe esse campo; cadastro pode responder 400.
-      security: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/Register"
-      responses:
-        "201":
-          description: Operação concluída.
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/User"
-        "400":
-          $ref: "#/components/responses/400"
-        "500":
-          $ref: "#/components/responses/500"
-  /auth/register-admin:
-    post:
-      tags:
-        - auth
-      summary: Criar administrador
-      description: "Perfis permitidos: ADMIN. SYNDIC corresponde ao atributo isSyndic."
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/Register"
-      responses:
-        "201":
-          description: Operação concluída.
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/User"
-        "400":
-          $ref: "#/components/responses/400"
-        "401":
-          $ref: "#/components/responses/401"
-        "403":
-          $ref: "#/components/responses/403"
-        "500":
-          $ref: "#/components/responses/500"
   /auth/login:
     post:
       tags:
@@ -2068,25 +2017,6 @@ components:
           enum:
             - mobile
       required:
-        - email
-        - password
-    Register:
-      type: object
-      properties:
-        name:
-          type: string
-          minLength: 2
-          maxLength: 100
-        email:
-          type: string
-          format: email
-        password:
-          type: string
-          format: password
-          minLength: 8
-          description: De 8 caracteres a 72 bytes UTF-8. Nunca registrar em logs.
-      required:
-        - name
         - email
         - password
     Refresh:

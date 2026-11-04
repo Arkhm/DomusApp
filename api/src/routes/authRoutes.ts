@@ -1,15 +1,13 @@
 import { Router } from 'express';
 import { authController } from '../controllers/authController';
 import { authMiddleware } from '../middlewares/authMiddleware';
-import { authorizeRole } from '../middlewares/roleMiddleware';
 import { forgotPasswordLimiter, loginLimiter, sessionLimiter } from '../middlewares/rateLimitMiddleware';
 import { validate } from '../middlewares/validate';
-import { loginSchema, registerSchema, forgotPasswordSchema, resetPasswordSchema, refreshSchema } from '../schemas/authSchema';
+import { loginSchema, forgotPasswordSchema, resetPasswordSchema, refreshSchema } from '../schemas/authSchema';
 
 const router = Router();
 
 // Rotas Públicas
-router.post('/register', validate(registerSchema), authController.register);
 // `loginLimiter` corta força bruta antes da validação de propósito: um body
 // malformado ainda deve consumir cota (só login bem-sucedido é de graça).
 router.post('/login', loginLimiter, validate(loginSchema), authController.login);
@@ -24,17 +22,5 @@ router.post('/reset-password', sessionLimiter, validate(resetPasswordSchema), au
 
 // Rotas Protegidas
 router.get('/me', authMiddleware, authController.me);
-
-// Criar novo Administrador
-// 1. O authMiddleware verifica o token JWT e injeta o req.user
-// 2. O authorizeRole verifica se o req.user.role é "ADMIN"
-// 3. Só então o controlador é chamado
-router.post(
-  '/register-admin',
-  authMiddleware,
-  authorizeRole(['ADMIN']),
-  validate(registerSchema),
-  authController.registerAdmin
-);
 
 export default router;
