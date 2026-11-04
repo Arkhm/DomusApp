@@ -50,6 +50,18 @@ export const votingRepository = {
     });
   },
 
+  // Cria o voto e incrementa o total da opção na mesma transação. O
+  // @@unique([votingId, unitId]) faz o segundo voto da unidade falhar com P2002.
+  castVote: async (data: { votingId: string; optionId: string; unitId: string; userId: string }) => {
+    return await prisma.$transaction(async (tx) => {
+      await tx.votingVote.create({ data });
+      return await tx.votingOption.update({
+        where: { id: data.optionId },
+        data: { votes: { increment: 1 } },
+      });
+    });
+  },
+
   delete: async (id: string) => {
     return await prisma.voting.delete({ where: { id } });
   }

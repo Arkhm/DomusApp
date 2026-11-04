@@ -4,9 +4,10 @@ import type { CookieOptions } from 'express';
 // Nome único do cookie de sessão. Mantido aqui para que middleware,
 // controller e logout nunca saiam de sincronia.
 export const AUTH_COOKIE = 'domusapp_token';
+export const REFRESH_COOKIE = 'domusapp_refresh';
 
-// 24h — mesma janela do `expiresIn` do JWT emitido no authService.
-const MAX_AGE_MS = 24 * 60 * 60 * 1000;
+// 15min — mesma janela do `expiresIn` do JWT emitido no authService.
+const MAX_AGE_MS = 15 * 60 * 1000;
 
 const isProduction = () => process.env.NODE_ENV === 'production';
 
@@ -43,4 +44,15 @@ export const setAuthCookie = (res: Response, token: string) => {
 export const clearAuthCookie = (res: Response) => {
   const { maxAge: _maxAge, ...options } = authCookieOptions();
   res.clearCookie(AUTH_COOKIE, options);
+};
+
+export const refreshCookieOptions = (): CookieOptions => ({
+  ...authCookieOptions(), path: '/auth/refresh', maxAge: 7 * 24 * 60 * 60 * 1000,
+});
+export const setRefreshCookie = (res: Response, token: string) => {
+  res.cookie(REFRESH_COOKIE, token, refreshCookieOptions());
+};
+export const clearRefreshCookie = (res: Response) => {
+  const { maxAge: _maxAge, ...options } = refreshCookieOptions();
+  res.clearCookie(REFRESH_COOKIE, options);
 };

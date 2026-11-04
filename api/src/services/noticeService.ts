@@ -1,6 +1,7 @@
 import { noticeRepository } from '../repositories/noticeRepository';
 import { userRepository } from '../repositories/userRepository';
 import { hasPanelAccess } from '../lib/access';
+import { HttpError } from '../lib/httpError';
 
 const VALID_STATUS = new Set(['DRAFT', 'PUBLISHED']);
 const VALID_PRIORITY = new Set(['NORMAL', 'URGENT']);
@@ -88,6 +89,17 @@ export const noticeService = {
     const notice = await noticeRepository.findById(noticeId);
     if (!notice) {
       throw new Error('Aviso não encontrado.');
+    }
+    const user = await userRepository.findById(userId);
+    if (!user) {
+      throw new Error('Usuário não encontrado.');
+    }
+    // Mesma regra de visibilidade do findForUser: morador só lê aviso
+    // publicado para todos ou para a própria unidade.
+    const isAddressee = notice.status === 'PUBLISHED' &&
+      (notice.targetType === 'ALL' || (notice.targetType === 'UNIT' && notice.targetUnitId === user.unitId));
+    if (!isAddressee && !hasPanelAccess(user)) {
+      throw new HttpError(403, 'Você não tem acesso a este aviso.');
     }
     await noticeRepository.markAsRead(noticeId, userId);
     return { message: 'Marcado como lido.' };

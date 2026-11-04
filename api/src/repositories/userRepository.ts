@@ -1,12 +1,28 @@
 import { prisma } from '../lib/prisma';
 
 export const userRepository = {
+  revokeTokens: async (id: string) => {
+    await prisma.user.update({ where: { id }, data: { tokenVersion: { increment: 1 } } });
+  },
+
+  consumeResetToken: async (id: string, tokenHash: string, password: string) => {
+    const result = await prisma.user.updateMany({
+      where: { id, resetToken: tokenHash, resetTokenExpiry: { gt: new Date() } },
+      data: { password, resetToken: null, resetTokenExpiry: null, tokenVersion: { increment: 1 } },
+    });
+    return result.count === 1;
+  },
+
   findByEmail: async (email: string) => {
     return await prisma.user.findUnique({ where: { email } });
   },
 
   findByCpf: async (cpf: string) => {
     return await prisma.user.findUnique({ where: { cpf } });
+  },
+
+  findByResetTokenHash: async (resetToken: string) => {
+    return await prisma.user.findUnique({ where: { resetToken } });
   },
 
   findById: async (id: string) => {

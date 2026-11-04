@@ -12,7 +12,7 @@ import type { LoginResponse, SessionProfile, User } from '../types';
  * (`isSyndic: true`) conseguem autenticar. Ver TODO no README do mobile.
  */
 export async function login(email: string, password: string): Promise<LoginResponse> {
-  const { data } = await api.post<LoginResponse>('/auth/login', { email, password });
+  const { data } = await api.post<LoginResponse>('/auth/login', { email, password, client: 'mobile' });
   return data;
 }
 
@@ -50,4 +50,8 @@ export async function withResolvedUnit(user: User): Promise<User> {
   } catch {
     return user;
   }
+}
+
+export async function logout(): Promise<void> {
+  await api.post('/auth/logout');
 }

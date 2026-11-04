@@ -8,6 +8,8 @@ import {
     CalendarDays,
     Vote,
     TreePalm,
+    CalendarCheck,
+    MessageSquare,
     ChevronLeft,
     ChevronRight,
 } from 'lucide-react';
@@ -22,11 +24,12 @@ const navItems = [
     { to: '/comunicados', label: 'Comunicados', icon: Megaphone },
     { to: '/eventos', label: 'Programação', icon: CalendarDays },
     { to: '/votacoes', label: 'Votações', icon: Vote },
+    { to: '/areas-comuns', label: 'Áreas comuns', icon: TreePalm },
+    { to: '/reservas', label: 'Reservas', icon: CalendarCheck },
+    { to: '/ocorrencias', label: 'Ocorrências', icon: MessageSquare },
 ];
 
-const plannedItems = [
-    { label: 'Áreas Comuns', icon: TreePalm },
-];
+
 
 export default function Sidebar() {
     const [collapsed, setCollapsed] = useState(true);
@@ -125,32 +128,6 @@ export default function Sidebar() {
                     );
                 })}
 
-                {/* Subtle separator before planned items */}
-                <div
-                    style={{
-                        height: 1,
-                        background: 'var(--color-line)',
-                        margin: collapsed ? '12px 22px' : '16px 24px',
-                    }}
-                />
-
-                {plannedItems.map((item) => {
-                    const Icon = item.icon;
-                    return (
-                        <div
-                            key={item.label}
-                            className="nav-item disabled"
-                            title={`${item.label} · em breve`}
-                            style={{
-                                padding: collapsed ? '14px 0' : '12px 24px',
-                                justifyContent: collapsed ? 'center' : 'flex-start',
-                            }}
-                        >
-                            <Icon size={18} strokeWidth={1.4} />
-                            {!collapsed && <span>{item.label}</span>}
-                        </div>
-                    );
-                })}
             </nav>
 
             {/* Footer — avatar + collapse toggle */}

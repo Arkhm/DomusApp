@@ -1,6 +1,8 @@
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import Login from '../pages/Login';
+import ForgotPassword from '../pages/ForgotPassword';
+import ResetPassword from '../pages/ResetPassword';
 import ProtectedLayout from '../components/layout/ProtectedLayout';
 import UsersList from '../pages/Users/UsersList';
 import NoticesList from '../pages/Notices/NoticesList';
@@ -8,6 +10,9 @@ import Dashboard from '../pages/Dashboard';
 import UnitsList from '../pages/Units/UnitsList';
 import EventsList from '../pages/Events/EventsList';
 import VotingsList from '../pages/Votings/VotingsList';
+import CommonAreasList from '../pages/CommonAreas/CommonAreasList';
+import ReservationsList from '../pages/Reservations/ReservationsList';
+import IncidentsList from '../pages/Incidents/IncidentsList';
 
 export default function AppRoutes() {
     const { isAuthenticated, isLoading } = useAuth();
@@ -28,6 +33,11 @@ export default function AppRoutes() {
                     isAuthenticated ? <Navigate to="/dashboard" replace /> : <Login />
                 }
             />
+            {/* Públicas de propósito, independente de sessão ativa: um link de
+                e-mail de redefinição precisa funcionar mesmo com o navegador
+                já logado em outra conta. */}
+            <Route path="/esqueci-senha" element={<ForgotPassword />} />
+            <Route path="/redefinir-senha" element={<ResetPassword />} />
 
             <Route element={<ProtectedLayout />}>
                 <Route path="/dashboard" element={<Dashboard />} />
@@ -36,6 +46,9 @@ export default function AppRoutes() {
                 <Route path="/comunicados" element={<NoticesList />} />
                 <Route path="/eventos" element={<EventsList />} />
                 <Route path="/votacoes" element={<VotingsList />} />
+                <Route path="/areas-comuns" element={<CommonAreasList />} />
+                <Route path="/reservas" element={<ReservationsList />} />
+                <Route path="/ocorrencias" element={<IncidentsList />} />
             </Route>
 
             <Route path="*" element={<Navigate to={isAuthenticated ? '/dashboard' : '/login'} replace />} />

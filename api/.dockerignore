@@ -1,6 +1,13 @@
 node_modules
-dist
-npm-debug.log
 .env
+.env.*
+.git
+dist
+coverage
+.nyc_output
+*.log
+*.tsbuildinfo
 Dockerfile
 .dockerignore
+tests
+scripts

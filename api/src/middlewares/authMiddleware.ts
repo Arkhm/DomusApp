@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
-import jwt from 'jsonwebtoken';
+import { verifyAccessToken } from '../lib/authTokens';
 import { AUTH_COOKIE, clearAuthCookie } from '../lib/authCookie';
 
 export interface AuthRequest extends Request {
@@ -13,7 +13,7 @@ export interface AuthRequest extends Request {
 // Fonte primária do token: o cookie httpOnly enviado automaticamente pelo
 // browser. O header Authorization continua aceito como fallback para clientes
 // que não têm cookie jar (Postman, testes, futuro app mobile com SecureStore).
-const extractToken = (req: AuthRequest): string | undefined => {
+export const extractToken = (req: AuthRequest): string | undefined => {
   const cookieToken = req.cookies?.[AUTH_COOKIE];
   if (cookieToken) return cookieToken;
 
@@ -36,8 +36,7 @@ export const authMiddleware = (req: AuthRequest, res: Response, next: NextFuncti
 
   try {
     // Descriptografa e valida a assinatura usando o segredo do seu .env
-    const secret = process.env.JWT_SECRET as string;
-    const decoded = jwt.verify(token, secret) as { id: string; role: string; isSyndic?: boolean };
+    const decoded = verifyAccessToken(token);
 
     // Acopla os dados do usuário (id e role) na requisição.
     req.user = decoded;

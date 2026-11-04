@@ -1,3 +1,4 @@
+import { logger } from '../lib/logger';
 import { Response } from 'express';
 import { PaymentError } from '../lib/paymentDomain';
 import { paymentWebhookService } from '../services/paymentWebhookService';
@@ -9,7 +10,7 @@ function respondError(res: Response, error: unknown) {
     res.status(error.statusCode).json({ error: error.message, code: error.code });
     return;
   }
-  console.error('invoice_request_failed', { code: 'INTERNAL_ERROR' });
+  logger.error({ code: 'INTERNAL_ERROR' }, 'Falha ao processar solicitação de fatura.');
   res.status(500).json({ error: 'Não foi possível concluir a operação.' });
 }
 

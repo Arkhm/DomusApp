@@ -123,6 +123,8 @@ O painel web é **administrativo** — só estas pessoas conseguem logar:
 
 **Quem pode mutar (criar/excluir):** apenas `ADMIN`. Síndica e funcionário acessam em **modo leitura** — veem tudo (inclusive rascunhos e contadores de leitura), mas não têm botões de "Novo X" nem ícones de lixeira.
 
+Exceções dos módulos de atendimento: a síndica também aprova e rejeita reservas, e funcionário e síndica atualizam e respondem ocorrências (veja abaixo).
+
 ---
 
 ## 👤 Credenciais (geradas no seed)
@@ -168,6 +170,46 @@ cd api && npm run check:security
 - João Marcelo Conceição Sousa
 - Juliano Aparecido Bernardo Quirino Junior
 
+## Áreas comuns, reservas e ocorrências
+
+- **Áreas comuns (RF-014)** — `/common-areas`. `ADMIN` cria, edita, ativa/desativa e remove; o morador só vê as áreas ativas. Área com reserva pendente ou aprovada de hoje em diante não pode ser removida: desative-a.
+- **Reservas (RF-015)** — `/reservations`. O morador solicita (`PENDING`) e cancela as próprias; `ADMIN` e síndica aprovam ou rejeitam. Datas `YYYY-MM-DD` e horários `HH:mm` no fuso de Brasília. Não há reserva no passado nem duas aprovadas no mesmo horário da mesma área: a checagem trava a área no banco, então duas aprovações simultâneas não passam juntas (409).
+- **Ocorrências (RF-019)** — `/incidents`. O morador registra (a unidade vem do cadastro dele) e acompanha as próprias; `ADMIN`, funcionário e síndica mudam o status e respondem. Ocorrência encerrada (`CLOSED`) não muda mais. O aviso ao morador quando o status muda fica para o módulo de notificações.
+
+No painel web: **Áreas comuns**, **Reservas** e **Ocorrências** no menu lateral. No app mobile: **Reservas** e **Ocorrências** na Home do morador. Contrato completo no Swagger.
+
 ## Pagamentos
 
 A referência técnica da integração Pix também está em [api/docs/mercado-pago.md](api/docs/mercado-pago.md).
+
+## Qualidade, documentação e imagens de produção
+
+Use Node 22. Os testes da API carregam o Axios de web e mobile, portanto instale as dependências dos três projetos.
+
+```bash
+npm ci --prefix api
+npm ci --prefix web
+npm ci --prefix mobile
+cd api
+npx prisma generate
+npm run typecheck
+npm test
+npm run test:coverage
+```
+
+A cobertura inclui todos os serviços e repositórios, mesmo sem teste, e exige **70% das linhas**. Integrações precisam de MySQL descartável com nome terminado em `_test`, migrações aplicadas e `RUN_DB_INTEGRATION=true` / `RUN_PAYMENT_INTEGRATION=true` no ambiente ou no `api/.env` local ignorado. Configure `DATABASE_HOST/PORT/USER/PASSWORD/NAME/URL` e os segredos independentes `JWT_SECRET` / `JWT_REFRESH_SECRET`. Não execute integrações no banco de uso. O CI cria `domusapp_test`, aplica `prisma migrate deploy` e usa credenciais fictícias. Para os clientes: `cd web && npm run build` e `cd mobile && npx tsc --noEmit`.
+
+Swagger UI: **http://localhost:3333/api/docs/**. O contrato central está em [api/docs/openapi.yaml](api/docs/openapi.yaml), também disponível em `/api/docs/openapi.yaml`. Cookie `domusapp_token` e Bearer são alternativas. Para cookie, faça login pelo Swagger; para mobile, use Bearer em Authorize. O Helmet permanece ativo: só a documentação permite seus estilos inline e HTTP local; scripts e assets vêm da própria API.
+
+API e worker emitem JSON pelo Pino. `LOG_LEVEL` aceita `trace/debug/info/warn/error/fatal/silent`; o padrão é `info`, ou `silent` em `NODE_ENV=test` quando não configurado. Veja `docker compose logs -f api payment-worker`. Os registros usam IDs e códigos operacionais, sem bodies, senhas, tokens ou cabeçalhos de autenticação. Apenas o preview do Ethereal é registrado em desenvolvimento para testar recuperação sem SMTP; SMTP real não registra conteúdo nem link. Não há log automático de requisições nem `pino-pretty` em produção.
+
+O Compose usa `target: development`, volumes e `npm run dev`. Os estágios de produção são construídos separadamente:
+
+```bash
+docker build --target production -t domus-api-prod api
+docker build --target production --build-arg VITE_API_URL=https://api.seudominio.com -t domus-web-prod web
+```
+
+A API compila os pontos de entrada do servidor e worker via `tsc`; `npm start` executa `node dist/server.js` (fora do Docker, rode `npm run build` antes). A imagem final usa o usuário `node`, inclui Prisma Client gerado e contrato, e remove devDependencies e peers opcionais de desenvolvimento (CLI Prisma e TypeScript). O próprio build verifica a importação do client e a ausência de Prisma CLI, TypeScript e tsx. Migrações continuam separadas: a imagem final não inclui a CLI Prisma. O worker na mesma imagem usa `npm run payments:worker:prod`.
+
+O web gera Vite e serve com nginx na porta **80**, com fallback para `index.html` nas rotas do React. `VITE_API_URL` é público e fixado **no build**; alterá-lo exige reconstruir. Inclua a origem real do web em `ALLOWED_ORIGIN` da API.

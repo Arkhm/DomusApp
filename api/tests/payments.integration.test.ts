@@ -1,8 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { randomUUID, createHmac } from 'node:crypto';
+import { randomInt, randomUUID, createHmac } from 'node:crypto';
 import express from 'express';
-import jwt from 'jsonwebtoken';
+import { createAuthTokens } from '../src/lib/authTokens';
 import { prisma } from '../src/lib/prisma';
 import { invoiceService } from '../src/services/invoiceService';
 import { paymentService } from '../src/services/paymentService';
@@ -45,10 +45,24 @@ test('pagamentos com MySQL isolado', { skip: !enabled }, async t => {
   process.env.MERCADO_PAGO_SELLER_ID = sellerId;
   process.env.MERCADO_PAGO_WEBHOOK_SECRET = 'integration-test-secret';
   process.env.JWT_SECRET = 'integration-test-jwt';
+  process.env.JWT_REFRESH_SECRET = 'integration-test-refresh-jwt';
   const unit = await prisma.unit.create({ data: { number: prefix, type: 'APARTMENT' } });
   const user = await prisma.user.create({ data: { name: 'Morador Teste', email: `${prefix}@example.com`, cpf: prefix,
     password: 'unused-test-hash', unitId: unit.id } });
-  await prisma.user.update({ where: { id: user.id }, data: { cpf: '12345678901' } });
+  // CPF único por execução: um CPF fixo colide entre execuções paralelas no mesmo banco.
+  await prisma.user.update({ where: { id: user.id }, data: { cpf: String(randomInt(1e10, 1e11)) } });
+  // Limpeza registrada logo após o setup: se algo falhar depois, o Prisma é desconectado e o processo encerra.
+  t.after(async () => {
+    const invoices = await prisma.invoice.findMany({ where: { userId: user.id }, select: { id: true, operationId: true } });
+    const ids = invoices.map(i => i.id);
+    await prisma.paymentWebhook.deleteMany({ where: { sellerId } });
+    await prisma.invoiceAudit.deleteMany({ where: { invoiceId: { in: ids } } });
+    await prisma.paymentAttempt.deleteMany({ where: { invoiceId: { in: ids } } });
+    await prisma.invoice.deleteMany({ where: { id: { in: ids } } });
+    await prisma.paymentOperation.deleteMany({ where: { id: { in: invoices.flatMap(i => i.operationId ? [i.operationId] : []) } } });
+    await prisma.user.delete({ where: { id: user.id } }); await prisma.unit.delete({ where: { id: unit.id } });
+    await prisma.$disconnect();
+  });
   const input = { description: 'Mensalidade', amount: 123.45, dueDate: '2026-11-10', userId: user.id, unitId: unit.id };
   t.mock.method(mercadoPagoService, 'verifyAccount', async () => {});
   t.mock.method(mercadoPagoService, 'createOrder', async (payload: any, key: string) => {
@@ -278,7 +292,7 @@ test('pagamentos com MySQL isolado', { skip: !enabled }, async t => {
     await new Promise<void>(resolve => server.once('listening', resolve));
     const address = server.address() as { port: number };
     const base = `http://127.0.0.1:${address.port}/invoices`;
-    const token = jwt.sign(actor, process.env.JWT_SECRET!);
+    const token = createAuthTokens({ ...actor, tokenVersion: 0 }).token;
     const headers = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' };
     try {
       assert.equal((await fetch(base)).status, 401);
@@ -304,17 +318,5 @@ test('pagamentos com MySQL isolado', { skip: !enabled }, async t => {
       const failed = await fetch(base + '/payments/health', { headers });
       assert.equal(failed.status, 500); assert.equal(JSON.stringify(await failed.json()).includes('private'), false);
     } finally { await new Promise<void>((resolve, reject) => server.close(error => error ? reject(error) : resolve())); }
-  });
-
-  t.after(async () => {
-    const invoices = await prisma.invoice.findMany({ where: { userId: user.id }, select: { id: true, operationId: true } });
-    const ids = invoices.map(i => i.id);
-    await prisma.paymentWebhook.deleteMany({ where: { sellerId } });
-    await prisma.invoiceAudit.deleteMany({ where: { invoiceId: { in: ids } } });
-    await prisma.paymentAttempt.deleteMany({ where: { invoiceId: { in: ids } } });
-    await prisma.invoice.deleteMany({ where: { id: { in: ids } } });
-    await prisma.paymentOperation.deleteMany({ where: { id: { in: invoices.flatMap(i => i.operationId ? [i.operationId] : []) } } });
-    await prisma.user.delete({ where: { id: user.id } }); await prisma.unit.delete({ where: { id: unit.id } });
-    await prisma.$disconnect();
   });
 });
