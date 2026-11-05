@@ -127,6 +127,10 @@ Exceções dos módulos de atendimento: a síndica também aprova e rejeita rese
 
 ---
 
+## Cadastro de usuários
+
+Somente administradores autenticados criam usuários, pelo endpoint `POST /users` no painel web. O mesmo endpoint cadastra administradores, funcionários e moradores; moradores devem estar vinculados a uma unidade. Não há autocadastro: o morador recebe suas credenciais da administração. No ambiente de desenvolvimento, o seed cria o administrador inicial.
+
 ## 👤 Credenciais (geradas no seed)
 
 | Perfil | E-mail | Senha | Acessa o painel? |

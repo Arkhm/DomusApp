@@ -30,6 +30,14 @@ function semSegredos(value: unknown) {
   }
 }
 
+test('usuários: endpoints antigos de cadastro não estão disponíveis', async () => {
+  const token = createAuthTokens({ id: randomUUID(), role: 'ADMIN', isSyndic: false, tokenVersion: 0 }).token;
+  for (const path of ['/auth/register', '/auth/register-admin']) {
+    assert.equal((await request(app).post(path).send({})).status, 404);
+    assert.equal((await request(app).post(path).set('Authorization', `Bearer ${token}`).send({})).status, 404);
+  }
+});
+
 test('usuários: autenticação e RBAC protegem todas as operações administrativas', async () => {
   const token = createAuthTokens({ id: randomUUID(), role: 'MORADOR', isSyndic: false, tokenVersion: 0 }).token;
   for (const [method, path] of [['get', '/users'], ['get', `/users/${usuario.id}`], ['post', '/users'],

@@ -5,24 +5,6 @@ import { clearAuthCookie, setAuthCookie, clearRefreshCookie, setRefreshCookie, R
 import { AuthRequest, extractToken } from '../middlewares/authMiddleware';
 
 export const authController = {
-  async register(req: Request, res: Response) {
-    try {
-      const user = await authService.register(req.body);
-      res.status(201).json(user);
-    } catch (error: any) {
-      res.status(400).json({ error: error.message });
-    }
-  },
-
-  async registerAdmin(req: Request, res: Response) {
-    try {
-      const admin = await authService.createAdmin(req.body);
-      res.status(201).json(admin);
-    } catch (error: any) {
-      res.status(400).json({ error: error.message });
-    }
-  },
-
   async login(req: Request, res: Response) {
     try {
       const { email, password } = req.body;

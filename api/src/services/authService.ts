@@ -6,36 +6,6 @@ import { generateResetToken, hashResetToken, RESET_TOKEN_TTL_MS } from '../lib/r
 import { sendPasswordResetEmail } from '../lib/mailer';
 import { sanitizeUser } from '../lib/sanitizeUser';
 
-
-// Tipagem
-interface RegisterDTO {
-  name?: string;
-  email?: string;
-  password?: string;
-}
-
-const createUserLogic = async (data: RegisterDTO, assignedRole: string) => {
-  if (!data.name || !data.email || !data.password) {
-    throw new Error("Nome, email e senha são obrigatórios.");
-  }
-
-  const userExists = await userRepository.findByEmail(data.email);
-  if (userExists) {
-    throw new Error('E-mail já cadastrado.');
-  }
-
-  const hashedPassword = await bcrypt.hash(data.password, 10);
-
-  const newUser = await userRepository.create({
-    name: data.name,
-    email: data.email,
-    password: hashedPassword,
-    role: assignedRole,
-  });
-
-  return sanitizeUser(newUser);
-};
-
 export const authService = {
   async refresh(refreshToken: string) {
     const payload = verifyRefreshToken(refreshToken);
@@ -53,17 +23,6 @@ export const authService = {
     try { userId = verifyAccessToken(token, { ignoreExpiration: true }).id; }
     catch { return; } // Invalid signatures or claims cannot identify a session to revoke.
     await userRepository.revokeTokens(userId);
-  },
-
-  
-  async register(data: RegisterDTO) {
-    // Registro público sempre será MORADOR
-    return await createUserLogic(data, "MORADOR");
-  },
-
-  async createAdmin(data: RegisterDTO) {
-    // Rota específica para criar administrador
-    return await createUserLogic(data, "ADMIN");
   },
 
   async login(email: string, password: string) {
