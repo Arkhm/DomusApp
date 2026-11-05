@@ -57,7 +57,8 @@ api.interceptors.response.use(
   async (error: unknown) => {
     if (!isAxiosError(error) || error.response?.status !== 401) return Promise.reject(error);
     const config = error.config as RetryConfig | undefined;
-    if (!config || config.url?.startsWith('/auth/')) return Promise.reject(error);
+    const noRefresh = ['/auth/login', '/auth/logout', '/auth/refresh', '/auth/forgot-password', '/auth/reset-password'];
+    if (!config || noRefresh.includes(config.url?.split('?')[0] ?? '')) return Promise.reject(error);
     if (config._retry) {
       await expireSession();
       return Promise.reject(error);
@@ -82,7 +83,8 @@ api.interceptors.response.use(
       }
       await refreshPromise;
     } catch (refreshError) {
-      await expireSession();
+      const failure = toApiFailure(refreshError, 'Falha ao renovar sessão.');
+      if (failure.kind !== 'network' && failure.kind !== 'server') await expireSession();
       return Promise.reject(refreshError);
     }
     return api(config);

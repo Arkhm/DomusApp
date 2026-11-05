@@ -230,3 +230,31 @@ test('middleware mantém autenticação por cookie e Bearer, rejeitando refresh 
   authMiddleware({ headers: { authorization: `Bearer ${pair.refreshToken}` } } as any, res as unknown as Response, () => { next++; });
   assert.equal(next, 0); assert.equal(res.statusCode, 401);
 });
+
+
+test('/auth/me retorna cadastro atual de qualquer perfil ativo, sem segredos', async t => {
+  for (const actor of [{ role: 'ADMIN', isSyndic: false }, { role: 'FUNCIONARIO', isSyndic: false },
+    { role: 'MORADOR', isSyndic: false }, { role: 'MORADOR', isSyndic: true }]) {
+    await t.test(JSON.stringify(actor), async t => {
+      const profile = { ...baseUser, ...actor, unit: { id: 'unidade-atual' }, name: 'Nome atualizado' };
+      t.mock.method(userRepository, 'findById', async (id: string) => { assert.equal(id, baseUser.id); return profile as any; });
+      const res = response();
+      await authController.me({ user: { id: baseUser.id } } as any, res as any);
+      assert.equal(res.statusCode, 200);
+      assert.equal(res.body.user.name, profile.name);
+      assert.deepEqual(res.body.user.unit, profile.unit);
+      assert.equal(res.body.user.role, actor.role);
+      for (const key of ['password', 'resetToken', 'resetTokenExpiry']) assert.equal(key in res.body.user, false);
+    });
+  }
+});
+test('/auth/me rejeita cadastro inativo ou excluído', async t => {
+  for (const profile of [null, { ...baseUser, role: 'ADMIN', status: 'INACTIVE' }]) {
+    await t.test(profile ? 'inativo' : 'excluído', async t => {
+      t.mock.method(userRepository, 'findById', async () => profile as any);
+      const res = response();
+      await authController.me({ user: { id: baseUser.id } } as any, res as any);
+      assert.equal(res.statusCode, 401);
+    });
+  }
+});

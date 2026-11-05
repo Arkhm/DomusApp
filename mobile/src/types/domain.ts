@@ -35,11 +35,7 @@ export interface User {
   isCouncilMember: boolean;
   condominiumId: string;
   unitId: string | null;
-  /**
-   * A API só devolve a relação `unit` em `GET /users/:id` (restrito a
-   * ADMIN/FUNCIONARIO). O `POST /auth/login` devolve apenas `unitId`.
-   * Ver `userService.resolveUnit`.
-   */
+  /** Relação disponível no perfil atualizado de GET /auth/me. */
   unit?: Unit | null;
   createdAt: string;
   updatedAt: string;
@@ -109,15 +105,6 @@ export interface LoginResponse {
   token: string;
   refreshToken: string;
 }
-
-/** Payload do JWT, devolvido por `GET /users/me` dentro de `perfil`. */
-export interface SessionProfile {
-  id: string;
-  role: UserRole;
-  iat?: number;
-  exp?: number;
-}
-
 
 export interface CommonArea {
   id: string;

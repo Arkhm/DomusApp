@@ -159,7 +159,7 @@ paths:
       tags:
         - auth
       summary: Consultar usuário da sessão
-      description: ""
+      description: Retorna o próprio perfil atualizado com unidade, para qualquer usuário ACTIVE autenticado. Não concede privilégios administrativos; usuários inativos ou excluídos recebem 401.
       responses:
         "200":
           description: Operação concluída.
@@ -182,8 +182,9 @@ paths:
     get:
       tags:
         - users
-      summary: Consultar perfil do token
-      description: ""
+      summary: Consultar perfil do token (legado)
+      deprecated: true
+      description: Mantido por compatibilidade. Clientes novos devem consultar GET /auth/me.
       responses:
         "200":
           description: Operação concluída.

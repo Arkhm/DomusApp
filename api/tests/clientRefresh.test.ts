@@ -64,7 +64,7 @@ for (const platform of ['web', 'mobile'] as const) {
         if (platform === 'mobile') assert.equal(config.headers.Authorization, 'Bearer new-access');
         return respond(200, { ok: true });
       };
-      const results = await Promise.allSettled([app.api.get('/one'), app.api.get('/two')]);
+      const results = await Promise.allSettled([app.api.get('/auth/me'), app.api.get('/two')]);
       assert.equal(refreshCalls, 1);
       if (scenario === 'success') {
         assert.ok(results.every(result => result.status === 'fulfilled'));
@@ -116,3 +116,21 @@ for (const platform of ['web', 'mobile'] as const) {
     await Promise.all([request, logout]); assert.deepEqual(order, ['refresh', 'logout']);
   });
 }
+
+test('mobile: indisponibilidade no refresh preserva tokens e não encerra a sessão', async () => {
+  for (const status of [undefined, 503]) {
+    const app = client('mobile'); let notified = 0;
+    app.onUnauthorized(() => { notified++; });
+    app.api.defaults.adapter = async (config: any) => {
+      if (config.url === '/auth/refresh') {
+        throw new app.axios.AxiosError('Indisponível', status ? 'ERR_BAD_RESPONSE' : 'ERR_NETWORK', config, undefined,
+          status ? { status, data: {}, headers: {}, config } : undefined);
+      }
+      throw new app.axios.AxiosError('Unauthorized', 'ERR_BAD_REQUEST', config, undefined, { status: 401 });
+    };
+    await assert.rejects(app.api.get('/auth/me'));
+    assert.equal(app.saved.get('access'), 'old-access');
+    assert.equal(app.saved.get('refresh'), 'old-refresh');
+    assert.equal(notified, 0);
+  }
+});
