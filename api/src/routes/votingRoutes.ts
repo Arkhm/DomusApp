@@ -1,3 +1,4 @@
+import { updateVotingSchema } from '../schemas/updateSchemas';
 import { idParamsSchema } from '../schemas/common';
 import { Router } from 'express';
 import { votingController } from '../controllers/votingController';
@@ -15,6 +16,7 @@ router.get('/', authorizeRole(['ADMIN', 'FUNCIONARIO', 'MORADOR']), votingContro
 router.post('/:id/votes', authorizeRole(['MORADOR']), validate(idParamsSchema, 'params'), validate(castVoteSchema), votingController.vote);
 
 router.post('/', authorizeRole(['ADMIN', 'SYNDIC']), validate(createVotingSchema), votingController.create);
+router.put('/:id', authorizeRole(['ADMIN', 'SYNDIC']), validate(idParamsSchema, 'params'), validate(updateVotingSchema), votingController.update);
 router.delete('/:id', authorizeRole(['ADMIN', 'SYNDIC']), validate(idParamsSchema, 'params'), votingController.delete);
 
 export default router;

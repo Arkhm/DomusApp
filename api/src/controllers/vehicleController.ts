@@ -3,6 +3,14 @@ import { vehicleService } from '../services/vehicleService';
 import { AuthRequest } from '../middlewares/authMiddleware';
 
 export const vehicleController = {
+  async update(req: AuthRequest, res: Response) {
+    try {
+      res.status(200).json(await vehicleService.update(req.params.id as string, req.body, req.user!));
+    } catch (error: any) {
+      res.status(error.statusCode ?? 400).json({ error: error.message });
+    }
+  },
+
   async list(req: AuthRequest, res: Response) {
     try {
       const plate = typeof req.query.plate === 'string' ? req.query.plate : undefined;

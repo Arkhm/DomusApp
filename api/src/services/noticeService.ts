@@ -1,12 +1,31 @@
+import { unitRepository } from '../repositories/unitRepository';
+import { updateNoticeSchema } from '../schemas/updateSchemas';
+import { UpdateActor, requireEditor, isSyndic, hasPanelAccess } from '../lib/access';
 import { noticeRepository } from '../repositories/noticeRepository';
 import { userRepository } from '../repositories/userRepository';
-import { hasPanelAccess } from '../lib/access';
 import { HttpError } from '../lib/httpError';
 
 const VALID_STATUS = new Set(['DRAFT', 'PUBLISHED']);
 const VALID_PRIORITY = new Set(['NORMAL', 'URGENT']);
 
 export const noticeService = {
+  async update(id: string, input: unknown, actor: UpdateActor) {
+    requireEditor(actor, isSyndic(actor));
+    const data = updateNoticeSchema.parse(input);
+    const record = await noticeRepository.findById(id);
+    if (!record) throw new HttpError(404, 'Registro não encontrado.');
+    requireEditor(actor, isSyndic(actor) && record.authorId === actor.id);
+    const targetType = data.targetType ?? record.targetType;
+    const targetUnitId = data.targetUnitId !== undefined ? data.targetUnitId : record.targetUnitId;
+    if (targetType === 'UNIT' && (!targetUnitId || !await unitRepository.findById(targetUnitId))) {
+      throw new HttpError(400, 'Informe uma unidade existente para o destinatário.');
+    }
+    if (data.targetType !== undefined || data.targetUnitId !== undefined) {
+      data.targetUnitId = targetType === 'ALL' ? null : targetUnitId;
+    }
+    return noticeRepository.update(id, data);
+  },
+
   async create(data: {
     title: string;
     content: string;

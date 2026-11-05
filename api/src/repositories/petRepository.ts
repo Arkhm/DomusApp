@@ -1,6 +1,9 @@
+import { Prisma } from '@prisma/client';
 import { prisma } from '../lib/prisma';
 
 export const petRepository = {
+  update: (id: string, data: Prisma.PetUpdateInput) => prisma.pet.update({ where: { id }, data }),
+
   create: async (data: { name: string; species: string; size: string; ownerId: string }) => {
     return await prisma.pet.create({ data });
   },

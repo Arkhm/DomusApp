@@ -1,3 +1,4 @@
+import { updatePetSchema } from '../schemas/updateSchemas';
 import { createPetSchema } from '../schemas/petSchema';
 import { idParamsSchema } from '../schemas/common';
 import { validate } from '../middlewares/validate';
@@ -13,6 +14,7 @@ router.use(authMiddleware);
 router.get('/', authorizeRole(['ADMIN', 'FUNCIONARIO']), petController.list);
 router.get('/me', authorizeRole(['MORADOR']), petController.listMine);
 router.post('/', authorizeRole(['MORADOR']), validate(createPetSchema), petController.create);
+router.put('/:id', authorizeRole(['ADMIN', 'MORADOR']), validate(idParamsSchema, 'params'), validate(updatePetSchema), petController.update);
 router.delete('/:id', authorizeRole(['ADMIN', 'MORADOR']), validate(idParamsSchema, 'params'), petController.delete);
 
 export default router;

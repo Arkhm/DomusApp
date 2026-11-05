@@ -1,23 +1,25 @@
+import { updateNoticeSchema } from '../schemas/updateSchemas';
 import { idParamsSchema } from '../schemas/common';
-    import { Router } from 'express';
-    import { noticeController } from '../controllers/noticeController';
-    import { authMiddleware } from '../middlewares/authMiddleware';
-    import { authorizeRole } from '../middlewares/roleMiddleware';
-    import { validate } from '../middlewares/validate';
-    import { createNoticeSchema } from '../schemas/noticeSchema';
+import { Router } from 'express';
+import { noticeController } from '../controllers/noticeController';
+import { authMiddleware } from '../middlewares/authMiddleware';
+import { authorizeRole } from '../middlewares/roleMiddleware';
+import { validate } from '../middlewares/validate';
+import { createNoticeSchema } from '../schemas/noticeSchema';
 
-    const router = Router();
+const router = Router();
 
-    router.use(authMiddleware);
+router.use(authMiddleware);
 
-    // Qualquer pessoa logada pode VER os avisos
-    router.get('/', noticeController.list);
+// Qualquer pessoa logada pode VER os avisos
+router.get('/', noticeController.list);
 
-    // Qualquer pessoa logada pode marcar como lido (só registra para si)
-    router.post('/:id/read', validate(idParamsSchema, 'params'), noticeController.markRead);
+// Qualquer pessoa logada pode marcar como lido (só registra para si)
+router.post('/:id/read', validate(idParamsSchema, 'params'), noticeController.markRead);
 
-    // ADMIN e SYNDIC podem CRIAR ou DELETAR avisos
-    router.post('/', authorizeRole(['ADMIN', 'SYNDIC']), validate(createNoticeSchema), noticeController.create);
-    router.delete('/:id', authorizeRole(['ADMIN', 'SYNDIC']), validate(idParamsSchema, 'params'), noticeController.delete);
+// ADMIN e síndica podem criar; autoria também é verificada ao editar ou excluir.
+router.post('/', authorizeRole(['ADMIN', 'SYNDIC']), validate(createNoticeSchema), noticeController.create);
+router.put('/:id', authorizeRole(['ADMIN', 'SYNDIC']), validate(idParamsSchema, 'params'), validate(updateNoticeSchema), noticeController.update);
+router.delete('/:id', authorizeRole(['ADMIN', 'SYNDIC']), validate(idParamsSchema, 'params'), noticeController.delete);
 
-    export default router;
+export default router;

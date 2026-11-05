@@ -1,9 +1,16 @@
+import { updateVotingSchema } from '../schemas/updateSchemas';
+import { UpdateActor, requireEditor, isSyndic } from '../lib/access';
 import { Prisma } from '@prisma/client';
 import { votingRepository } from '../repositories/votingRepository';
 import { userRepository } from '../repositories/userRepository';
 import { HttpError } from '../lib/httpError';
 
 export const votingService = {
+  async update(id: string, input: unknown, actor: UpdateActor) {
+    requireEditor(actor, isSyndic(actor));
+    return votingRepository.update(id, updateVotingSchema.parse(input));
+  },
+
   async create(data: {
     title: string;
     description: string;

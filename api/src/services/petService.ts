@@ -1,9 +1,21 @@
+import { HttpError } from '../lib/httpError';
+import { updatePetSchema } from '../schemas/updateSchemas';
+import { UpdateActor, requireEditor } from '../lib/access';
 import { petRepository } from '../repositories/petRepository';
 
 const VALID_SPECIES = new Set(['CACHORRO', 'GATO', 'PASSARO', 'OUTRO']);
 const VALID_SIZES = new Set(['PEQUENO', 'MEDIO', 'GRANDE']);
 
 export const petService = {
+  async update(id: string, input: unknown, actor: UpdateActor) {
+    requireEditor(actor, actor.role === 'MORADOR');
+    const data = updatePetSchema.parse(input);
+    const record = await petRepository.findById(id);
+    if (!record) throw new HttpError(404, 'Registro não encontrado.');
+    requireEditor(actor, actor.role === 'MORADOR' && record.ownerId === actor.id);
+    return petRepository.update(id, data);
+  },
+
   async listAll() {
     return await petRepository.findAll();
   },
