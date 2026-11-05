@@ -4,7 +4,7 @@ info:
   version: 1.0.0
   description: "Contrato centralizado das rotas. Autenticação por cookie httpOnly ou Bearer como alternativas. Para cookie
     web, faça login: o navegador não permite definir o cookie manualmente no Authorize. Entradas passam pelos schemas
-    Zod e regras dos serviços."
+    Zod e regras dos serviços. Rotas protegidas validam cadastro ACTIVE e tokenVersion no banco a cada requisição; tokens revogados recebem 401 e indisponibilidade de validação recebe 503. Tokens legados sem versão exigem novo login."
 servers:
   - url: /
 security:

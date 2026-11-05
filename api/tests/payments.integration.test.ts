@@ -49,6 +49,7 @@ test('pagamentos com MySQL isolado', { skip: !enabled }, async t => {
   const unit = await prisma.unit.create({ data: { number: prefix, type: 'APARTMENT' } });
   const user = await prisma.user.create({ data: { name: 'Morador Teste', email: `${prefix}@example.com`, cpf: prefix,
     password: 'unused-test-hash', unitId: unit.id } });
+  await prisma.user.create({ data: { ...actor, name: 'Síndica de teste', cpf: randomUUID(), email: `${randomUUID()}@example.test`, password: 'hash', unitId: unit.id } });
   // CPF único por execução: um CPF fixo colide entre execuções paralelas no mesmo banco.
   await prisma.user.update({ where: { id: user.id }, data: { cpf: String(randomInt(1e10, 1e11)) } });
   // Limpeza registrada logo após o setup: se algo falhar depois, o Prisma é desconectado e o processo encerra.
@@ -60,7 +61,7 @@ test('pagamentos com MySQL isolado', { skip: !enabled }, async t => {
     await prisma.paymentAttempt.deleteMany({ where: { invoiceId: { in: ids } } });
     await prisma.invoice.deleteMany({ where: { id: { in: ids } } });
     await prisma.paymentOperation.deleteMany({ where: { id: { in: invoices.flatMap(i => i.operationId ? [i.operationId] : []) } } });
-    await prisma.user.delete({ where: { id: user.id } }); await prisma.unit.delete({ where: { id: unit.id } });
+    await prisma.user.deleteMany({ where: { id: { in: [user.id, actor.id] } } }); await prisma.unit.delete({ where: { id: unit.id } });
     await prisma.$disconnect();
   });
   const input = { description: 'Mensalidade', amount: 123.45, dueDate: '2026-11-10', userId: user.id, unitId: unit.id };

@@ -221,3 +221,9 @@ O web gera Vite e serve com nginx na porta **80**, com fallback para `index.html
 ## Identificação da sessão
 
 Web e mobile usam `GET /auth/me` para consultar o próprio perfil atualizado com unidade (`{ user }`), sem senha ou dados de recuperação. Exige token válido e cadastro ACTIVE. `GET /users/me` permanece legado, com o contrato anterior, por compatibilidade. A consulta de perfil não concede acesso administrativo: as permissões das rotas e dos serviços continuam obrigatórias. O painel aceita somente ADMIN, FUNCIONARIO e morador síndico; uma recusa de acesso ao painel não dispara logout global no mobile.
+
+## Revogação imediata de sessão
+
+Access tokens (15 minutos) e refresh tokens (7 dias) carregam `tokenVersion`. Cada requisição protegida consulta o cadastro atual: usuário excluído, inativo ou com versão diferente recebe 401. Cargo e flag de síndica usados na autorização vêm do banco. Falha de consulta retorna 503 sem autorizar a operação nem apagar os cookies.
+
+Logout e recuperação de senha revogam as sessões de todos os dispositivos. Edição administrativa de senha, cargo, status ou flag de síndica também incrementa a versão na mesma escrita; campos comuns não encerram sessões. Repetir logout com um token antigo não revoga sessões emitidas posteriormente. Tokens anteriores a esta atualização, sem versão, exigem novo login. Requisições já autorizadas e em execução não são canceladas.

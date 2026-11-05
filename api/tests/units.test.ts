@@ -1,3 +1,4 @@
+import { userRepository } from '../src/repositories/userRepository';
 import test from 'node:test';
 import app from '../src/app';
 import assert from 'node:assert/strict';
@@ -15,7 +16,8 @@ function authorization(role: string) {
   return `Bearer ${createAuthTokens({ id: randomUUID(), role, isSyndic: false, tokenVersion: 0 }).token}`;
 }
 
-test('unidades: sem token retorna 401 e morador recebe 403 em todas as rotas', async () => {
+test('unidades: sem token retorna 401 e morador recebe 403 em todas as rotas', async t => {
+  t.mock.method(userRepository, 'findAuthState', async (id: string) => ({ id, status: 'ACTIVE', role: 'MORADOR', isSyndic: false, tokenVersion: 0 }));
   for (const [method, path] of [['get', '/units'], ['post', '/units'], ['put', `/units/${unit.id}`],
     ['delete', `/units/${unit.id}`]] as const) {
     assert.equal((await request(app)[method](path).send({})).status, 401);
@@ -91,13 +93,19 @@ test('unidades: HTTP e repository com MySQL isolado', { skip: process.env.RUN_DB
   const prefix = randomUUID();
   const ids: string[] = [];
   const residentId = randomUUID();
+  const staffIds: string[] = [];
   t.after(async () => {
     try {
-      await prisma.user.deleteMany({ where: { id: residentId } });
+      await prisma.user.deleteMany({ where: { id: { in: [residentId, ...staffIds] } } });
       await prisma.unit.deleteMany({ where: { OR: [{ id: { in: ids } }, { block: prefix }] } });
     } finally { await prisma.$disconnect(); }
   });
-  const admin = authorization('ADMIN');
+  const authorizePersisted = async (role: string) => {
+    const user = await prisma.user.create({ data: { name: role, role, cpf: randomUUID(), email: `${randomUUID()}@example.test`, password: 'hash' } });
+    staffIds.push(user.id);
+    return `Bearer ${createAuthTokens(user).token}`;
+  };
+  const admin = await authorizePersisted('ADMIN');
   let createdId: string;
 
   await t.test('cria apartamento e casa com normalização, defaults e valores extremos de vagas', async () => {
@@ -118,7 +126,7 @@ test('unidades: HTTP e repository com MySQL isolado', { skip: process.env.RUN_DB
   });
 
   await t.test('funcionário pode listar, mas não criar, editar ou excluir', async () => {
-    const employee = authorization('FUNCIONARIO');
+    const employee = await authorizePersisted('FUNCIONARIO');
     const list = await request(app).get('/units').set('Authorization', employee);
     assert.equal(list.status, 200);
     assert.ok(list.body.some((item: any) => item.id === createdId));

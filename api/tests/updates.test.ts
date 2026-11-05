@@ -1,3 +1,4 @@
+import { userRepository } from '../src/repositories/userRepository';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
@@ -20,11 +21,12 @@ const resident = { ...syndic, id: randomUUID(), isSyndic: false };
 const bearer = (actor: typeof admin) => `Bearer ${createAuthTokens(actor).token}`;
 const status = (code: number) => (error: any) => error.statusCode === code;
 
-test('PUTs: autenticação, RBAC, campos imutáveis e corpo vazio', async () => {
+test('PUTs: autenticação, RBAC, campos imutáveis e corpo vazio', async t => {
+  t.mock.method(userRepository, 'findAuthState', async (id: string) => ({ id, status: 'ACTIVE', role: id === admin.id ? 'ADMIN' : 'FUNCIONARIO', isSyndic: false, tokenVersion: 0 }));
   for (const path of ['notices', 'events', 'votings', 'vehicles', 'pets']) {
     const url = `/${path}/${randomUUID()}`;
     await request(app).put(url).send({}).expect(401);
-    await request(app).put(url).set('Authorization', bearer({ ...admin, role: 'FUNCIONARIO' })).send({}).expect(403);
+    await request(app).put(url).set('Authorization', bearer({ ...admin, id: randomUUID(), role: 'FUNCIONARIO' })).send({}).expect(403);
     await request(app).put(url).set('Authorization', bearer(admin)).send({ authorId: resident.id, ownerId: resident.id, unitId: resident.id, votes: 99 }).expect(400);
   }
   for (const schema of [updateNoticeSchema, updateEventSchema, updateVotingSchema, updateVehicleSchema, updatePetSchema]) {

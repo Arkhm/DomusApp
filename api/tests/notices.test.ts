@@ -10,7 +10,8 @@ import { noticeService } from '../src/services/noticeService';
 import { noticeRepository } from '../src/repositories/noticeRepository';
 import { userRepository } from '../src/repositories/userRepository';
 
-test('avisos: autenticação em todas as rotas e RBAC nas operações administrativas', async () => {
+test('avisos: autenticação em todas as rotas e RBAC nas operações administrativas', async t => {
+  t.mock.method(userRepository, 'findAuthState', async (id: string) => ({ id, status: 'ACTIVE', role: 'MORADOR', isSyndic: false, tokenVersion: 0 }));
   const id = randomUUID();
   const token = createAuthTokens({ id, role: 'MORADOR', isSyndic: false, tokenVersion: 0 }).token;
   for (const [method, path] of [['get', '/notices'], ['post', '/notices'], ['post', `/notices/${id}/read`],

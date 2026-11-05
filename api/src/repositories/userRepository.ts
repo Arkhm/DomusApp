@@ -1,8 +1,13 @@
 import { prisma } from '../lib/prisma';
 
 export const userRepository = {
-  revokeTokens: async (id: string) => {
-    await prisma.user.update({ where: { id }, data: { tokenVersion: { increment: 1 } } });
+  findAuthState: (id: string) => prisma.user.findUnique({ where: { id },
+    select: { id: true, status: true, role: true, isSyndic: true, tokenVersion: true },
+  }),
+
+  revokeTokens: async (id: string, expectedVersion?: number) => {
+    return prisma.user.updateMany({ where: { id, tokenVersion: expectedVersion },
+      data: { tokenVersion: { increment: 1 } } });
   },
 
   consumeResetToken: async (id: string, tokenHash: string, password: string) => {

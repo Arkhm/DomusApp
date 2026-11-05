@@ -1,3 +1,4 @@
+import { HttpError } from '../lib/httpError';
 import bcrypt from 'bcryptjs';
 import { createAuthTokens, verifyAccessToken, verifyRefreshToken } from '../lib/authTokens';
 import { userRepository } from '../repositories/userRepository';
@@ -7,10 +8,12 @@ import { sanitizeUser } from '../lib/sanitizeUser';
 
 export const authService = {
   async refresh(refreshToken: string) {
-    const payload = verifyRefreshToken(refreshToken);
+    let payload: ReturnType<typeof verifyRefreshToken>;
+    try { payload = verifyRefreshToken(refreshToken); }
+    catch { throw new HttpError(401, 'Refresh token inválido.'); }
     const user = await userRepository.findById(payload.sub);
     if (!user || user.status !== 'ACTIVE' || user.tokenVersion !== payload.tokenVersion) {
-      throw new Error('Refresh token inválido ou revogado.');
+      throw new HttpError(401, 'Refresh token inválido ou revogado.');
     }
     // shortcut: refresh reutilizavel ate expirar ou ate tokenVersion mudar, trocar por tabela de sessoes com deteccao de reuso se precisar revogar sessao individual.
     return createAuthTokens(user);
@@ -18,10 +21,10 @@ export const authService = {
 
   async logout(token?: string) {
     if (!token) return;
-    let userId: string;
-    try { userId = verifyAccessToken(token, { ignoreExpiration: true }).id; }
+    let payload: ReturnType<typeof verifyAccessToken>;
+    try { payload = verifyAccessToken(token, { ignoreExpiration: true }); }
     catch { return; } // Invalid signatures or claims cannot identify a session to revoke.
-    await userRepository.revokeTokens(userId);
+    await userRepository.revokeTokens(payload.id, payload.tokenVersion);
   },
 
   async login(email: string, password: string) {
@@ -48,7 +51,7 @@ export const authService = {
   async getAuthenticatedUser(userId: string) {
     const user = await userRepository.findById(userId);
     if (!user || user.status !== 'ACTIVE') {
-      throw new Error('Sessão inválida.');
+      throw new HttpError(401, 'Sessão inválida.');
     }
 
     return sanitizeUser(user);

@@ -66,13 +66,14 @@ test('refresh rejeita expiração, adulteração, versão revogada e usuário in
 test('logout incrementa tokenVersion e revoga refresh de todas as sessões', async t => {
   const user = { ...baseUser };
   t.mock.method(userRepository, 'findById', async () => user as any);
-  const original = prisma.user.update;
-  t.after(() => { prisma.user.update = original; });
+  const original = prisma.user.updateMany;
+  t.after(() => { prisma.user.updateMany = original; });
   const update = t.mock.fn(async ({ where, data }: any) => {
     assert.equal(where.id, user.id); assert.deepEqual(data.tokenVersion, { increment: 1 });
-    user.tokenVersion++; return user;
+    if (where.tokenVersion !== user.tokenVersion) return { count: 0 };
+    user.tokenVersion++; return { count: 1 };
   });
-  prisma.user.update = update as any;
+  prisma.user.updateMany = update as any;
   const web = tokens.createAuthTokens(user); const mobile = tokens.createAuthTokens(user);
   await authService.logout(web.token);
   assert.equal(update.mock.callCount(), 1);
@@ -83,14 +84,15 @@ test('logout incrementa tokenVersion e revoga refresh de todas as sessões', asy
 
 test('logout revoga access expirado assinado, mas rejeita adulteração, issuer e audience inválidos', async t => {
   const user = { ...baseUser };
-  const original = prisma.user.update;
-  t.after(() => { prisma.user.update = original; });
+  const original = prisma.user.updateMany;
+  t.after(() => { prisma.user.updateMany = original; });
   const update = t.mock.fn(async ({ where, data }: any) => {
     assert.equal(where.id, user.id); assert.deepEqual(data.tokenVersion, { increment: 1 });
-    user.tokenVersion++; return user;
+    if (where.tokenVersion !== user.tokenVersion) return { count: 0 };
+    user.tokenVersion++; return { count: 1 };
   });
-  prisma.user.update = update as any;
-  const claims = { id: user.id, role: user.role, isSyndic: user.isSyndic };
+  prisma.user.updateMany = update as any;
+  const claims = { id: user.id, role: user.role, isSyndic: user.isSyndic, tokenVersion: user.tokenVersion };
   const options = { issuer: 'domusapp', audience: 'domusapp:access', expiresIn: -1 };
   const expired = jwt.sign(claims, process.env.JWT_SECRET!, options);
   assert.throws(() => tokens.verifyAccessToken(expired), /expired/);
@@ -217,17 +219,18 @@ test('refresh aceita cookie web e body mobile com respostas adequadas a cada cli
   assert.equal(invalid.statusCode, 401);
 });
 
-test('middleware mantém autenticação por cookie e Bearer, rejeitando refresh como access', async () => {
+test('middleware mantém autenticação por cookie e Bearer, rejeitando refresh como access', async t => {
+  t.mock.method(userRepository, 'findAuthState', async () => baseUser);
   const { authMiddleware } = await import('../src/middlewares/authMiddleware.js');
   const pair = tokens.createAuthTokens(baseUser);
   for (const request of [{ cookies: { domusapp_token: pair.token }, headers: {} },
     { headers: { authorization: `Bearer ${pair.token}` } }]) {
     const req = request as any; let next = 0;
-    authMiddleware(req, response() as unknown as Response, () => { next++; });
+    await authMiddleware(req, response() as unknown as Response, () => { next++; });
     assert.equal(next, 1); assert.equal(req.user.id, baseUser.id);
   }
   const res = response(); let next = 0;
-  authMiddleware({ headers: { authorization: `Bearer ${pair.refreshToken}` } } as any, res as unknown as Response, () => { next++; });
+  await authMiddleware({ headers: { authorization: `Bearer ${pair.refreshToken}` } } as any, res as unknown as Response, () => { next++; });
   assert.equal(next, 0); assert.equal(res.statusCode, 401);
 });
 
