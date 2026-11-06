@@ -103,6 +103,11 @@ export const userService = {
       delete data.password;
     }
 
+    const sensitiveChange = !!data.password || ['role', 'status', 'isSyndic'].some(
+      field => data[field] !== undefined && data[field] !== user[field as keyof typeof user],
+    );
+    if (sensitiveChange) data.tokenVersion = { increment: 1 };
+
     const updatedUser = await userRepository.update(id, data);
     return sanitizeUser(updatedUser);
   },

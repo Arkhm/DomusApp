@@ -1,3 +1,5 @@
+import { HttpError } from './httpError';
+
 // Quem tem acesso ao painel administrativo do DomusApp.
 //
 // O painel é usado por administração, equipe operacional (porteiro, zelador) e
@@ -12,4 +14,10 @@ export function hasPanelAccess(user: {
   if (user.role === 'ADMIN' || user.role === 'FUNCIONARIO') return true;
   if (user.role === 'MORADOR' && user.isSyndic === true) return true;
   return false;
+}
+
+export type UpdateActor = { id: string; role: string; isSyndic?: boolean };
+export const isSyndic = (actor: UpdateActor) => actor.role === 'MORADOR' && actor.isSyndic === true;
+export function requireEditor(actor: UpdateActor, allowed: boolean) {
+  if (actor.role !== 'ADMIN' && !allowed) throw new HttpError(403, 'Você não tem permissão para editar este registro.');
 }

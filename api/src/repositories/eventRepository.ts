@@ -1,6 +1,9 @@
+import { Prisma } from '@prisma/client';
 import { prisma } from '../lib/prisma';
 
 export const eventRepository = {
+  update: (id: string, data: Prisma.EventUncheckedUpdateInput) => prisma.event.update({ where: { id }, data, include: { author: { select: { name: true, role: true } }, targetUnit: true } }),
+
   create: async (data: any) => {
     // Inclui as relações pra response bater com o tipo `Event` consumido pelo front.
     return await prisma.event.create({

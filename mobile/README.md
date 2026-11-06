@@ -16,7 +16,7 @@ ainda falta do lado da API.
 | Login com e-mail + senha | ✅ integrado a `POST /auth/login` |
 | Validação de campos, loading, erro de credencial, erro de rede | ✅ |
 | Token em `expo-secure-store` (Keychain / EncryptedSharedPreferences) | ✅ |
-| Sessão restaurada ao abrir o app | ✅ valida via `GET /users/me` |
+| Sessão restaurada ao abrir o app | ✅ consulta perfil atualizado via `GET /auth/me` |
 | Home com saudação + identificação do morador | ✅ |
 | Resumo do topo (comunicados e próximo evento) | ✅ `GET /notices` + `GET /events` |
 | Grid com os 15 módulos | ✅ (Reservas e Ocorrências prontas; demais em "Em breve") |
@@ -146,28 +146,6 @@ Regras seguidas:
 
 ## TODO / limitações conhecidas
 
-### 1. Morador comum não consegue logar (bloqueador da API)
-
-`api/src/services/authService.ts` chama `hasPanelAccess()` no login e rejeita
-quem não é `ADMIN`, `FUNCIONARIO` ou síndica (`isSyndic: true`). Um morador
-comum recebe **401** com "Sua conta não tem acesso ao painel administrativo".
-
-O app está pronto para o morador, mas hoje só entra quem tem acesso ao painel.
-**TODO(API):** separar "acesso ao painel web" de "acesso ao app", liberando o
-login para `MORADOR` com `status: 'ACTIVE'`.
-
-### 2. Bloco/apartamento nem sempre aparece no header
-
-- `POST /auth/login` devolve o usuário **sem** a relação `unit` (só `unitId`).
-- `GET /users/me` devolve apenas o payload do JWT: `{ id, role }`.
-- `GET /users/:id` traz a `unit`, mas é restrito a `ADMIN`/`FUNCIONARIO`.
-
-`authService.withResolvedUnit()` tenta buscar a unidade e falha em silêncio
-quando a API nega; nesse caso o header mostra o papel ("Síndica(o)",
-"Morador(a)") no lugar do "Bloco A · 101".
-**TODO(API):** fazer `GET /users/me` devolver o usuário completo com `unit` e
-`condominium`.
-
 ### 3. Contagem de "não lidos" só existe na visão de morador
 
 `GET /notices` devolve `isRead` por aviso apenas para morador comum. Para
@@ -213,3 +191,7 @@ Os demais cartões do grid levam ao placeholder com a nota correspondente
 - No target **web** o token cai em `localStorage`, porque `expo-secure-store`
   não existe no browser (`src/services/secureStorage.ts`). O alvo de entrega é
   o app nativo; o web serve só para desenvolvimento.
+
+## Perfil e sessão atuais
+
+O login aceita qualquer conta ACTIVE. Após o login e ao restaurar a sessão, o app consulta `GET /auth/me` e salva o perfil atualizado com unidade no SecureStore. Não depende de `GET /users/:id`. Um access token expirado dispara refresh e uma única repetição da consulta; sessão inválida limpa a autenticação. Falhas de rede/servidor preservam o perfil disponível para uso offline, sem conceder permissões adicionais na API.

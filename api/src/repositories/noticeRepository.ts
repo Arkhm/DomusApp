@@ -1,6 +1,21 @@
+import { Prisma } from '@prisma/client';
+import { HttpError } from '../lib/httpError';
 import { prisma } from '../lib/prisma';
 
 export const noticeRepository = {
+  update: (id: string, data: Prisma.NoticeUncheckedUpdateInput) => prisma.$transaction(async tx => {
+    await tx.$queryRaw`SELECT id FROM Notice WHERE id = ${id} FOR UPDATE`;
+    const previous = await tx.notice.findUnique({ where: { id } });
+    if (!previous) throw new HttpError(404, 'Aviso não encontrado.');
+    const updated = await tx.notice.update({ where: { id }, data,
+      include: { author: { select: { name: true, role: true } }, targetUnit: true } });
+    if (previous.title !== updated.title || previous.content !== updated.content ||
+        previous.targetType !== updated.targetType || previous.targetUnitId !== updated.targetUnitId) {
+      await tx.noticeRead.deleteMany({ where: { noticeId: id } });
+    }
+    return updated;
+  }),
+
   create: async (data: any) => {
     // Inclui as relações pra response bater com o tipo `Notice` que o front consome.
     // Sem `include`, a API devolvia o registro cru do Prisma (sem author/targetUnit),

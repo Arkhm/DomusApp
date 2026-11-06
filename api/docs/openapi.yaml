@@ -4,7 +4,7 @@ info:
   version: 1.0.0
   description: "Contrato centralizado das rotas. Autenticação por cookie httpOnly ou Bearer como alternativas. Para cookie
     web, faça login: o navegador não permite definir o cookie manualmente no Authorize. Entradas passam pelos schemas
-    Zod e regras dos serviços."
+    Zod e regras dos serviços. Rotas protegidas validam cadastro ACTIVE e tokenVersion no banco a cada requisição; tokens revogados recebem 401 e indisponibilidade de validação recebe 503. Tokens legados sem versão exigem novo login."
 servers:
   - url: /
 security:
@@ -159,7 +159,7 @@ paths:
       tags:
         - auth
       summary: Consultar usuário da sessão
-      description: ""
+      description: Retorna o próprio perfil atualizado com unidade, para qualquer usuário ACTIVE autenticado. Não concede privilégios administrativos; usuários inativos ou excluídos recebem 401.
       responses:
         "200":
           description: Operação concluída.
@@ -182,8 +182,9 @@ paths:
     get:
       tags:
         - users
-      summary: Consultar perfil do token
-      description: ""
+      summary: Consultar perfil do token (legado)
+      deprecated: true
+      description: Mantido por compatibilidade. Clientes novos devem consultar GET /auth/me.
       responses:
         "200":
           description: Operação concluída.
@@ -505,6 +506,40 @@ paths:
         "500":
           $ref: "#/components/responses/500"
   /notices/{id}:
+    put:
+      tags: [notices]
+      summary: Editar registro parcialmente
+      description: "ADMIN edita qualquer aviso; síndica somente os próprios. Mudanças de título, conteúdo ou destinatários resetam leituras. Status e prioridade preservam leituras. Campos omitidos são preservados; exige pelo menos um campo editável. Campos desconhecidos são descartados."
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NoticeUpdate'
+      responses:
+        '200':
+          description: Registro atualizado.
+          content:
+            application/json:
+              schema:
+                type: object
+        '400':
+          $ref: '#/components/responses/400'
+        '401':
+          $ref: '#/components/responses/401'
+        '403':
+          $ref: '#/components/responses/403'
+        '404':
+          $ref: '#/components/responses/404'
+        '409':
+          $ref: '#/components/responses/409'
     delete:
       tags:
         - notices
@@ -568,6 +603,40 @@ paths:
         "500":
           $ref: "#/components/responses/500"
   /events/{id}:
+    put:
+      tags: [events]
+      summary: Editar registro parcialmente
+      description: "ADMIN edita qualquer evento; síndica somente os próprios. Permite publicar e cancelar eventos. Campos omitidos são preservados; exige pelo menos um campo editável. Campos desconhecidos são descartados."
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EventUpdate'
+      responses:
+        '200':
+          description: Registro atualizado.
+          content:
+            application/json:
+              schema:
+                type: object
+        '400':
+          $ref: '#/components/responses/400'
+        '401':
+          $ref: '#/components/responses/401'
+        '403':
+          $ref: '#/components/responses/403'
+        '404':
+          $ref: '#/components/responses/404'
+        '409':
+          $ref: '#/components/responses/409'
     delete:
       tags:
         - events
@@ -631,6 +700,40 @@ paths:
         "500":
           $ref: "#/components/responses/500"
   /votings/{id}:
+    put:
+      tags: [votings]
+      summary: Editar registro parcialmente
+      description: "ADMIN e síndica editam somente votações antes do início e sem votos. Início final deve permanecer futuro; opções omitidas ou iguais preservam IDs. Campos omitidos são preservados; exige pelo menos um campo editável. Campos desconhecidos são descartados."
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VotingUpdate'
+      responses:
+        '200':
+          description: Registro atualizado.
+          content:
+            application/json:
+              schema:
+                type: object
+        '400':
+          $ref: '#/components/responses/400'
+        '401':
+          $ref: '#/components/responses/401'
+        '403':
+          $ref: '#/components/responses/403'
+        '404':
+          $ref: '#/components/responses/404'
+        '409':
+          $ref: '#/components/responses/409'
     delete:
       tags:
         - votings
@@ -783,6 +886,40 @@ paths:
         "500":
           $ref: "#/components/responses/500"
   /vehicles/{id}:
+    put:
+      tags: [vehicles]
+      summary: Editar registro parcialmente
+      description: "Somente ADMIN. Unidade não pode ser alterada. Placa duplicada retorna 409. Campos omitidos são preservados; exige pelo menos um campo editável. Campos desconhecidos são descartados."
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VehicleUpdate'
+      responses:
+        '200':
+          description: Registro atualizado.
+          content:
+            application/json:
+              schema:
+                type: object
+        '400':
+          $ref: '#/components/responses/400'
+        '401':
+          $ref: '#/components/responses/401'
+        '403':
+          $ref: '#/components/responses/403'
+        '404':
+          $ref: '#/components/responses/404'
+        '409':
+          $ref: '#/components/responses/409'
     delete:
       tags:
         - vehicles
@@ -864,6 +1001,40 @@ paths:
         "500":
           $ref: "#/components/responses/500"
   /pets/{id}:
+    put:
+      tags: [pets]
+      summary: Editar registro parcialmente
+      description: "ADMIN ou morador proprietário. Proprietário não pode ser alterado. Campos omitidos são preservados; exige pelo menos um campo editável. Campos desconhecidos são descartados."
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PetUpdate'
+      responses:
+        '200':
+          description: Registro atualizado.
+          content:
+            application/json:
+              schema:
+                type: object
+        '400':
+          $ref: '#/components/responses/400'
+        '401':
+          $ref: '#/components/responses/401'
+        '403':
+          $ref: '#/components/responses/403'
+        '404':
+          $ref: '#/components/responses/404'
+        '409':
+          $ref: '#/components/responses/409'
     delete:
       tags:
         - pets
@@ -1981,6 +2152,118 @@ components:
       scheme: bearer
       bearerFormat: JWT
   schemas:
+    PetUpdate:
+      type: "object"
+      minProperties: 1
+      properties:
+        name:
+          type: "string"
+          minLength: 1
+          maxLength: 191
+        species:
+          type: "string"
+          enum: ["CACHORRO", "GATO", "PASSARO", "OUTRO"]
+        size:
+          type: "string"
+          enum: ["PEQUENO", "MEDIO", "GRANDE"]
+    VehicleUpdate:
+      type: "object"
+      minProperties: 1
+      properties:
+        plate:
+          type: "string"
+          description: "Normalizada para formato ABC1234 ou ABC1D23; única."
+        model:
+          type: "string"
+          minLength: 1
+          maxLength: 191
+        color:
+          type: "string"
+          maxLength: 191
+          nullable: true
+    VotingUpdate:
+      type: "object"
+      minProperties: 1
+      properties:
+        title:
+          type: "string"
+          minLength: 1
+          maxLength: 191
+        description:
+          type: "string"
+          minLength: 1
+        startDate:
+          type: "string"
+          format: "date-time"
+        endDate:
+          type: "string"
+          format: "date-time"
+        options:
+          type: "array"
+          minItems: 2
+          items:
+            type: "string"
+            minLength: 1
+            maxLength: 191
+    EventUpdate:
+      type: "object"
+      minProperties: 1
+      properties:
+        title:
+          type: "string"
+          minLength: 1
+          maxLength: 191
+        content:
+          type: "string"
+          minLength: 1
+        eventDate:
+          type: "string"
+          format: "date-time"
+        location:
+          type: "string"
+          maxLength: 191
+          nullable: true
+        targetType:
+          type: "string"
+          enum: ["ALL", "UNIT"]
+        targetUnitId:
+          type: "string"
+          format: "uuid"
+          nullable: true
+        category:
+          type: "string"
+          enum: ["ASSEMBLEIA", "CONFRATERNIZACAO", "MANUTENCAO", "REUNIAO", "OUTRO"]
+        capacity:
+          type: "integer"
+          minimum: 1
+          nullable: true
+        status:
+          type: "string"
+          enum: ["DRAFT", "PUBLISHED", "CANCELLED"]
+    NoticeUpdate:
+      type: "object"
+      minProperties: 1
+      properties:
+        title:
+          type: "string"
+          minLength: 1
+          maxLength: 191
+        content:
+          type: "string"
+          minLength: 1
+        targetType:
+          type: "string"
+          enum: ["ALL", "UNIT"]
+        targetUnitId:
+          type: "string"
+          format: "uuid"
+          nullable: true
+        status:
+          type: "string"
+          enum: ["DRAFT", "PUBLISHED"]
+        priority:
+          type: "string"
+          enum: ["NORMAL", "URGENT"]
     Error:
       type: object
       properties:

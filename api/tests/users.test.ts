@@ -38,7 +38,8 @@ test('usuários: endpoints antigos de cadastro não estão disponíveis', async 
   }
 });
 
-test('usuários: autenticação e RBAC protegem todas as operações administrativas', async () => {
+test('usuários: autenticação e RBAC protegem todas as operações administrativas', async t => {
+  t.mock.method(userRepository, 'findAuthState', async (id: string) => ({ id, status: 'ACTIVE', role: 'MORADOR', isSyndic: false, tokenVersion: 0 }));
   const token = createAuthTokens({ id: randomUUID(), role: 'MORADOR', isSyndic: false, tokenVersion: 0 }).token;
   for (const [method, path] of [['get', '/users'], ['get', `/users/${usuario.id}`], ['post', '/users'],
     ['put', `/users/${usuario.id}`], ['delete', `/users/${usuario.id}`]] as const) {
@@ -201,6 +202,7 @@ test('usuários: HTTP e repository com MySQL isolado', { skip: process.env.RUN_D
   });
 
   await t.test('repository consome token válido uma vez, rejeita expirado e revoga sessões', async () => {
+    const versionBefore = (await userRepository.findById(createdId))!.tokenVersion;
     const resetToken = randomUUID();
     await userRepository.update(createdId, { resetToken, resetTokenExpiry: new Date(Date.now() + 60000) });
     assert.equal((await userRepository.findByResetTokenHash(resetToken))?.id, createdId);
@@ -212,9 +214,9 @@ test('usuários: HTTP e repository com MySQL isolado', { skip: process.env.RUN_D
     assert.equal(consumed?.resetToken, null);
     assert.equal(consumed?.resetTokenExpiry, null);
     assert.equal(consumed?.password, 'nova-senha-hash');
-    assert.equal(consumed?.tokenVersion, 1);
+    assert.equal(consumed?.tokenVersion, versionBefore + 1);
     await userRepository.revokeTokens(createdId);
-    assert.equal((await userRepository.findById(createdId))?.tokenVersion, 2);
+    assert.equal((await userRepository.findById(createdId))?.tokenVersion, versionBefore + 2);
     const expired = randomUUID();
     await userRepository.update(createdId, { resetToken: expired, resetTokenExpiry: new Date(Date.now() - 60000) });
     assert.equal(await userRepository.consumeResetToken(createdId, expired, 'senha-indevida'), false);

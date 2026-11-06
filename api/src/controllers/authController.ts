@@ -1,3 +1,4 @@
+import { HttpError } from '../lib/httpError';
 import { logger } from '../lib/logger';
 import { Request, Response } from 'express';
 import { authService } from '../services/authService';
@@ -36,12 +37,16 @@ export const authController = {
   async refresh(req: Request, res: Response) {
     const refreshToken = req.cookies?.[REFRESH_COOKIE] ?? req.body?.refreshToken;
     try {
-      if (typeof refreshToken !== 'string' || !refreshToken) throw new Error('Refresh ausente.');
+      if (typeof refreshToken !== 'string' || !refreshToken) throw new HttpError(401, 'Refresh ausente.');
       const tokens = await authService.refresh(refreshToken);
       setAuthCookie(res, tokens.token);
       setRefreshCookie(res, tokens.refreshToken);
       res.status(200).json(req.body?.client === 'mobile' ? tokens : { message: 'Sessão renovada.' });
-    } catch {
+    } catch (error) {
+      if (!(error instanceof HttpError && error.statusCode === 401)) {
+        res.status(503).json({ error: 'Não foi possível renovar a sessão. Tente novamente.' });
+        return;
+      }
       clearAuthCookie(res);
       clearRefreshCookie(res);
       res.status(401).json({ error: 'Sessão inválida ou expirada.' });
@@ -54,7 +59,11 @@ export const authController = {
     try {
       const user = await authService.getAuthenticatedUser(req.user!.id);
       res.status(200).json({ user });
-    } catch (error: any) {
+    } catch (error) {
+      if (!(error instanceof HttpError && error.statusCode === 401)) {
+        res.status(503).json({ error: 'Não foi possível consultar a sessão. Tente novamente.' });
+        return;
+      }
       clearAuthCookie(res);
       res.status(401).json({ error: error.message });
     }

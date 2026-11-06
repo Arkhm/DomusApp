@@ -1,3 +1,7 @@
+import { Prisma } from '@prisma/client';
+import { HttpError } from '../lib/httpError';
+import { updateVehicleSchema } from '../schemas/updateSchemas';
+import { UpdateActor, requireEditor } from '../lib/access';
 import { vehicleRepository } from '../repositories/vehicleRepository';
 import { userRepository } from '../repositories/userRepository';
 import { unitRepository } from '../repositories/unitRepository';
@@ -16,6 +20,21 @@ async function getResidentUnitId(userId: string) {
 }
 
 export const vehicleService = {
+  async update(id: string, input: unknown, actor: UpdateActor) {
+    requireEditor(actor, false);
+    const data = updateVehicleSchema.parse(input);
+    const record = await vehicleRepository.findById(id);
+    if (!record) throw new HttpError(404, 'Registro não encontrado.');
+    requireEditor(actor, false);
+    try { return await vehicleRepository.update(id, data); }
+    catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+        throw new HttpError(409, 'Já existe um veículo cadastrado com esta placa.');
+      }
+      throw error;
+    }
+  },
+
   async listAll(plate?: string) {
     return await vehicleRepository.findAll(plate ? normalizePlate(plate) : undefined);
   },

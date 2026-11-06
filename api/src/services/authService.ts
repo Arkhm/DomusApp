@@ -1,17 +1,19 @@
+import { HttpError } from '../lib/httpError';
 import bcrypt from 'bcryptjs';
 import { createAuthTokens, verifyAccessToken, verifyRefreshToken } from '../lib/authTokens';
 import { userRepository } from '../repositories/userRepository';
-import { hasPanelAccess } from '../lib/access';
 import { generateResetToken, hashResetToken, RESET_TOKEN_TTL_MS } from '../lib/resetToken';
 import { sendPasswordResetEmail } from '../lib/mailer';
 import { sanitizeUser } from '../lib/sanitizeUser';
 
 export const authService = {
   async refresh(refreshToken: string) {
-    const payload = verifyRefreshToken(refreshToken);
+    let payload: ReturnType<typeof verifyRefreshToken>;
+    try { payload = verifyRefreshToken(refreshToken); }
+    catch { throw new HttpError(401, 'Refresh token inválido.'); }
     const user = await userRepository.findById(payload.sub);
     if (!user || user.status !== 'ACTIVE' || user.tokenVersion !== payload.tokenVersion) {
-      throw new Error('Refresh token inválido ou revogado.');
+      throw new HttpError(401, 'Refresh token inválido ou revogado.');
     }
     // shortcut: refresh reutilizavel ate expirar ou ate tokenVersion mudar, trocar por tabela de sessoes com deteccao de reuso se precisar revogar sessao individual.
     return createAuthTokens(user);
@@ -19,10 +21,10 @@ export const authService = {
 
   async logout(token?: string) {
     if (!token) return;
-    let userId: string;
-    try { userId = verifyAccessToken(token, { ignoreExpiration: true }).id; }
+    let payload: ReturnType<typeof verifyAccessToken>;
+    try { payload = verifyAccessToken(token, { ignoreExpiration: true }); }
     catch { return; } // Invalid signatures or claims cannot identify a session to revoke.
-    await userRepository.revokeTokens(userId);
+    await userRepository.revokeTokens(payload.id, payload.tokenVersion);
   },
 
   async login(email: string, password: string) {
@@ -40,27 +42,16 @@ export const authService = {
       throw new Error('Credenciais inválidas.');
     }
 
-    // Essa condição bloqueia o login com usuário MORADOR sem ter isSyndic, vou deixar o lib/access ocioso pelo menos por agora, não precisamos dele.
-    // if (!hasPanelAccess(user)) {
-    //   throw new Error('Sua conta não tem acesso ao painel administrativo.');
-    // }
-
     const tokens = createAuthTokens(user);
 
     return { user: sanitizeUser(user), ...tokens };
   },
 
-  // Reidrata a sessão a partir do id que veio no token do cookie. Revalida o
-  // acesso no banco: um usuário revogado ou rebaixado depois da emissão do
-  // token deixa de ser aceito antes de o cookie expirar.
+  // Consulta o cadastro atual da sessão; permissões são verificadas pelos recursos.
   async getAuthenticatedUser(userId: string) {
     const user = await userRepository.findById(userId);
-    if (!user) {
-      throw new Error('Sessão inválida.');
-    }
-
-    if (!hasPanelAccess(user)) {
-      throw new Error('Sua conta não tem acesso ao painel administrativo.');
+    if (!user || user.status !== 'ACTIVE') {
+      throw new HttpError(401, 'Sessão inválida.');
     }
 
     return sanitizeUser(user);

@@ -17,7 +17,7 @@ type TokenUser = { id: string; role: string; isSyndic: boolean; tokenVersion: nu
 export function createAuthTokens(user: TokenUser) {
   const { accessSecret, refreshSecret } = validateAuthSecrets();
   return {
-    token: jwt.sign({ id: user.id, role: user.role, isSyndic: user.isSyndic }, accessSecret, {
+    token: jwt.sign({ id: user.id, role: user.role, isSyndic: user.isSyndic, tokenVersion: user.tokenVersion }, accessSecret, {
       algorithm: 'HS256', expiresIn: '15m', issuer, audience: accessAudience, jwtid: randomUUID(),
     }),
     refreshToken: jwt.sign({ tokenVersion: user.tokenVersion }, refreshSecret, {
@@ -29,10 +29,10 @@ export function verifyAccessToken(token: string, options: { ignoreExpiration?: b
   const { accessSecret } = validateAuthSecrets();
   const payload = jwt.verify(token, accessSecret, { algorithms: ['HS256'], issuer, audience: accessAudience,
     ignoreExpiration: options.ignoreExpiration ?? false });
-  if (typeof payload === 'string' || typeof payload.id !== 'string' || typeof payload.role !== 'string') {
+  if (typeof payload === 'string' || typeof payload.id !== 'string' || typeof payload.role !== 'string' || !Number.isInteger(payload.tokenVersion) || payload.tokenVersion < 0) {
     throw new Error('Token inválido.');
   }
-  return { id: payload.id, role: payload.role, isSyndic: payload.isSyndic === true };
+  return { id: payload.id, role: payload.role, isSyndic: payload.isSyndic === true, tokenVersion: payload.tokenVersion as number };
 }
 export function verifyRefreshToken(token: string) {
   const { refreshSecret } = validateAuthSecrets();

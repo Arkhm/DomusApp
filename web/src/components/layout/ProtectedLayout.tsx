@@ -10,9 +10,7 @@ export default function ProtectedLayout() {
         return <Navigate to="/login" replace />;
     }
 
-    // Defesa em profundidade: backend já recusa o login e o /auth/me de quem não
-    // tem acesso, mas se um perfil antigo (pré-gate) ainda estiver no cache do
-    // browser, redireciona antes de montar o painel.
+    // A sessão identifica o usuário; este gate autoriza o acesso ao painel.
     if (!hasPanelAccess(user)) {
         return <Navigate to="/login" replace />;
     }
