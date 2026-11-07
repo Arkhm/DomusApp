@@ -1,5 +1,5 @@
 import { updateVotingSchema } from '../schemas/updateSchemas';
-import { UpdateActor, requireEditor, isSyndic } from '../lib/access';
+import { UpdateActor, requireEditor, isSyndic, hasPanelAccess } from '../lib/access';
 import { Prisma } from '@prisma/client';
 import { votingRepository } from '../repositories/votingRepository';
 import { userRepository } from '../repositories/userRepository';
@@ -65,8 +65,23 @@ export const votingService = {
     });
   },
 
-  async list() {
-    return await votingRepository.findAll();
+  async list(actor: UpdateActor) {
+    const user = await userRepository.findById(actor.id);
+    if (!user) throw new HttpError(403, 'Usuário não encontrado.');
+    const votings = await votingRepository.findAll(user.unitId);
+    const panel = hasPanelAccess(actor);
+    const now = new Date();
+    return votings.map(({ ballots, ...voting }) => {
+      const ballot = ballots[0];
+      return {
+        ...voting,
+        // Resultados parciais podem influenciar o voto dos moradores.
+        options: panel || now > voting.endDate ? voting.options : voting.options.map(({ votes, ...option }) => option),
+        myVote: ballot ? {
+          optionId: ballot.optionId, votedAt: ballot.createdAt, votedBy: ballot.user?.name ?? null,
+        } : null,
+      };
+    });
   },
 
   async vote(votingId: string, optionId: string, userId: string) {
@@ -83,10 +98,10 @@ export const votingService = {
     // Limites inclusivos, como o getVotingStatus do web.
     const now = new Date();
     if (now < voting.startDate) {
-      throw new Error('A votação ainda não começou.');
+      throw new HttpError(409, 'A votação ainda não começou.');
     }
     if (now > voting.endDate) {
-      throw new Error('A votação já foi encerrada.');
+      throw new HttpError(409, 'A votação já foi encerrada.');
     }
     if (!voting.options.some((option) => option.id === optionId)) {
       throw new Error('Opção inválida para esta votação.');

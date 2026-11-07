@@ -90,7 +90,8 @@ test('votações: regras do voto no serviço', async t => {
   ] as const) {
     await t.test(`recusa voto ${name}`, async t => {
       const cast = arrange(t, voting);
-      await assert.rejects(() => votingService.vote(voting.id, optionId, resident.id), message);
+      await assert.rejects(() => votingService.vote(voting.id, optionId, resident.id),
+        (error: any) => error.statusCode === 409 && message.test(error.message));
       assert.equal(cast.mock.callCount(), 0);
     });
   }
@@ -120,6 +121,89 @@ test('votações: regras do voto no serviço', async t => {
     });
     await assert.rejects(() => votingService.vote(randomUUID(), optionId, resident.id),
       (error: any) => error.statusCode === 409 && /já votou/.test(error.message));
+  });
+});
+
+test('votações: listagem protege resultados e retorna o voto da unidade', async t => {
+  const resident = { id: randomUUID(), role: 'MORADOR', unitId: randomUUID() };
+  const votedAt = new Date('2026-01-01T12:00:00.000Z');
+  const fixture = (endDate = new Date(Date.now() + 60_000)) => ({
+    id: randomUUID(), title: 'Portaria', description: 'Escolha',
+    startDate: new Date(Date.now() - 60_000), endDate,
+    author: { name: 'Administração', role: 'ADMIN' },
+    options: [{ id: 'sim', text: 'Sim', votes: 7 }, { id: 'nao', text: 'Não', votes: 3 }],
+    ballots: [{ optionId: 'sim', createdAt: votedAt, user: { name: 'Outro morador da unidade' } }],
+  });
+  const arrange = (t: any, item: unknown, user: unknown = resident) => {
+    t.mock.method(userRepository, 'findById', async () => user);
+    return t.mock.method(votingRepository, 'findAll', async () => [item]);
+  };
+  await t.test('myVote inclui quem votou pela unidade e não expõe ballots nem contagens parciais', async t => {
+    const find = arrange(t, fixture());
+    const [item] = await votingService.list(resident);
+    assert.equal(find.mock.calls[0]!.arguments[0], resident.unitId);
+    assert.deepEqual(item!.myVote, { optionId: 'sim', votedAt, votedBy: 'Outro morador da unidade' });
+    assert.ok(!('ballots' in item!));
+    assert.ok(item!.options.every(option => !('votes' in option)));
+  });
+  await t.test('morador de unidade sem voto recebe null', async t => {
+    arrange(t, { ...fixture(), ballots: [] });
+    assert.equal((await votingService.list(resident))[0]!.myVote, null);
+  });
+  await t.test('perfil sem unidade não consulta votos de outras unidades', async t => {
+    const find = arrange(t, { ...fixture(), ballots: [] }, { ...resident, unitId: null });
+    assert.equal((await votingService.list(resident))[0]!.myVote, null);
+    assert.equal(find.mock.calls[0]!.arguments[0], null);
+  });
+  await t.test('autor removido preserva o voto com votedBy null', async t => {
+    arrange(t, { ...fixture(), ballots: [{ optionId: 'sim', createdAt: votedAt, user: null }] });
+    assert.deepEqual((await votingService.list(resident))[0]!.myVote, { optionId: 'sim', votedAt, votedBy: null });
+  });
+  await t.test('votação agendada também omite votes', async t => {
+    arrange(t, { ...fixture(), startDate: new Date(Date.now() + 30_000) });
+    assert.ok((await votingService.list(resident))[0]!.options.every(option => !('votes' in option)));
+  });
+  await t.test('após o encerramento o morador vê as contagens', async t => {
+    arrange(t, fixture(new Date(Date.now() - 1_000)));
+    assert.deepEqual((await votingService.list(resident))[0]!.options.map(option => 'votes' in option ? option.votes : undefined), [7, 3]);
+  });
+  for (const actor of [
+    { ...resident, role: 'ADMIN' }, { ...resident, role: 'FUNCIONARIO' }, { ...resident, isSyndic: true },
+  ]) {
+    await t.test(`painel ${actor.role}${'isSyndic' in actor ? ' síndica' : ''} mantém contagens antes do fim`, async t => {
+      arrange(t, fixture());
+      assert.deepEqual((await votingService.list(actor))[0]!.options.map(option => 'votes' in option ? option.votes : undefined), [7, 3]);
+    });
+  }
+  await t.test('repositório filtra pela unidade e seleciona apenas o nome do autor', async t => {
+    const original = prisma.voting.findMany;
+    const find = t.mock.fn(async (_args: Prisma.VotingFindManyArgs) => [] as any);
+    prisma.voting.findMany = find as typeof original;
+    t.after(() => { prisma.voting.findMany = original; });
+    await votingRepository.findAll(resident.unitId);
+    const args = find.mock.calls[0]!.arguments[0]!;
+    assert.deepEqual(args.include!.ballots, {
+      where: { unitId: resident.unitId }, take: 1,
+      select: { optionId: true, createdAt: true, user: { select: { name: true } } },
+    });
+    await votingRepository.findAll(null);
+    assert.deepEqual(find.mock.calls[1]!.arguments[0]!.include!.ballots, {
+      where: { unitId: '' }, take: 1,
+      select: { optionId: true, createdAt: true, user: { select: { name: true } } },
+    });
+  });
+  await t.test('HTTP ignora unitId do cliente e usa a unidade da sessão', async t => {
+    t.mock.method(userRepository, 'findAuthState', async () => ({
+      ...resident, status: 'ACTIVE', tokenVersion: 0, isSyndic: false,
+    }) as any);
+    const find = arrange(t, fixture());
+    const response = await request(app).get(`/votings?unitId=${randomUUID()}`)
+      .set('Authorization', bearer(resident.id)).expect(200);
+    assert.equal(find.mock.calls[0]!.arguments[0], resident.unitId);
+    assert.equal(response.body[0].myVote.votedAt, votedAt.toISOString());
+    assert.equal(response.body[0].myVote.votedBy, 'Outro morador da unidade');
+    assert.ok(!('votes' in response.body[0].options[0]));
+    assert.ok(!('ballots' in response.body[0]));
   });
 });
 
