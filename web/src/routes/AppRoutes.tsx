@@ -1,3 +1,4 @@
+import { lazy, Suspense } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import Login from '../pages/Login';
@@ -13,6 +14,7 @@ import VotingsList from '../pages/Votings/VotingsList';
 import CommonAreasList from '../pages/CommonAreas/CommonAreasList';
 import ReservationsList from '../pages/Reservations/ReservationsList';
 import IncidentsList from '../pages/Incidents/IncidentsList';
+const Reports = lazy(() => import('../pages/Reports'));
 
 export default function AppRoutes() {
     const { isAuthenticated, isLoading } = useAuth();
@@ -49,6 +51,7 @@ export default function AppRoutes() {
                 <Route path="/areas-comuns" element={<CommonAreasList />} />
                 <Route path="/reservas" element={<ReservationsList />} />
                 <Route path="/ocorrencias" element={<IncidentsList />} />
+                <Route path="/relatorios" element={<Suspense fallback={<p role="status">Carregando relatórios...</p>}><Reports /></Suspense>} />
             </Route>
 
             <Route path="*" element={<Navigate to={isAuthenticated ? '/dashboard' : '/login'} replace />} />
