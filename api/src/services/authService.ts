@@ -1,6 +1,6 @@
 import { HttpError } from '../lib/httpError';
 import bcrypt from 'bcryptjs';
-import { createAuthTokens, verifyAccessToken, verifyRefreshToken } from '../lib/authTokens';
+import { createAuthTokens, verifyLogoutToken, verifyRefreshToken } from '../lib/authTokens';
 import { userRepository } from '../repositories/userRepository';
 import { generateResetToken, hashResetToken, RESET_TOKEN_TTL_MS } from '../lib/resetToken';
 import { sendPasswordResetEmail } from '../lib/mailer';
@@ -21,8 +21,8 @@ export const authService = {
 
   async logout(token?: string) {
     if (!token) return;
-    let payload: ReturnType<typeof verifyAccessToken>;
-    try { payload = verifyAccessToken(token, { ignoreExpiration: true }); }
+    let payload: ReturnType<typeof verifyLogoutToken>;
+    try { payload = verifyLogoutToken(token); }
     catch { return; } // Invalid signatures or claims cannot identify a session to revoke.
     await userRepository.revokeTokens(payload.id, payload.tokenVersion);
   },

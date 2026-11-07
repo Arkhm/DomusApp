@@ -65,6 +65,18 @@ test('logout compara versão atomicamente e repetição não encerra sessões no
   assert.equal((await authenticate(old.token)).res.statusCode, 401);
   assert.equal((await authenticate(fresh.token)).next, 1);
 });
+test('logout com access legado recente revoga sem conferir versão; legado antigo ou adulterado não revoga', async t => {
+  const revoke = t.mock.method(userRepository, 'revokeTokens', async () => ({ count: 1 }));
+  const legacy = (iat: number, secret = process.env.JWT_SECRET!) => jwt.sign({ id: actor.id, role: actor.role, iat }, secret,
+    { issuer: 'domusapp', audience: 'domusapp:access' });
+  const now = Math.floor(Date.now() / 1000);
+  await authService.logout(legacy(now - 60));
+  assert.equal(revoke.mock.callCount(), 1);
+  assert.deepEqual(revoke.mock.calls[0]!.arguments, [actor.id, undefined]);
+  await authService.logout(legacy(now - 8 * 24 * 60 * 60));
+  await authService.logout(legacy(now - 60, 'outro-segredo-qualquer'));
+  assert.equal(revoke.mock.callCount(), 1);
+});
 test('edições sensíveis incrementam versão na mesma escrita; campos comuns e inalterados preservam', async t => {
   const user = { ...actor, name: 'Teste', email: 'teste@example.test', unitId: randomUUID(), password: 'hash' };
   for (const [data, revokes] of [[{ name: 'Novo' }, false], [{ role: 'admin', isSyndic: false, status: 'ACTIVE' }, false],
