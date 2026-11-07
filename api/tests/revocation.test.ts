@@ -77,6 +77,13 @@ test('logout com access legado recente revoga sem conferir versão; legado antig
   await authService.logout(legacy(now - 60, 'outro-segredo-qualquer'));
   assert.equal(revoke.mock.callCount(), 1);
 });
+test('edição de usuário com tokenVersion alterado no meio do caminho responde 409 sem gravar', async t => {
+  const user = { ...actor, name: 'Teste', email: 'teste@example.test', unitId: null, password: 'hash' };
+  t.mock.method(userRepository, 'findById', async () => user as any);
+  const update = t.mock.method(userRepository, 'updateIfVersion', async () => null);
+  await assert.rejects(userService.update(user.id, { role: 'ADMIN', name: 'Outro' }), (error: any) => error.statusCode === 409);
+  assert.equal(update.mock.calls[0]!.arguments[1], actor.tokenVersion);
+});
 test('edições sensíveis incrementam versão na mesma escrita; campos comuns e inalterados preservam', async t => {
   const user = { ...actor, name: 'Teste', email: 'teste@example.test', unitId: randomUUID(), password: 'hash' };
   for (const [data, revokes] of [[{ name: 'Novo' }, false], [{ role: 'admin', isSyndic: false, status: 'ACTIVE' }, false],
@@ -84,7 +91,7 @@ test('edições sensíveis incrementam versão na mesma escrita; campos comuns e
     [{ password: 'NovaSenha123' }, true]] as const) {
     await t.test(JSON.stringify(data), async t => {
       t.mock.method(userRepository, 'findById', async () => user as any);
-      t.mock.method(userRepository, 'update', async (_id: string, patch: any) => {
+      t.mock.method(userRepository, 'updateIfVersion', async (_id: string, _version: number, patch: any) => {
         assert.deepEqual(patch.tokenVersion, revokes ? { increment: 1 } : undefined); return user as any;
       });
       await userService.update(user.id, { ...data });
@@ -119,6 +126,9 @@ test('revogação completa com MySQL isolado', { skip: process.env.RUN_DB_INTEGR
   assert.equal((await authenticate(fresh.token)).res.statusCode, 401);
   await assert.rejects(authService.refresh(fresh.refreshToken));
   const updated = createAuthTokens(await prisma.user.findUniqueOrThrow({ where: { id: user.id } }));
+  const current = await prisma.user.findUniqueOrThrow({ where: { id: user.id } });
+  assert.equal(await userRepository.updateIfVersion(user.id, current.tokenVersion - 1, { name: 'Escrita velha' }), null);
+  assert.equal((await userRepository.updateIfVersion(user.id, current.tokenVersion, { name: 'Escrita atual' }))?.name, 'Escrita atual');
   await userService.update(user.id, { status: 'INACTIVE' });
   assert.equal((await authenticate(updated.token)).res.statusCode, 401);
   await prisma.user.delete({ where: { id: user.id } });

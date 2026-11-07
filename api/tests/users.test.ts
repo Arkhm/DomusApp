@@ -88,7 +88,7 @@ test('usuários: edição rejeita conflitos, CPF inválido, cargo inválido e re
       s.mock.method(userRepository, 'findById', async () => usuario as any);
       s.mock.method(userRepository, 'findByEmail', async () => (scenario.email ?? null) as any);
       s.mock.method(userRepository, 'findByCpf', async () => (scenario.cpf ?? null) as any);
-      const update = s.mock.method(userRepository, 'update', async () => { throw new Error('Gravação indevida.'); });
+      const update = s.mock.method(userRepository, 'updateIfVersion', async () => { throw new Error('Gravação indevida.'); });
       await assert.rejects(userService.update(usuario.id, { ...scenario.data }), scenario.error);
       assert.equal(update.mock.callCount(), 0);
     });
@@ -97,10 +97,10 @@ test('usuários: edição rejeita conflitos, CPF inválido, cargo inválido e re
 
 test('usuários: editar outro campo aceita CPF legado inalterado e preserva senha vazia', async t => {
   t.mock.method(userRepository, 'findById', async () => ({ ...usuario, cpf: '12345678901' }) as any);
-  const update = t.mock.method(userRepository, 'update', async (_id: string, data: any) => ({ ...usuario, ...data }) as any);
+  const update = t.mock.method(userRepository, 'updateIfVersion', async (_id: string, _version: number, data: any) => ({ ...usuario, ...data }) as any);
   const result = await userService.update(usuario.id, { name: 'Nome atualizado', cpf: '12345678901', password: '' });
   assert.equal(result.name, 'Nome atualizado');
-  assert.equal('password' in update.mock.calls[0]!.arguments[1], false);
+  assert.equal('password' in update.mock.calls[0]!.arguments[2], false);
   semSegredos(result);
 });
 
