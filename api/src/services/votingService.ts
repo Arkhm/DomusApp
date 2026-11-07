@@ -8,7 +8,12 @@ import { HttpError } from '../lib/httpError';
 export const votingService = {
   async update(id: string, input: unknown, actor: UpdateActor) {
     requireEditor(actor, isSyndic(actor));
-    return votingRepository.update(id, updateVotingSchema.parse(input));
+    const data = updateVotingSchema.parse(input);
+    // Mesma regra de avisos e eventos: a síndica só edita o que ela criou.
+    const record = await votingRepository.findById(id);
+    if (!record) throw new HttpError(404, 'Votação não encontrada.');
+    requireEditor(actor, isSyndic(actor) && record.authorId === actor.id);
+    return votingRepository.update(id, data);
   },
 
   async create(data: {
