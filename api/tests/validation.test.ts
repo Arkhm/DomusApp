@@ -41,8 +41,8 @@ test('validate cobre params e query inclusive o getter do Express 5', () => {
   assert.deepEqual(req.query, { page: 2 }); assert.equal(next, 2);
 });
 
-test('schemas adicionais preservam vagas e rejeitam filtros e placas malformados', () => {
-  assert.equal(createUnitSchema.parse({ number: '1', parkingSpots: '2' }).parkingSpots, 2);
+test('schemas adicionais impedem edição manual de vagas e rejeitam filtros e placas malformados', () => {
+  assert.equal(createUnitSchema.safeParse({ number: '1', parkingSpots: '2' }).success, false);
   assert.equal(createUnitSchema.safeParse({ number: '1', parkingSpots: true }).success, false);
   assert.equal(createVehicleSchema.parse({ plate: 'abc-1234', model: 'Carro' }).plate, 'ABC1234');
   for (const query of [{ page: '0' }, { limit: '101' }, { status: ['PAID'] }, { startDate: '2026-02-30' },

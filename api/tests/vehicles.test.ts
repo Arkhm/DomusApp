@@ -38,10 +38,37 @@ test('veículos: validações do serviço', async t => {
     await assert.rejects(() => vehicleService.create(randomUUID(), { plate: 'ABC1234', model: 'Carro' }), /nenhuma unidade/);
   });
   await t.test('recusa unidade removida entre as consultas', async t => {
+    t.mock.method(unitRepository, 'withLockedUnit', async (_id: string, work: any) => work({}));
     t.mock.method(userRepository, 'findById', async () => ({ unitId: randomUUID() }) as any);
     t.mock.method(unitRepository, 'findById', async () => null);
     await assert.rejects(() => vehicleService.create(randomUUID(), { plate: 'ABC1234', model: 'Carro' }), /Unidade não encontrada/);
   });
+});
+
+test('veículos: cadastro consulta e grava usando a transação que bloqueou a unidade', async t => {
+  const transaction = {} as any;
+  const unitId = randomUUID();
+  t.mock.method(userRepository, 'findById', async () => ({ unitId }) as any);
+  t.mock.method(unitRepository, 'withLockedUnit', async (id: string, work: any) => {
+    assert.equal(id, unitId);
+    return work(transaction);
+  });
+  t.mock.method(unitRepository, 'findById', async (_id: string, tx: any) => {
+    assert.equal(tx, transaction); return { parkingSpots: 1 } as any;
+  });
+  t.mock.method(vehicleRepository, 'countByUnit', async (_id: string, tx: any) => {
+    assert.equal(tx, transaction); return 0;
+  });
+  t.mock.method(vehicleRepository, 'findByPlate', async (_plate: string, tx: any) => {
+    assert.equal(tx, transaction); return null;
+  });
+  t.mock.method(vehicleRepository, 'create', async (data: any, tx: any) => {
+    assert.equal(tx, transaction); return data;
+  });
+  const result = await vehicleService.create(randomUUID(), { plate: 'abc-1234', model: ' Carro ' });
+  assert.equal(result.unitId, unitId);
+  assert.equal(result.model, 'Carro');
+  assert.equal(result.plate, 'ABC1234');
 });
 
 test('veículos: HTTP, unidade e repositório com MySQL isolado', { skip: !enabled }, async t => {

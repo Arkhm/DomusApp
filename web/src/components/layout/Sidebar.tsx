@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import {
+    Car,
     LayoutDashboard,
     Users,
     Building2,
@@ -20,6 +21,7 @@ import { getInitials, roleLabel } from '../luxury/formatters';
 const navItems = [
     { to: '/dashboard', label: 'Painel', icon: LayoutDashboard },
     { to: '/usuarios', label: 'Residentes', icon: Users },
+    { to: '/vagas', label: 'Vagas', icon: Car },
     { to: '/unidades', label: 'Unidades', icon: Building2 },
     { to: '/comunicados', label: 'Comunicados', icon: Megaphone },
     { to: '/eventos', label: 'Programação', icon: CalendarDays },
@@ -109,7 +111,7 @@ export default function Sidebar() {
                     gap: 2,
                 }}
             >
-                {navItems.map((item) => {
+                {navItems.filter(item => item.to !== '/vagas' || user?.role === 'ADMIN' || user?.role === 'FUNCIONARIO').map((item) => {
                     const Icon = item.icon;
                     return (
                         <NavLink

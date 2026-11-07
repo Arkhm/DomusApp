@@ -377,12 +377,16 @@ paths:
                       minLength: 1
                       maxLength: 20
                     parkingSpots:
-                      oneOf:
-                        - type: integer
-                          minimum: 0
-                          maximum: 20
-                        - type: string
-                          pattern: ^([0-9]|1[0-9]|20)$
+                      type: integer
+                      minimum: 0
+                      readOnly: true
+                      description: Contador derivado das vagas atribuídas; não editável.
+                    parkingSpotRecords:
+                      type: array
+                      readOnly: true
+                      items:
+                        $ref: "#/components/schemas/ParkingSpotRecord"
+                      description: Vagas numeradas atribuídas, ordenadas por número. Números PROV são provisórios, criados na migração para preservar os limites existentes.
         "400":
           $ref: "#/components/responses/400"
         "401":
@@ -2141,6 +2145,193 @@ paths:
           $ref: "#/components/responses/404"
         "500":
           $ref: "#/components/responses/500"
+  /parking-spots:
+    get:
+      tags: [parking-spots]
+      summary: Listar vagas numeradas
+      description: "Perfis permitidos: ADMIN e FUNCIONARIO, seguindo a consulta de unidades. Síndica não gerencia vagas. Filtros combinados por interseção. Livre significa sem unidade atribuída; não indica ocupação física por veículo."
+      parameters:
+        - name: type
+          in: query
+          schema:
+            $ref: "#/components/schemas/ParkingType"
+        - name: block
+          in: query
+          schema:
+            type: string
+            maxLength: 50
+          description: Bloco/quadra da unidade atribuída.
+        - name: unitId
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: free
+          in: query
+          schema:
+            type: string
+            enum:
+              - "true"
+              - "false"
+          description: "true: sem unidade; false: atribuída."
+      responses:
+        "200":
+          description: Operação concluída.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ParkingSpot"
+        "400":
+          $ref: "#/components/responses/400"
+        "401":
+          $ref: "#/components/responses/401"
+        "403":
+          $ref: "#/components/responses/403"
+    post:
+      tags: [parking-spots]
+      summary: Criar vaga numerada
+      description: "Perfis permitidos: ADMIN e FUNCIONARIO, seguindo a consulta de unidades. Síndica não gerencia vagas. Cria sem unidade. Para vincular RESIDENT ou DISABLED, utilize a rota assign."
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ParkingSpotInput"
+      responses:
+        "201":
+          description: Operação concluída.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ParkingSpot"
+        "400":
+          $ref: "#/components/responses/400"
+        "401":
+          $ref: "#/components/responses/401"
+        "403":
+          $ref: "#/components/responses/403"
+        "409":
+          $ref: "#/components/responses/409"
+  /parking-spots/me:
+    get:
+      tags: [parking-spots]
+      summary: Consultar vagas da própria unidade
+      description: Apenas MORADOR (incluindo síndica). A unidade vem do cadastro do usuário autenticado; parâmetros não alteram o vínculo consultado. Sem unidade retorna lista vazia. Não expõe dados de moradores.
+      responses:
+        "200":
+          description: Operação concluída.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ParkingSpot"
+        "401":
+          $ref: "#/components/responses/401"
+        "403":
+          $ref: "#/components/responses/403"
+        "404":
+          $ref: "#/components/responses/404"
+  /parking-spots/{id}:
+    put:
+      tags: [parking-spots]
+      summary: Editar número ou tipo da vaga
+      description: "Perfis permitidos: ADMIN e FUNCIONARIO, seguindo a consulta de unidades. Síndica não gerencia vagas. Atualização parcial; ao menos um campo. Vaga atribuída não pode virar VISITOR (409): desatribua primeiro."
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ParkingSpotUpdate"
+      responses:
+        "200":
+          description: Operação concluída.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ParkingSpot"
+        "400":
+          $ref: "#/components/responses/400"
+        "401":
+          $ref: "#/components/responses/401"
+        "403":
+          $ref: "#/components/responses/403"
+        "404":
+          $ref: "#/components/responses/404"
+        "409":
+          $ref: "#/components/responses/409"
+    delete:
+      tags: [parking-spots]
+      summary: Remover vaga
+      description: "Perfis permitidos: ADMIN e FUNCIONARIO, seguindo a consulta de unidades. Síndica não gerencia vagas. Recalcula o contador na mesma transação. Se a unidade ficar com mais veículos do que vagas, retorna 409 e reverte a remoção."
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Operação concluída.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Message"
+        "400":
+          $ref: "#/components/responses/400"
+        "401":
+          $ref: "#/components/responses/401"
+        "403":
+          $ref: "#/components/responses/403"
+        "404":
+          $ref: "#/components/responses/404"
+        "409":
+          $ref: "#/components/responses/409"
+  /parking-spots/{id}/assign:
+    put:
+      tags: [parking-spots]
+      summary: Atribuir, transferir ou desatribuir vaga
+      description: "Perfis permitidos: ADMIN e FUNCIONARIO, seguindo a consulta de unidades. Síndica não gerencia vagas. Somente RESIDENT e DISABLED podem ter unidade. VISITOR com unitId não nulo retorna 400. Atribuição repetida é idempotente. Locks da vaga e das unidades em ordem fixa protegem contadores e o cadastro concorrente de veículos. Transferência, desatribuição ou remoção que deixe veículos excedentes retorna 409 e reverte toda a transação."
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ParkingSpotAssign"
+      responses:
+        "200":
+          description: Operação concluída.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ParkingSpot"
+        "400":
+          $ref: "#/components/responses/400"
+        "401":
+          $ref: "#/components/responses/401"
+        "403":
+          $ref: "#/components/responses/403"
+        "404":
+          $ref: "#/components/responses/404"
+        "409":
+          $ref: "#/components/responses/409"
 components:
   securitySchemes:
     cookieAuth:
@@ -2152,6 +2343,101 @@ components:
       scheme: bearer
       bearerFormat: JWT
   schemas:
+    ParkingType:
+      type: string
+      enum:
+        - RESIDENT
+        - VISITOR
+        - DISABLED
+      description: Morador, visitante ou PcD.
+    ParkingSpotInput:
+      type: object
+      additionalProperties: false
+      required:
+        - number
+        - type
+      properties:
+        number:
+          type: string
+          minLength: 1
+          maxLength: 80
+          example: A-01
+          description: Único. Espaços são removidos e letras convertidas para maiúsculas.
+        type:
+          $ref: "#/components/schemas/ParkingType"
+    ParkingSpotUpdate:
+      type: object
+      additionalProperties: false
+      minProperties: 1
+      properties:
+        number:
+          type: string
+          minLength: 1
+          maxLength: 80
+          example: A-01
+          description: Único. Espaços são removidos e letras convertidas para maiúsculas.
+        type:
+          $ref: "#/components/schemas/ParkingType"
+    ParkingSpotAssign:
+      type: object
+      additionalProperties: false
+      required:
+        - unitId
+      properties:
+        unitId:
+          type: string
+          format: uuid
+          nullable: true
+          description: Unidade de destino. null desatribui a vaga.
+    ParkingSpotRecord:
+      type: object
+      required:
+        - id
+        - number
+        - type
+        - unitId
+      properties:
+        id:
+          type: string
+          format: uuid
+        number:
+          type: string
+        type:
+          $ref: "#/components/schemas/ParkingType"
+        unitId:
+          type: string
+          format: uuid
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    ParkingSpot:
+      allOf:
+        - $ref: "#/components/schemas/ParkingSpotRecord"
+        - type: object
+          required:
+            - unit
+          properties:
+            unit:
+              type: object
+              nullable: true
+              properties:
+                id:
+                  type: string
+                  format: uuid
+                type:
+                  type: string
+                  enum:
+                    - APARTMENT
+                    - HOUSE
+                block:
+                  type: string
+                  nullable: true
+                number:
+                  type: string
     PetUpdate:
       type: "object"
       minProperties: 1
@@ -2424,6 +2710,8 @@ components:
           type: boolean
     UnitCreate:
       type: object
+      additionalProperties: false
+      description: Quantidade de vagas é derivada dos registros numerados. Enviar parkingSpots é rejeitado (400).
       properties:
         type:
           type: string
@@ -2437,17 +2725,12 @@ components:
           type: string
           minLength: 1
           maxLength: 20
-        parkingSpots:
-          oneOf:
-            - type: integer
-              minimum: 0
-              maximum: 20
-            - type: string
-              pattern: ^([0-9]|1[0-9]|20)$
       required:
         - number
     UnitUpdate:
       type: object
+      additionalProperties: false
+      description: Quantidade de vagas é derivada dos registros numerados. Enviar parkingSpots é rejeitado (400).
       properties:
         type:
           type: string
@@ -2461,13 +2744,6 @@ components:
           type: string
           minLength: 1
           maxLength: 20
-        parkingSpots:
-          oneOf:
-            - type: integer
-              minimum: 0
-              maximum: 20
-            - type: string
-              pattern: ^([0-9]|1[0-9]|20)$
     NoticeCreate:
       type: object
       properties:

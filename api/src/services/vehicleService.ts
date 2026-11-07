@@ -54,28 +54,31 @@ export const vehicleService = {
       throw new Error('Placa inválida. Use o formato ABC1234 ou ABC1D23.');
     }
 
+    const model = data.model.trim();
     const unitId = await getResidentUnitId(userId);
-    const unit = await unitRepository.findById(unitId);
-    if (!unit) throw new Error('Unidade não encontrada.');
+    return unitRepository.withLockedUnit(unitId, async tx => {
+      const unit = await unitRepository.findById(unitId, tx);
+      if (!unit) throw new Error('Unidade não encontrada.');
 
-    if (unit.parkingSpots === 0) {
-      throw new Error('Sua unidade não possui vagas cadastradas. Fale com a administração.');
-    }
+      if (unit.parkingSpots === 0) {
+        throw new Error('Sua unidade não possui vagas cadastradas. Fale com a administração.');
+      }
 
-    const count = await vehicleRepository.countByUnit(unitId);
-    if (count >= unit.parkingSpots) {
-      throw new Error(`Sua unidade tem ${unit.parkingSpots} vaga(s) e todas já estão ocupadas.`);
-    }
+      const count = await vehicleRepository.countByUnit(unitId, tx);
+      if (count >= unit.parkingSpots) {
+        throw new Error(`Sua unidade tem ${unit.parkingSpots} vaga(s) e todas já estão ocupadas.`);
+      }
 
-    if (await vehicleRepository.findByPlate(plate)) {
-      throw new Error('Já existe um veículo cadastrado com esta placa.');
-    }
+      if (await vehicleRepository.findByPlate(plate, tx)) {
+        throw new Error('Já existe um veículo cadastrado com esta placa.');
+      }
 
-    return await vehicleRepository.create({
-      plate,
-      model: data.model.trim(),
-      color: data.color?.trim() || null,
-      unitId,
+      return await vehicleRepository.create({
+        plate,
+        model,
+        color: data.color?.trim() || null,
+        unitId,
+      }, tx);
     });
   },
 
