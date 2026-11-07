@@ -22,3 +22,24 @@ export function findNextEvent(events: CondoEvent[], now: Date = new Date()): Con
 
   return upcoming[0] ?? null;
 }
+
+/** Agrupa pela data do evento; cancelados continuam visíveis na sua seção. */
+export function splitEvents(events: CondoEvent[], now: Date = new Date()): { upcoming: CondoEvent[]; past: CondoEvent[] } {
+  const visible = events.filter((event) => event.status !== 'DRAFT' && Number.isFinite(Date.parse(event.eventDate)));
+  return {
+    upcoming: visible.filter((event) => Date.parse(event.eventDate) >= now.getTime())
+      .sort((a, b) => Date.parse(a.eventDate) - Date.parse(b.eventDate)),
+    past: visible.filter((event) => Date.parse(event.eventDate) < now.getTime())
+      .sort((a, b) => Date.parse(b.eventDate) - Date.parse(a.eventDate)),
+  };
+}
+
+const eventDateTimeFormatter = new Intl.DateTimeFormat('pt-BR', {
+  day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit',
+  timeZone: 'America/Sao_Paulo',
+});
+
+export function formatEventDateTime(event: CondoEvent): string {
+  const date = new Date(event.eventDate);
+  return Number.isNaN(date.getTime()) ? 'Data não informada' : `${eventDateTimeFormatter.format(date)} (horário de Brasília)`;
+}
