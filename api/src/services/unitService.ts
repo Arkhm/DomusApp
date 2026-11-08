@@ -1,5 +1,5 @@
 import { unitRepository } from '../repositories/unitRepository';
-import { vehicleRepository } from '../repositories/vehicleRepository';
+import { createUnitSchema, updateUnitSchema } from '../schemas/unitSchema';
 
 type UnitType = 'APARTMENT' | 'HOUSE';
 const VALID_TYPES: ReadonlyArray<UnitType> = ['APARTMENT', 'HOUSE'];
@@ -8,17 +8,9 @@ function isValidType(s: string): s is UnitType {
   return (VALID_TYPES as ReadonlyArray<string>).includes(s);
 }
 
-function parseParkingSpots(value: unknown): number | undefined {
-  if (value === undefined || value === null || value === '') return undefined;
-  const spots = Number(value);
-  if (!Number.isInteger(spots) || spots < 0 || spots > 20) {
-    throw new Error('Quantidade de vagas inválida. Use um número inteiro entre 0 e 20.');
-  }
-  return spots;
-}
-
 export const unitService = {
-  async create(data: { type?: string; block?: string; number: string; parkingSpots?: number }) {
+  async create(input: unknown) {
+    const data = createUnitSchema.parse(input);
     if (!data.number) {
       throw new Error('O número da unidade é obrigatório.');
     }
@@ -43,7 +35,6 @@ export const unitService = {
       type,
       block: data.block || null,
       number: data.number,
-      parkingSpots: parseParkingSpots(data.parkingSpots) ?? 0,
     });
   },
 
@@ -51,7 +42,8 @@ export const unitService = {
     return await unitRepository.findAll();
   },
 
-  async update(id: string, data: { type?: string; block?: string; number?: string; parkingSpots?: number }) {
+  async update(id: string, input: unknown) {
+    const data = updateUnitSchema.parse(input);
     const unit = await unitRepository.findById(id);
 
     if (!unit) {
@@ -83,21 +75,10 @@ export const unitService = {
       }
     }
 
-    const spotsToUpdate = parseParkingSpots(data.parkingSpots) ?? unit.parkingSpots;
-    if (spotsToUpdate < unit.parkingSpots) {
-      const vehicles = await vehicleRepository.countByUnit(id);
-      if (vehicles > spotsToUpdate) {
-        throw new Error(
-          `Esta unidade tem ${vehicles} veículo(s) cadastrado(s). Remova veículos antes de reduzir as vagas para ${spotsToUpdate}.`,
-        );
-      }
-    }
-
     return await unitRepository.update(id, {
       type: typeToUpdate,
       block: blockToUpdate,
       number: numberToUpdate,
-      parkingSpots: spotsToUpdate,
     });
   },
 

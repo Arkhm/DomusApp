@@ -8,6 +8,7 @@ import ProtectedLayout from '../components/layout/ProtectedLayout';
 import UsersList from '../pages/Users/UsersList';
 import NoticesList from '../pages/Notices/NoticesList';
 import Dashboard from '../pages/Dashboard';
+import ParkingSpotsList from '../pages/ParkingSpots/ParkingSpotsList';
 import UnitsList from '../pages/Units/UnitsList';
 import EventsList from '../pages/Events/EventsList';
 import VotingsList from '../pages/Votings/VotingsList';
@@ -45,6 +46,7 @@ export default function AppRoutes() {
                 <Route path="/dashboard" element={<Dashboard />} />
                 <Route path="/usuarios" element={<UsersList />} />
                 <Route path="/unidades" element={<UnitsList />} />
+                <Route path="/vagas" element={<ParkingSpotsList />} />
                 <Route path="/comunicados" element={<NoticesList />} />
                 <Route path="/eventos" element={<EventsList />} />
                 <Route path="/votacoes" element={<VotingsList />} />

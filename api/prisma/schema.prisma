@@ -58,7 +58,8 @@ model Unit {
   type        String   @default("APARTMENT") // "APARTMENT" | "HOUSE"
   block       String? 
   number      String  
-  parkingSpots Int     @default(0)
+  parkingSpots Int     @default(0) // Contador derivado de parkingSpotRecords.
+  parkingSpotRecords ParkingSpot[]
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
@@ -380,4 +381,22 @@ model Incident {
 
   @@index([authorId])
   @@index([status])
+}
+
+enum ParkingType {
+  RESIDENT
+  VISITOR
+  DISABLED
+}
+
+model ParkingSpot {
+  id        String      @id @default(uuid())
+  number    String      @unique
+  type      ParkingType
+  unitId    String?
+  unit      Unit?       @relation(fields: [unitId], references: [id], onDelete: SetNull)
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+
+  @@index([unitId])
 }
