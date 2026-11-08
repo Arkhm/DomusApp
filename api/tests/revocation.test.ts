@@ -65,6 +65,25 @@ test('logout compara versão atomicamente e repetição não encerra sessões no
   assert.equal((await authenticate(old.token)).res.statusCode, 401);
   assert.equal((await authenticate(fresh.token)).next, 1);
 });
+test('logout com access legado recente revoga sem conferir versão; legado antigo ou adulterado não revoga', async t => {
+  const revoke = t.mock.method(userRepository, 'revokeTokens', async () => ({ count: 1 }));
+  const legacy = (iat: number, secret = process.env.JWT_SECRET!) => jwt.sign({ id: actor.id, role: actor.role, iat }, secret,
+    { issuer: 'domusapp', audience: 'domusapp:access' });
+  const now = Math.floor(Date.now() / 1000);
+  await authService.logout(legacy(now - 60));
+  assert.equal(revoke.mock.callCount(), 1);
+  assert.deepEqual(revoke.mock.calls[0]!.arguments, [actor.id, undefined]);
+  await authService.logout(legacy(now - 8 * 24 * 60 * 60));
+  await authService.logout(legacy(now - 60, 'outro-segredo-qualquer'));
+  assert.equal(revoke.mock.callCount(), 1);
+});
+test('edição de usuário com tokenVersion alterado no meio do caminho responde 409 sem gravar', async t => {
+  const user = { ...actor, name: 'Teste', email: 'teste@example.test', unitId: null, password: 'hash' };
+  t.mock.method(userRepository, 'findById', async () => user as any);
+  const update = t.mock.method(userRepository, 'updateIfVersion', async () => null);
+  await assert.rejects(userService.update(user.id, { role: 'ADMIN', name: 'Outro' }), (error: any) => error.statusCode === 409);
+  assert.equal(update.mock.calls[0]!.arguments[1], actor.tokenVersion);
+});
 test('edições sensíveis incrementam versão na mesma escrita; campos comuns e inalterados preservam', async t => {
   const user = { ...actor, name: 'Teste', email: 'teste@example.test', unitId: randomUUID(), password: 'hash' };
   for (const [data, revokes] of [[{ name: 'Novo' }, false], [{ role: 'admin', isSyndic: false, status: 'ACTIVE' }, false],
@@ -72,7 +91,7 @@ test('edições sensíveis incrementam versão na mesma escrita; campos comuns e
     [{ password: 'NovaSenha123' }, true]] as const) {
     await t.test(JSON.stringify(data), async t => {
       t.mock.method(userRepository, 'findById', async () => user as any);
-      t.mock.method(userRepository, 'update', async (_id: string, patch: any) => {
+      t.mock.method(userRepository, 'updateIfVersion', async (_id: string, _version: number, patch: any) => {
         assert.deepEqual(patch.tokenVersion, revokes ? { increment: 1 } : undefined); return user as any;
       });
       await userService.update(user.id, { ...data });
@@ -107,6 +126,9 @@ test('revogação completa com MySQL isolado', { skip: process.env.RUN_DB_INTEGR
   assert.equal((await authenticate(fresh.token)).res.statusCode, 401);
   await assert.rejects(authService.refresh(fresh.refreshToken));
   const updated = createAuthTokens(await prisma.user.findUniqueOrThrow({ where: { id: user.id } }));
+  const current = await prisma.user.findUniqueOrThrow({ where: { id: user.id } });
+  assert.equal(await userRepository.updateIfVersion(user.id, current.tokenVersion - 1, { name: 'Escrita velha' }), null);
+  assert.equal((await userRepository.updateIfVersion(user.id, current.tokenVersion, { name: 'Escrita atual' }))?.name, 'Escrita atual');
   await userService.update(user.id, { status: 'INACTIVE' });
   assert.equal((await authenticate(updated.token)).res.statusCode, 401);
   await prisma.user.delete({ where: { id: user.id } });

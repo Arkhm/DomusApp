@@ -13,6 +13,7 @@ import { parse } from 'yaml';
 import authRoutes from './routes/authRoutes';
 import userRoutes from './routes/userRoutes';
 import noticeRoutes from './routes/noticeRoutes';
+import notificationRoutes from './routes/notificationRoutes';
 import unitRoutes from './routes/unitRoutes';
 import eventRoutes from './routes/eventRoutes';
 import votingRoutes from './routes/votingRoutes';
@@ -95,6 +96,7 @@ app.get('/api/status', (req: Request, res: Response) => {
 app.use('/auth', authRoutes);
 app.use('/users', userRoutes);
 app.use('/notices', noticeRoutes);
+app.use('/notifications', notificationRoutes);
 app.use('/units', unitRoutes);
 app.use('/events', eventRoutes);
 app.use('/votings', votingRoutes);

@@ -128,7 +128,8 @@ paths:
         - auth
       summary: Iniciar sessão
       description: Web recebe cookies httpOnly domusapp_token e domusapp_refresh; client=mobile recebe também token e
-        refreshToken. Morador sem isSyndic não acessa o painel.
+        refreshToken. Com client=panel, perfil sem acesso ao painel (morador sem isSyndic) recebe 403
+        sem cookies.
       security: []
       requestBody:
         required: true
@@ -147,6 +148,8 @@ paths:
           $ref: "#/components/responses/400"
         "401":
           $ref: "#/components/responses/401"
+        "403":
+          $ref: "#/components/responses/403"
         "429":
           $ref: "#/components/responses/429"
         "500":
@@ -753,21 +756,30 @@ paths:
           $ref: "#/components/responses/500"
   /votings:
     get:
-      tags:
-        - votings
-      summary: Listar votações
-      description: "Perfis permitidos: ADMIN, FUNCIONARIO, MORADOR (inclui a síndica)."
+      tags: [votings]
+      summary: Listar votações e o voto da unidade
+      description: >-
+        ADMIN, FUNCIONARIO e MORADOR (incluindo síndica). myVote corresponde ao voto
+        da unidade atual do usuário, mesmo que outro morador tenha votado. É null
+        sem unidade ou sem voto. Somente o painel (ADMIN/FUNCIONARIO/síndica)
+        recebe options[].votes antes do encerramento. Para moradores comuns,
+        votes é omitido enquanto agora <= endDate. Status é derivado das datas
+        pelo cliente. A unidade não é um parâmetro.
       responses:
-        "200":
-          description: Operação concluída.
-        "400":
-          $ref: "#/components/responses/400"
-        "401":
-          $ref: "#/components/responses/401"
-        "403":
-          $ref: "#/components/responses/403"
-        "500":
-          $ref: "#/components/responses/500"
+        '200':
+          description: Array de votações, sem paginação.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ResidentVoting'
+        '400':
+          $ref: '#/components/responses/400'
+        '401':
+          $ref: '#/components/responses/401'
+        '403':
+          $ref: '#/components/responses/403'
     post:
       tags:
         - votings
@@ -2232,6 +2244,82 @@ paths:
           $ref: "#/components/responses/404"
         "500":
           $ref: "#/components/responses/500"
+  /notifications:
+    get:
+      tags: [notifications]
+      summary: Listar a central pessoal de notificações
+      description: >-
+        Retorna comunicados PUBLISHED e eventos PUBLISHED ou CANCELLED destinados a ALL
+        ou à unidade atual do usuário, inclusive para síndicos. Sem unidade, retorna
+        apenas ALL. Ordenação por createdAt decrescente, com desempate pelo id.
+        isRead de NOTICE usa NoticeRead, compartilhado com POST /notices/{id}/read;
+        edições do comunicado podem invalidar essa leitura. Não envia rascunhos.
+      responses:
+        '200':
+          description: Notificações visíveis, ou uma lista vazia.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Notification'
+        '401':
+          $ref: '#/components/responses/401'
+        '503':
+          description: Não foi possível validar a sessão.
+        '500':
+          $ref: '#/components/responses/500'
+  /notifications/{type}/{id}/read:
+    post:
+      tags: [notifications]
+      summary: Marcar uma notificação visível como lida
+      description: >-
+        Operação idempotente e individual. O id é o sourceId (UUID do comunicado ou
+        evento), não o id composto da notificação. NOTICE também grava NoticeRead
+        na mesma transação. Não concede a visão de painel para síndicos.
+      parameters:
+        - in: path
+          name: type
+          required: true
+          schema:
+            type: string
+            enum: [NOTICE, EVENT]
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Leitura confirmada.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [message]
+                properties:
+                  message:
+                    type: string
+                    example: Notificação lida.
+        '400':
+          $ref: '#/components/responses/400'
+        '401':
+          $ref: '#/components/responses/401'
+        '404':
+          description: Item inexistente, rascunho ou não destinado ao usuário.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: Notificação não encontrada.
+        '503':
+          description: Não foi possível validar a sessão.
+        '500':
+          $ref: '#/components/responses/500'
 components:
   securitySchemes:
     cookieAuth:
@@ -2419,6 +2507,73 @@ components:
               count:
                 type: "integer"
                 minimum: 0
+    ResidentVoting:
+      type: object
+      required: [id, title, description, startDate, endDate, author, options, myVote]
+      properties:
+        id: { type: string, format: uuid }
+        title: { type: string }
+        description: { type: string }
+        startDate: { type: string, format: date-time }
+        endDate: { type: string, format: date-time }
+        authorId: { type: string, format: uuid }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+        author:
+          type: object
+          required: [name, role]
+          properties:
+            name: { type: string }
+            role: { type: string, enum: [ADMIN, FUNCIONARIO, MORADOR] }
+        options:
+          type: array
+          items:
+            type: object
+            required: [id, text]
+            properties:
+              id: { type: string, format: uuid }
+              text: { type: string }
+              votes:
+                type: integer
+                minimum: 0
+                description: Omitido antes do encerramento para quem não tem acesso ao painel.
+              votingId: { type: string, format: uuid }
+              createdAt: { type: string, format: date-time }
+        myVote:
+          type: object
+          nullable: true
+          required: [optionId, votedAt, votedBy]
+          properties:
+            optionId: { type: string, format: uuid }
+            votedAt: { type: string, format: date-time }
+            votedBy:
+              type: string
+              nullable: true
+              description: Nome de quem votou; null se o usuário foi removido.
+    Notification:
+      type: object
+      required: [id, type, sourceId, title, description, createdAt, isRead]
+      properties:
+        id:
+          type: string
+          description: Identificador composto TYPE:UUID, usado como chave na lista.
+          example: NOTICE:ba382bf4-653b-4b7e-b0c0-d22d53657d39
+        type:
+          type: string
+          enum: [NOTICE, EVENT]
+        sourceId:
+          type: string
+          format: uuid
+        title:
+          type: string
+        description:
+          type: string
+          enum: [Novo comunicado, Evento publicado, Evento cancelado]
+        createdAt:
+          type: string
+          format: date-time
+        isRead:
+          type: boolean
     PetUpdate:
       type: "object"
       minProperties: 1
@@ -2566,6 +2721,7 @@ components:
           type: string
           enum:
             - mobile
+            - panel
       required:
         - email
         - password

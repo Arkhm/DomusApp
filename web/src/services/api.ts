@@ -46,7 +46,9 @@ api.interceptors.response.use(
             }
             await refreshPromise;
         } catch (refreshError) {
-            await endSession();
+            // Só um 401 do refresh é rejeição definitiva. Rede fora ou 503 mantêm
+            // os cookies (a API também os preserva) para a próxima tentativa.
+            if (axios.isAxiosError(refreshError) && refreshError.response?.status === 401) await endSession();
             return Promise.reject(refreshError);
         }
         return api(config);

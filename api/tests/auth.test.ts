@@ -187,6 +187,22 @@ test('login web não expõe tokens no JSON; mobile recebe par e perfis são sani
   assert.equal('resetToken' in sanitizeUser(user), false);
 });
 
+test('login com client=panel recusa morador sem síndica antes de gravar cookies', async t => {
+  const password = await bcrypt.hash('senha válida', 4);
+  const resident = { ...baseUser, role: 'MORADOR', isSyndic: false, password };
+  const syndic = { ...resident, isSyndic: true };
+  let current: typeof resident = resident;
+  t.mock.method(userRepository, 'findByEmail', async () => current as any);
+  const denied = response();
+  await authController.login({ body: { client: 'panel', email: resident.email, password: 'senha válida' } } as Request, denied as unknown as Response);
+  assert.equal(denied.statusCode, 403); assert.equal(denied.cookies.size, 0);
+  current = syndic;
+  const allowed = response();
+  await authController.login({ body: { client: 'panel', email: syndic.email, password: 'senha válida' } } as Request, allowed as unknown as Response);
+  assert.equal(allowed.statusCode, 200); assert.ok(allowed.cookies.has('domusapp_token'));
+  assert.equal('token' in allowed.body, false);
+});
+
 test('cookies usam HttpOnly e mesmas flags, com paths e prazos distintos', () => {
   const access = authCookieOptions(); const refresh = refreshCookieOptions();
   assert.equal(access.httpOnly, true); assert.equal(refresh.httpOnly, true);
