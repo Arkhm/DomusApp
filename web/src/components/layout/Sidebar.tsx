@@ -115,7 +115,6 @@ export default function Sidebar() {
                 }}
             >
                 {navItems.filter(item => item.to !== '/vagas' || user?.role === 'ADMIN' || user?.role === 'FUNCIONARIO').map((item) => {
-                {navItems.map((item) => {
                     if (item.to === '/relatorios' && !hasPanelAccess(user)) return null;
                     const Icon = item.icon;
                     return (
