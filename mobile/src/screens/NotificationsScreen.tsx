@@ -13,12 +13,13 @@ const dateFormatter = new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: 
 
 export function NotificationsScreen(): React.JSX.Element {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
-  const { items, isLoading, isRefreshing, failure, openingId, unreadCount, reload, markRead } = useNotifications();
+  const { items, isLoading, isRefreshing, failure, openingId, unreadCount, reload, loadTarget } = useNotifications();
 
   async function open(item: AppNotification): Promise<void> {
-    if (!await markRead(item)) return;
-    if (item.type === 'NOTICE') navigation.navigate('Comunicados');
-    else navigation.navigate('Eventos');
+    const target = await loadTarget(item);
+    if (!target) return;
+    if (target.type === 'NOTICE') navigation.navigate('Comunicado', { notice: target.notice });
+    else navigation.navigate('Evento', { event: target.event });
   }
 
   return (

@@ -107,7 +107,7 @@ export default function Reports() {
                 <button className="btn-gold" disabled={loading} type="submit">Aplicar período</button>
             </form>
             {filterError && <p role="alert" style={{ color: 'var(--color-err)', marginBottom: 16 }}>{filterError}</p>}
-            <p style={{ marginBottom: 24 }}>Datas inclusivas no calendário de São Paulo. Ocupação é um retrato atual e não depende do período.</p>
+            <p style={{ marginBottom: 24 }}>Datas inclusivas. Cobranças usam a data de vencimento; reservas, a data reservada; ocorrências, o horário de Brasília. Ocupação é um retrato atual e não depende do período.</p>
             {loading ? <p role="status">Carregando relatórios...</p> : error ? <div role="alert" className="luxe-card" style={{ padding: 24 }}>
                 <p>{error}</p><button className="btn-ghost" onClick={() => setRevision(value => value + 1)}>Tentar novamente</button>
             </div> : data && <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 440px), 1fr))', gap: 24 }}>

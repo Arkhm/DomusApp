@@ -34,23 +34,9 @@ export function verifyAccessToken(token: string, options: { ignoreExpiration?: b
   }
   return { id: payload.id, role: payload.role, isSyndic: payload.isSyndic === true, tokenVersion: payload.tokenVersion as number };
 }
-// Tokens emitidos antes do tokenVersion no access (PR #35) não passam pelo
-// verifyAccessToken, mas o refresh da mesma sessão continua válido por até 7 dias.
-// No logout, um access legado assinado e recente revoga sem condição de versão.
-const LEGACY_LOGOUT_WINDOW_S = 7 * 24 * 60 * 60;
-export function verifyLogoutToken(token: string): { id: string; tokenVersion?: number } {
-  try {
-    const { id, tokenVersion } = verifyAccessToken(token, { ignoreExpiration: true });
-    return { id, tokenVersion };
-  } catch (error) {
-    const { accessSecret } = validateAuthSecrets();
-    const payload = jwt.verify(token, accessSecret, { algorithms: ['HS256'], issuer, audience: accessAudience,
-      ignoreExpiration: true });
-    const legacy = typeof payload !== 'string' && typeof payload.id === 'string' && payload.tokenVersion === undefined
-      && typeof payload.iat === 'number' && Date.now() / 1000 - payload.iat <= LEGACY_LOGOUT_WINDOW_S;
-    if (!legacy) throw error;
-    return { id: payload.id };
-  }
+export function verifyLogoutToken(token: string): { id: string; tokenVersion: number } {
+  const { id, tokenVersion } = verifyAccessToken(token, { ignoreExpiration: true });
+  return { id, tokenVersion };
 }
 export function verifyRefreshToken(token: string) {
   const { refreshSecret } = validateAuthSecrets();

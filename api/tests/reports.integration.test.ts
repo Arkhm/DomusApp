@@ -7,6 +7,7 @@ import app from '../src/app';
 import { prisma } from '../src/lib/prisma';
 import { createAuthTokens } from '../src/lib/authTokens';
 import { reportRepository } from '../src/repositories/reportRepository';
+import { validDate } from '../src/lib/paymentDomain';
 
 test('relatórios: agregações e HTTP com fixtures MySQL isoladas', { skip: process.env.RUN_DB_INTEGRATION !== 'true' }, async t => {
   assert.match(process.env.DATABASE_NAME ?? '', /_test$/, 'Integração exige banco terminado em _test.');
@@ -44,18 +45,18 @@ test('relatórios: agregações e HTTP com fixtures MySQL isoladas', { skip: pro
   }).token;
   await prisma.commonArea.createMany({ data: areaIds.map(id => ({ id, name: 'Salão ' + suffix })) });
   const invoices = [
-    ['2073-01-31T02:59:59.999Z', '999.00', 'PAID'],
-    ['2073-01-31T03:00:00.000Z', '0.10', 'PAID'],
-    ['2073-02-01T02:59:59.999Z', '0.20', 'PAID'],
+    ['2073-01-30T23:59:59.999Z', '999.00', 'PAID'],
+    ['2073-01-31', '0.10', 'PAID'],
+    ['2073-01-31T23:59:59.999Z', '0.20', 'PAID'],
     ['2073-01-31T12:00:00.000Z', '0.10', 'PENDING'],
-    ['2073-02-01T03:00:00.000Z', '100.00', 'PENDING'],
+    ['2073-02-01', '100.00', 'PENDING'],
     ['2073-02-02T03:00:00.000Z', '50.00', 'OVERDUE'],
-    ['2073-03-02T02:59:59.999Z', '0.05', 'PAID'],
-    ['2073-03-02T03:00:00.000Z', '999.00', 'PAID'],
+    ['2073-03-01T23:59:59.999Z', '0.05', 'PAID'],
+    ['2073-03-02', '999.00', 'PAID'],
     ...['CANCELLED', 'EXPIRED', 'REJECTED', 'REFUNDED', 'CHARGED_BACK', 'PARTIALLY_REFUNDED'].map(status => ['2073-02-02T03:00:00.000Z', '999.00', status]),
   ] as const;
   await prisma.invoice.createMany({ data: invoices.map(([dueDate, amount, status]) => ({
-    description: 'Fatura de relatório ' + suffix, dueDate: new Date(dueDate), amount, status,
+    description: 'Fatura de relatório ' + suffix, dueDate: validDate(dueDate, 'Data de vencimento'), amount, status,
     userId: userIds[3]!, unitId: unitIds[1]!,
   })) });
   await prisma.incident.createMany({ data: [
@@ -91,8 +92,8 @@ test('relatórios: agregações e HTTP com fixtures MySQL isoladas', { skip: pro
     assert.equal(body.total.total, body.byBlock.reduce((sum: number, row: any) => sum + row.total, 0));
     assert.equal(body.total.occupied, body.byBlock.reduce((sum: number, row: any) => sum + row.occupied, 0));
   });
-  await t.test('faturas: centavos exatos, fronteiras locais, passado estrito e estados excluídos', async () => {
-    const rows = await reportRepository.charges(period, new Date('2073-02-01T03:00:00Z'));
+  await t.test('faturas: datas civis UTC, centavos exatos, passado estrito e estados excluídos', async () => {
+    const rows = await reportRepository.charges(period, new Date('2073-02-01T00:00:00Z'));
     const values = rows.map(row => ({ ...row, count: Number(row.count), amount: row.amount.toFixed(2) }));
     assert.deepEqual(values, [
       { month: '2073-01', status: 'OVERDUE', count: 1, amount: '0.10' },
@@ -107,8 +108,11 @@ test('relatórios: agregações e HTTP com fixtures MySQL isoladas', { skip: pro
     assert.equal(body.summary.paid.amount, '0.35');
     assert.equal(body.byMonth.length, 3);
     assert.equal(body.summary.delinquencyRate, 33.2);
-    const later = await reportRepository.charges(period, new Date('2073-02-01T03:00:00.001Z'));
+    const later = await reportRepository.charges(period, new Date('2073-02-01T00:00:00.001Z'));
     assert.equal(later.find(row => row.month === '2073-02' && row.status === 'OVERDUE')!.amount.toFixed(2), '150.00');
+    const firstDay = await reportRepository.charges({ startDate: '2073-02-01', endDate: '2073-02-01' }, new Date('2073-02-01T00:00:00Z'));
+    assert.deepEqual(firstDay.map(row => ({ month: row.month, count: Number(row.count), amount: row.amount.toFixed(2) })),
+      [{ month: '2073-02', count: 1, amount: '100.00' }]);
   });
   await t.test('ocorrências usam createdAt local, categorias e status atuais', async () => {
     const { body } = await request(app).get('/reports/incidents' + query).set('Authorization', token(1)).expect(200);

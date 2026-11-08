@@ -65,17 +65,26 @@ test('logout compara versão atomicamente e repetição não encerra sessões no
   assert.equal((await authenticate(old.token)).res.statusCode, 401);
   assert.equal((await authenticate(fresh.token)).next, 1);
 });
-test('logout com access legado recente revoga sem conferir versão; legado antigo ou adulterado não revoga', async t => {
+test('logout rejeita access legado mesmo recente e sua repetição preserva sessões novas', async t => {
   const revoke = t.mock.method(userRepository, 'revokeTokens', async () => ({ count: 1 }));
   const legacy = (iat: number, secret = process.env.JWT_SECRET!) => jwt.sign({ id: actor.id, role: actor.role, iat }, secret,
     { issuer: 'domusapp', audience: 'domusapp:access' });
   const now = Math.floor(Date.now() / 1000);
-  await authService.logout(legacy(now - 60));
-  assert.equal(revoke.mock.callCount(), 1);
-  assert.deepEqual(revoke.mock.calls[0]!.arguments, [actor.id, undefined]);
+  const recent = legacy(now - 60);
+  await authService.logout(recent);
+  const fresh = createAuthTokens(actor);
+  await authService.logout(recent);
   await authService.logout(legacy(now - 8 * 24 * 60 * 60));
   await authService.logout(legacy(now - 60, 'outro-segredo-qualquer'));
-  assert.equal(revoke.mock.callCount(), 1);
+  assert.equal(revoke.mock.callCount(), 0);
+  t.mock.method(userRepository, 'findAuthState', async () => actor);
+  assert.equal((await authenticate(fresh.token)).next, 1);
+});
+
+test('repository não permite revogação sem uma versão inteira válida', async () => {
+  for (const version of [undefined, -1, 0.5, '4']) {
+    await assert.rejects(userRepository.revokeTokens(actor.id, version as number), /Versão de sessão inválida/);
+  }
 });
 test('edição de usuário com tokenVersion alterado no meio do caminho responde 409 sem gravar', async t => {
   const user = { ...actor, name: 'Teste', email: 'teste@example.test', unitId: null, password: 'hash' };
