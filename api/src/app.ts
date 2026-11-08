@@ -23,6 +23,7 @@ import invoiceRoutes from './routes/invoiceRoutes';
 import commonAreaRoutes from './routes/commonAreaRoutes';
 import reservationRoutes from './routes/reservationRoutes';
 import incidentRoutes from './routes/incidentRoutes';
+import reportRoutes from './routes/reportRoutes';
 
 validateAuthSecrets();
 const app = express();
@@ -105,6 +106,7 @@ app.use('/invoices', invoiceRoutes);
 app.use('/common-areas', commonAreaRoutes);
 app.use('/reservations', reservationRoutes);
 app.use('/incidents', incidentRoutes);
+app.use('/reports', reportRoutes);
 
 // O `cors()` rejeita origem desconhecida lançando erro. Sem este handler o
 // Express responderia 500 em HTML; aqui vira um 403 JSON explícito.

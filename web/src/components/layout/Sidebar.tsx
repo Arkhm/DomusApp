@@ -10,14 +10,17 @@ import {
     TreePalm,
     CalendarCheck,
     MessageSquare,
+    ChartColumn,
     ChevronLeft,
     ChevronRight,
 } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import Monogram from '../luxury/Monogram';
 import { getInitials, roleLabel } from '../luxury/formatters';
+import { hasPanelAccess } from '../../lib/access';
 
 const navItems = [
+    { to: '/relatorios', label: 'Relatórios', icon: ChartColumn },
     { to: '/dashboard', label: 'Painel', icon: LayoutDashboard },
     { to: '/usuarios', label: 'Residentes', icon: Users },
     { to: '/unidades', label: 'Unidades', icon: Building2 },
@@ -110,6 +113,7 @@ export default function Sidebar() {
                 }}
             >
                 {navItems.map((item) => {
+                    if (item.to === '/relatorios' && !hasPanelAccess(user)) return null;
                     const Icon = item.icon;
                     return (
                         <NavLink
