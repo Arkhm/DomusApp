@@ -33,18 +33,22 @@ não pelo app.
 
 ## Como rodar
 
-Pré-requisitos: Node 18+ e o app **Expo Go** no celular (ou um emulador
-Android / simulador iOS).
+Pré-requisitos: Node **22.13+** na linha 22, **24.3+** na linha 24 ou **26+**,
+e o app **Expo Go compatível com SDK 58** no celular (ou um emulador
+Android / simulador iOS). O projeto usa Expo SDK 58; a versão do Expo Go
+precisa aceitar esse SDK.
 
 ```bash
-cd mobile && npm install
+cd mobile
+npm ci
 ```
 
 ```bash
 npm start
 ```
 
-Depois escaneie o QR Code com o Expo Go, ou use:
+Para celular físico, configure `DOMUS_API_URL` conforme a seção abaixo antes
+de iniciar o Expo. Depois escaneie o QR Code com o Expo Go, ou use:
 
 ```bash
 npm run android
@@ -58,11 +62,20 @@ npm run ios
 npm run web
 ```
 
-Checagem de tipos:
+Checagens locais, executadas dentro de `mobile/`:
 
 ```bash
-cd mobile && npx tsc --noEmit
+npx expo install --check
+npx expo-doctor@latest
+npx tsc --noEmit
+node --test src/utils/residentForms.test.cjs
+npx expo export --platform android
 ```
+
+O export verifica o empacotamento Android e grava os artefatos em `dist/`,
+ignorado pelo Git. A validação no aparelho deve conferir login, restauração
+da sessão, logout, navegação, fontes, comunicados/notificações, reservas,
+ocorrências, votações, cobranças e veículos/pets.
 
 ---
 
@@ -80,7 +93,8 @@ docker compose up api db
 Para trocar o endereço, defina `DOMUS_API_URL` ao iniciar o Expo:
 
 ```bash
-cd mobile && DOMUS_API_URL=http://192.168.0.10:3333 npx expo start --clear
+export DOMUS_API_URL=http://192.168.0.10:3333
+npx expo start --clear
 ```
 
 No PowerShell:
@@ -100,12 +114,18 @@ Qual endereço usar:
 `localhost` dentro do celular é o próprio celular — em device físico use
 sempre o IP da máquina na mesma rede Wi-Fi.
 
+Substitua `192.168.0.10` pelo IP atual do computador. Para verificar a conexão,
+abra `http://<IP-da-sua-máquina>:3333/api/status` no navegador do celular.
+Ao trocar a URL, reinicie o Expo com `--clear`. Não é necessário recriar
+o banco ou os containers para atualizar o SDK do mobile.
+
 ### Credenciais para teste
 
 Vindas de `api/src/seed.ts`:
 
 - `admin@domusapp.com` / `admin123` (ADMIN)
 - `maria.sindica@email.com` / `123456` (MORADOR com `isSyndic: true`)
+- `fernando@email.com` / `123456` (MORADOR sem acesso ao painel)
 
 ---
 

@@ -9,6 +9,7 @@
    ============================================================ */
 
 :root {
+  color-scheme: light;
   /* === LIGHT — default === */
   --color-ink-0: #FAF6EC;
   --color-ink-1: #FFFFFF;
@@ -80,6 +81,7 @@
 /* === DARK — when system prefers dark === */
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
+    color-scheme: dark;
     --color-ink-0: #06060A;
     --color-ink-1: #0B0913;
     --color-ink-2: #110D1C;
@@ -117,6 +119,7 @@
 
 /* === Manual override === */
 :root[data-theme="dark"] {
+  color-scheme: dark;
   --color-ink-0: #06060A;
   --color-ink-1: #0B0913;
   --color-ink-2: #110D1C;
@@ -149,6 +152,28 @@
   --metal-line: rgba(212, 175, 55, 0.22);
   --metal-line-strong: rgba(212, 175, 55, 0.42);
   --watermark-stroke: rgba(212, 175, 55, 0.10);
+}
+
+.theme-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
+  padding: 0;
+  border: 1px solid var(--color-line-strong);
+  border-radius: 4px;
+  background: var(--color-ink-1);
+  color: var(--color-bone-dim);
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+
+.theme-toggle:hover {
+  background: var(--color-ink-2);
+  border-color: var(--color-metal-1);
+  color: var(--color-metal-1);
 }
 
 /* ============================================================
