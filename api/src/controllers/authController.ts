@@ -1,4 +1,5 @@
 import { HttpError } from '../lib/httpError';
+import { hasPanelAccess } from '../lib/access';
 import { logger } from '../lib/logger';
 import { Request, Response } from 'express';
 import { authService } from '../services/authService';
@@ -10,6 +11,13 @@ export const authController = {
     try {
       const { email, password } = req.body;
       const { user, token, refreshToken } = await authService.login(email, password);
+
+      // Recusa antes de gravar cookies: o web não pode apagá-los sem chamar o
+      // logout, e o logout revogaria também a sessão do app do morador.
+      if (req.body.client === 'panel' && !hasPanelAccess(user)) {
+        res.status(403).json({ error: 'Seu perfil deve acessar o aplicativo do morador.' });
+        return;
+      }
 
       // Web usa apenas cookies httpOnly; mobile recebe o par para o SecureStore.
       setAuthCookie(res, token);

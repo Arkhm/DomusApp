@@ -37,7 +37,8 @@ paths:
         - auth
       summary: Iniciar sessão
       description: Web recebe cookies httpOnly domusapp_token e domusapp_refresh; client=mobile recebe também token e
-        refreshToken. Morador sem isSyndic não acessa o painel.
+        refreshToken. Com client=panel, perfil sem acesso ao painel (morador sem isSyndic) recebe 403
+        sem cookies.
       security: []
       requestBody:
         required: true
@@ -56,6 +57,8 @@ paths:
           $ref: "#/components/responses/400"
         "401":
           $ref: "#/components/responses/401"
+        "403":
+          $ref: "#/components/responses/403"
         "429":
           $ref: "#/components/responses/429"
         "500":
@@ -2299,6 +2302,7 @@ components:
           type: string
           enum:
             - mobile
+            - panel
       required:
         - email
         - password

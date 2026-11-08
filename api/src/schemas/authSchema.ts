@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { requiredString } from './common';
 
 export const loginSchema = z.object({
-  client: z.literal('mobile').optional(),
+  client: z.enum(['mobile', 'panel']).optional(),
   email: requiredString('E-mail é obrigatório.').email('E-mail inválido.'),
   password: z.string().min(1, 'Senha é obrigatória.'),
 });
