@@ -20,6 +20,7 @@ import {
 } from '../components';
 import { useAuth } from '../contexts/AuthContext';
 import { useHomeSummary } from '../hooks/useHomeSummary';
+import { useUnreadNotifications } from '../hooks/useNotifications';
 import { APP_MODULES, type AppModule } from '../config/modules';
 import {
   firstName,
@@ -57,6 +58,7 @@ export function HomeScreen(): React.JSX.Element {
   const navigation = useNavigation<HomeNavigation>();
   const { user, signOut } = useAuth();
   const { summary, isLoading, isRefreshing, failure, reload } = useHomeSummary();
+  const { unreadCount } = useUnreadNotifications();
   const [isSignOutVisible, setIsSignOutVisible] = React.useState(false);
 
   const residence = unitLabel(user) ?? roleLabel(user);
@@ -71,18 +73,11 @@ export function HomeScreen(): React.JSX.Element {
   }
 
   function openModule(module: AppModule): void {
-    if (module.screen === 'Reservas') {
-      navigation.navigate('Main', { screen: 'Reservas' });
+    if ('tab' in module.target) {
+      navigation.navigate('Main', { screen: module.target.tab });
       return;
     }
-    if (module.screen === 'Ocorrencias') {
-      navigation.navigate('Ocorrencias');
-      return;
-    }
-    navigation.navigate('EmBreve', {
-      title: module.label,
-      description: module.pendingNote,
-    });
+    navigation.navigate(module.target.stack);
   }
 
   return (
@@ -186,15 +181,11 @@ export function HomeScreen(): React.JSX.Element {
                   label={module.label}
                   icon={module.icon}
                   onPress={() => openModule(module)}
-                  isComingSoon={!module.screen}
+                  badge={module.id === 'notificacoes' ? unreadCount : null}
                 />
               </View>
             ))}
           </View>
-
-          <Text style={styles.legend}>
-            O ponto dourado marca os módulos que ainda não têm tela nesta versão.
-          </Text>
         </View>
       </ScrollView>
 
@@ -313,10 +304,5 @@ const styles = StyleSheet.create({
     // `flexGrow` iguala as larguras na linha.
     flexBasis: `${100 / GRID_COLUMNS - 6}%`,
     flexGrow: 1,
-  },
-  legend: {
-    ...typography.caption,
-    color: colors.textMuted,
-    paddingTop: spacing.xs,
   },
 });

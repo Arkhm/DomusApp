@@ -1,6 +1,7 @@
 import React from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useNavigation } from '@react-navigation/native';
 import { Button, SectionHeader } from '../components';
 import { useAuth } from '../contexts/AuthContext';
 import { roleLabel, unitLabel } from '../utils/format';
@@ -34,6 +35,7 @@ function InfoRow({ label, value }: InfoRowProps): React.JSX.Element {
  */
 export function ProfileScreen(): React.JSX.Element {
   const { user, signOut } = useAuth();
+  const navigation = useNavigation();
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['top']}>
@@ -56,6 +58,15 @@ export function ProfileScreen(): React.JSX.Element {
           Dados cadastrais são mantidos pela administração do condomínio. Para corrigir alguma
           informação, fale com a portaria ou com o síndico.
         </Text>
+
+        {user?.role === 'MORADOR' ? (
+          <Button
+            label="Meus veículos e pets"
+            variant="secondary"
+            onPress={() => navigation.navigate('VeiculosPets')}
+            accessibilityHint="Abre o cadastro de veículos da unidade e dos seus pets"
+          />
+        ) : null}
 
         <Button
           label="Sair da conta"

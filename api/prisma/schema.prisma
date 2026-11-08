@@ -34,11 +34,23 @@ model User {
   events          Event[]  @relation("EventAuthor")
   votings         Voting[] @relation("VotingAuthor")
   noticeReads     NoticeRead[]
+  notificationReads NotificationRead[]
   votingVotes     VotingVote[]
   reservations    Reservation[]
   incidents       Incident[]   @relation("IncidentAuthor")
   pets            Pet[]
   invoices        Invoice[]
+}
+
+model NotificationRead {
+  id       String   @id @default(uuid())
+  userId   String
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type     String   @db.VarChar(10)
+  sourceId String
+  readAt   DateTime @default(now())
+
+  @@unique([userId, type, sourceId])
 }
 
 model Unit {
