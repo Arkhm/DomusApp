@@ -1,12 +1,13 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Bell, ChevronDown, LogOut, Lock, User as UserIcon } from 'lucide-react';
+import { Bell, ChevronDown, LogOut, Lock, Moon, Sun, User as UserIcon } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import toast from 'react-hot-toast';
 import { useAuth } from '../../hooks/useAuth';
 import LiveClock from '../luxury/LiveClock';
 import { getInitials, roleLabel } from '../luxury/formatters';
 import { useGeoCity } from '../../hooks/useGeoCity';
+import { useTheme } from '../../hooks/useTheme';
 
 interface HeaderProps {
     title: string;
@@ -15,6 +16,7 @@ interface HeaderProps {
 
 export default function Header({ title, eyebrow }: HeaderProps) {
     const { user, logout } = useAuth();
+    const { theme, toggleTheme } = useTheme();
     const navigate = useNavigate();
     const [menuOpen, setMenuOpen] = useState(false);
     const menuRef = useRef<HTMLDivElement>(null);
@@ -90,7 +92,7 @@ export default function Header({ title, eyebrow }: HeaderProps) {
                 </div>
             </div>
 
-            <div style={{ display: 'flex', alignItems: 'center', gap: 24 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
                 {/* Clock — concierge feel */}
                 <div style={{ textAlign: 'right' }}>
                     <div
@@ -109,6 +111,17 @@ export default function Header({ title, eyebrow }: HeaderProps) {
                 </div>
 
                 <div style={{ width: 1, height: 32, background: 'var(--color-line-strong)' }} />
+
+                <button
+                    type="button"
+                    className="theme-toggle"
+                    onClick={toggleTheme}
+                    aria-label="Modo escuro"
+                    aria-pressed={theme === 'dark'}
+                    title={theme === 'dark' ? 'Ativar modo claro' : 'Ativar modo escuro'}
+                >
+                    {theme === 'dark' ? <Sun size={18} strokeWidth={1.4} aria-hidden="true" /> : <Moon size={18} strokeWidth={1.4} aria-hidden="true" />}
+                </button>
 
                 {/* Bell */}
                 <button

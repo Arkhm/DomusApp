@@ -41,7 +41,7 @@ export function NotificationsScreen(): React.JSX.Element {
             {isLoading ? <ActivityIndicator color={colors.brand} accessibilityLabel="Carregando notificações" /> : null}
           </View>
         }
-        ListEmptyComponent={!isLoading && !failure ? <Text style={styles.text}>Nenhuma notificação por enquanto. Novos comunicados e eventos aparecerão aqui.</Text> : null}
+        ListEmptyComponent={!isLoading && !failure ? <Text style={styles.text}>Nenhuma notificação por enquanto. Novos comunicados e eventos aparecerão aqui.</Text> : undefined}
         renderItem={({ item }) => {
           const date = new Date(item.createdAt);
           return (
