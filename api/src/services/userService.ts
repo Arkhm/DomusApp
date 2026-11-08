@@ -1,4 +1,5 @@
 import bcrypt from 'bcryptjs';
+import { HttpError } from '../lib/httpError';
 import { userRepository } from '../repositories/userRepository';
 import { isValidCpf } from '../lib/cpf';
 import { sanitizeUser } from '../lib/sanitizeUser';
@@ -108,7 +109,12 @@ export const userService = {
     );
     if (sensitiveChange) data.tokenVersion = { increment: 1 };
 
-    const updatedUser = await userRepository.update(id, data);
+    // Grava só se o tokenVersion ainda for o lido acima: uma alteração sensível
+    // concorrente já o incrementou, e esta edição comparou contra dados velhos.
+    const updatedUser = await userRepository.updateIfVersion(id, user.tokenVersion, data);
+    if (!updatedUser) {
+      throw new HttpError(409, 'O cadastro foi alterado por outra pessoa. Recarregue e tente novamente.');
+    }
     return sanitizeUser(updatedUser);
   },
 

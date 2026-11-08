@@ -9,7 +9,8 @@ const USER_CACHE_KEY = '@domusapp:user';
 
 export const authService = {
     async login(data: LoginRequest): Promise<LoginResponse> {
-        const response = await api.post<LoginResponse>('/auth/login', data);
+        // `client: 'panel'` faz a API recusar quem não tem acesso ao painel antes de gravar cookies.
+        const response = await api.post<LoginResponse>('/auth/login', { ...data, client: 'panel' });
         return response.data;
     },
 

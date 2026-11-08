@@ -134,3 +134,21 @@ test('mobile: indisponibilidade no refresh preserva tokens e não encerra a sess
     assert.equal(notified, 0);
   }
 });
+
+test('web: indisponibilidade no refresh não chama logout nem sai do painel', async () => {
+  for (const status of [undefined, 503]) {
+    const app = client('web'); let logoutCalls = 0;
+    app.api.defaults.adapter = async (config: any) => {
+      if (config.url === '/auth/logout') { logoutCalls++; return { status: 200, data: {}, headers: {}, config }; }
+      if (config.url === '/auth/refresh') {
+        throw new app.axios.AxiosError('Indisponível', status ? 'ERR_BAD_RESPONSE' : 'ERR_NETWORK', config, undefined,
+          status ? { status, data: {}, headers: {}, config } : undefined);
+      }
+      throw new app.axios.AxiosError('Unauthorized', 'ERR_BAD_REQUEST', config, undefined, { status: 401 });
+    };
+    await assert.rejects(app.api.get('/units'));
+    assert.equal(logoutCalls, 0);
+    assert.equal(app.saved.get('@domusapp:user'), '{}');
+    assert.equal(app.browser.location.href, '/dashboard');
+  }
+});

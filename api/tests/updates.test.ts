@@ -10,6 +10,8 @@ import { noticeService } from '../src/services/noticeService';
 import { eventService } from '../src/services/eventService';
 import { petService } from '../src/services/petService';
 import { vehicleService } from '../src/services/vehicleService';
+import { votingService } from '../src/services/votingService';
+import { votingRepository } from '../src/repositories/votingRepository';
 import { noticeRepository } from '../src/repositories/noticeRepository';
 import { eventRepository } from '../src/repositories/eventRepository';
 import { petRepository } from '../src/repositories/petRepository';
@@ -51,6 +53,15 @@ test('serviços de edição conferem autoria/propriedade e destinatário final',
       assert.equal(update.mock.callCount(), 2);
     });
   }
+  await t.test('votação: síndica só edita as próprias; ADMIN edita qualquer autor', async t => {
+    t.mock.method(votingRepository, 'findById', async () => ({ authorId: syndic.id }) as any);
+    const update = t.mock.method(votingRepository, 'update', async (_id: string, data: any) => data as any);
+    await votingService.update(randomUUID(), { title: 'Novo' }, syndic);
+    await assert.rejects(votingService.update(randomUUID(), { title: 'Outro' }, { ...syndic, id: randomUUID() }), status(403));
+    await votingService.update(randomUUID(), { title: 'Admin' }, admin);
+    await assert.rejects(votingService.update(randomUUID(), { title: 'Negado' }, resident), status(403));
+    assert.equal(update.mock.callCount(), 2);
+  });
   await t.test('pet: proprietário ou admin; outro morador e funcionário são negados', async t => {
     t.mock.method(petRepository, 'findById', async () => ({ ownerId: resident.id }) as any);
     t.mock.method(petRepository, 'update', async (_id: string, data: any) => data as any);
@@ -79,8 +90,8 @@ test('edições: persistência, leituras e concorrência em MySQL isolado', { sk
   const vehicle = await prisma.vehicle.create({ data: { plate: 'ABC1234', model: 'Modelo', unitId: unit.id } });
   const other = await prisma.vehicle.create({ data: { plate: 'DEF5678', model: 'Outro', unitId: unit.id } });
   const votingIds: string[] = [];
-  const voting = async (start: number) => {
-    const result = await prisma.voting.create({ data: { title: 'Votação', description: 'Escolha', authorId: admin.id,
+  const voting = async (start: number, authorId = admin.id) => {
+    const result = await prisma.voting.create({ data: { title: 'Votação', description: 'Escolha', authorId,
       startDate: new Date(Date.now() + start), endDate: new Date(Date.now() + 3600000),
       options: { create: [{ text: 'Sim' }, { text: 'Não' }] },
     }, include: { options: true } });
@@ -122,7 +133,8 @@ test('edições: persistência, leituras e concorrência em MySQL isolado', { sk
     await put(`/pets/${pet.id}`, syndic, { name: 'Negado' }).expect(403);
   });
   await t.test('votações: apenas agendadas sem votos; opções inalteradas preservam IDs', async () => {
-    const scheduled = await voting(600000);
+    const scheduled = await voting(600000, syndic.id);
+    await put(`/votings/${(await voting(600000)).id}`, syndic, { title: 'Negado' }).expect(403);
     await put(`/votings/${scheduled.id}`, syndic, { title: 'Novo' }).expect(200)
       .expect(r => assert.deepEqual(new Set(r.body.options.map((o: any) => o.id)), new Set(scheduled.options.map(o => o.id))));
     const current = await prisma.votingOption.findMany({ where: { votingId: scheduled.id }, orderBy: { createdAt: 'asc' } });

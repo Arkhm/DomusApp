@@ -57,7 +57,6 @@ export interface Notice {
   targetType: TargetType;
   status: NoticeStatus;
   priority: NoticePriority;
-  condominiumId: string;
   targetUnitId: string | null;
   targetUnit: Unit | null;
   authorId: string;
@@ -90,7 +89,6 @@ export interface CondoEvent {
   category: EventCategory;
   capacity: number | null;
   status: EventStatus;
-  condominiumId: string;
   targetUnitId: string | null;
   targetUnit: Unit | null;
   authorId: string;

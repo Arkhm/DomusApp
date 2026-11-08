@@ -14,6 +14,7 @@ import authRoutes from './routes/authRoutes';
 import userRoutes from './routes/userRoutes';
 import noticeRoutes from './routes/noticeRoutes';
 import parkingSpotRoutes from './routes/parkingSpotRoutes';
+import notificationRoutes from './routes/notificationRoutes';
 import unitRoutes from './routes/unitRoutes';
 import eventRoutes from './routes/eventRoutes';
 import votingRoutes from './routes/votingRoutes';
@@ -23,6 +24,7 @@ import invoiceRoutes from './routes/invoiceRoutes';
 import commonAreaRoutes from './routes/commonAreaRoutes';
 import reservationRoutes from './routes/reservationRoutes';
 import incidentRoutes from './routes/incidentRoutes';
+import reportRoutes from './routes/reportRoutes';
 
 validateAuthSecrets();
 const app = express();
@@ -95,6 +97,7 @@ app.get('/api/status', (req: Request, res: Response) => {
 app.use('/auth', authRoutes);
 app.use('/users', userRoutes);
 app.use('/notices', noticeRoutes);
+app.use('/notifications', notificationRoutes);
 app.use('/units', unitRoutes);
 app.use('/parking-spots', parkingSpotRoutes);
 app.use('/events', eventRoutes);
@@ -105,6 +108,7 @@ app.use('/invoices', invoiceRoutes);
 app.use('/common-areas', commonAreaRoutes);
 app.use('/reservations', reservationRoutes);
 app.use('/incidents', incidentRoutes);
+app.use('/reports', reportRoutes);
 
 // O `cors()` rejeita origem desconhecida lançando erro. Sem este handler o
 // Express responderia 500 em HTML; aqui vira um 403 JSON explícito.

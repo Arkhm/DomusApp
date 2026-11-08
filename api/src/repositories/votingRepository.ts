@@ -55,12 +55,18 @@ export const votingRepository = {
     });
   },
 
-  findAll: async () => {
+  findAll: async (unitId?: string | null) => {
     return await prisma.voting.findMany({
       orderBy: { createdAt: 'desc' },
       include: {
         author: { select: { name: true, role: true } },
-        options: { orderBy: { createdAt: 'asc' } }
+        options: { orderBy: { createdAt: 'asc' } },
+        // Nunca carregar votos de outras unidades, nem quando o perfil não tem unidade.
+        ballots: {
+          where: { unitId: unitId ?? '' },
+          take: 1,
+          select: { optionId: true, createdAt: true, user: { select: { name: true } } },
+        }
       }
     });
   },

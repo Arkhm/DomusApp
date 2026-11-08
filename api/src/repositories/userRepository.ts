@@ -1,3 +1,4 @@
+import { Prisma } from '@prisma/client';
 import { prisma } from '../lib/prisma';
 
 export const userRepository = {
@@ -74,6 +75,16 @@ export const userRepository = {
 
   create: async (data: any) => {
     return await prisma.user.create({ data });
+  },
+
+  // `null` quando o usuário sumiu ou o tokenVersion mudou desde a leitura (P2025).
+  updateIfVersion: async (id: string, tokenVersion: number, data: any) => {
+    try {
+      return await prisma.user.update({ where: { id, tokenVersion }, data });
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025') return null;
+      throw error;
+    }
   },
 
   update: async (id: string, data: any) => {

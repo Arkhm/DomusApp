@@ -11,6 +11,97 @@ security:
   - cookieAuth: []
   - bearerAuth: []
 paths:
+  "/reports/occupancy":
+    get:
+      tags: ["Relatórios"]
+      summary: "Taxa atual de ocupação por bloco"
+      description: "Acesso exclusivo a ADMIN, FUNCIONARIO e MORADOR com isSyndic=true. Conta uma unidade como ocupada se existir ao menos um MORADOR ACTIVE vinculado. ADMIN/FUNCIONARIO e moradores inativos não ocupam. Blocos nulos, vazios ou só com espaços são agrupados em Sem bloco. Taxa percentual = ocupadas ÷ total × 100; total geral ponderado por unidades. Não recebe período."
+      responses:
+        "200":
+          description: "Relatório calculado; listas vazias e totais zero quando não há dados."
+          content:
+            "application/json":
+              schema:
+                "$ref": "#/components/schemas/ReportOccupancy"
+        "400":
+          "$ref": "#/components/responses/400"
+        "401":
+          "$ref": "#/components/responses/401"
+        "403":
+          "$ref": "#/components/responses/403"
+        "500":
+          "$ref": "#/components/responses/500"
+        "503":
+          "$ref": "#/components/responses/503"
+  "/reports/charges-summary":
+    get:
+      tags: ["Relatórios"]
+      summary: "Cobranças por mês de vencimento"
+      description: "Acesso exclusivo a ADMIN, FUNCIONARIO e MORADOR com isSyndic=true. Filtra Invoice.dueDate por dias inclusivos em America/Sao_Paulo; agrega por mês local de vencimento. PAID é paga; OVERDUE é vencida independentemente da data; PENDING é vencida somente quando dueDate < instante atual (comparação estrita), caso contrário pendente. Outros estados (canceladas, expiradas, rejeitadas, estornadas, contestadas e parcialmente estornadas) são excluídos. Não altera status nem consulta o provedor. Valores são strings decimais exatas. Taxa de inadimplência = valor vencido ÷ total pago/pendente/vencido × 100, com uma casa decimal; denominador zero resulta em 0. Retorna somente meses com cobranças elegíveis."
+      parameters: [{"name":"startDate","in":"query","required":false,"description":"Primeiro dia civil incluído (AAAA-MM-DD). Padrão: primeiro dia do mês de endDate menos 11 meses.","schema":{"type":"string","format":"date"}},{"name":"endDate","in":"query","required":false,"description":"Último dia civil incluído (AAAA-MM-DD). Padrão: hoje em America/Sao_Paulo. Início ≤ fim; máximo de 24 meses, sem incluir o aniversário de dois anos. Datas entre 1000-01-01 e 9998-12-31.","schema":{"type":"string","format":"date"}}]
+      responses:
+        "200":
+          description: "Relatório calculado; listas vazias e totais zero quando não há dados."
+          content:
+            "application/json":
+              schema:
+                "$ref": "#/components/schemas/ReportCharges"
+        "400":
+          "$ref": "#/components/responses/400"
+        "401":
+          "$ref": "#/components/responses/401"
+        "403":
+          "$ref": "#/components/responses/403"
+        "500":
+          "$ref": "#/components/responses/500"
+        "503":
+          "$ref": "#/components/responses/503"
+  "/reports/incidents":
+    get:
+      tags: ["Relatórios"]
+      summary: "Ocorrências por categoria e status"
+      description: "Acesso exclusivo a ADMIN, FUNCIONARIO e MORADOR com isSyndic=true. Filtra Incident.createdAt pelos dias inclusivos em America/Sao_Paulo. Contagens por categoria e por status atual; nenhuma informação pessoal, título ou descrição é retornada."
+      parameters: [{"name":"startDate","in":"query","required":false,"description":"Primeiro dia civil incluído (AAAA-MM-DD). Padrão: primeiro dia do mês de endDate menos 11 meses.","schema":{"type":"string","format":"date"}},{"name":"endDate","in":"query","required":false,"description":"Último dia civil incluído (AAAA-MM-DD). Padrão: hoje em America/Sao_Paulo. Início ≤ fim; máximo de 24 meses, sem incluir o aniversário de dois anos. Datas entre 1000-01-01 e 9998-12-31.","schema":{"type":"string","format":"date"}}]
+      responses:
+        "200":
+          description: "Relatório calculado; listas vazias e totais zero quando não há dados."
+          content:
+            "application/json":
+              schema:
+                "$ref": "#/components/schemas/ReportIncidents"
+        "400":
+          "$ref": "#/components/responses/400"
+        "401":
+          "$ref": "#/components/responses/401"
+        "403":
+          "$ref": "#/components/responses/403"
+        "500":
+          "$ref": "#/components/responses/500"
+        "503":
+          "$ref": "#/components/responses/503"
+  "/reports/reservations":
+    get:
+      tags: ["Relatórios"]
+      summary: "Reservas por área comum e status"
+      description: "Acesso exclusivo a ADMIN, FUNCIONARIO e MORADOR com isSyndic=true. Filtra Reservation.date pelo dia civil inclusivo, respeitando o armazenamento a 00:00 UTC. Contagens por área (identificada por ID, incluindo áreas inativas com reservas históricas) e por status atual. Todos os status são incluídos; solicitações aprovadas não comprovam uso efetivo."
+      parameters: [{"name":"startDate","in":"query","required":false,"description":"Primeiro dia civil incluído (AAAA-MM-DD). Padrão: primeiro dia do mês de endDate menos 11 meses.","schema":{"type":"string","format":"date"}},{"name":"endDate","in":"query","required":false,"description":"Último dia civil incluído (AAAA-MM-DD). Padrão: hoje em America/Sao_Paulo. Início ≤ fim; máximo de 24 meses, sem incluir o aniversário de dois anos. Datas entre 1000-01-01 e 9998-12-31.","schema":{"type":"string","format":"date"}}]
+      responses:
+        "200":
+          description: "Relatório calculado; listas vazias e totais zero quando não há dados."
+          content:
+            "application/json":
+              schema:
+                "$ref": "#/components/schemas/ReportReservations"
+        "400":
+          "$ref": "#/components/responses/400"
+        "401":
+          "$ref": "#/components/responses/401"
+        "403":
+          "$ref": "#/components/responses/403"
+        "500":
+          "$ref": "#/components/responses/500"
+        "503":
+          "$ref": "#/components/responses/503"
   /api/status:
     get:
       tags:
@@ -37,7 +128,8 @@ paths:
         - auth
       summary: Iniciar sessão
       description: Web recebe cookies httpOnly domusapp_token e domusapp_refresh; client=mobile recebe também token e
-        refreshToken. Morador sem isSyndic não acessa o painel.
+        refreshToken. Com client=panel, perfil sem acesso ao painel (morador sem isSyndic) recebe 403
+        sem cookies.
       security: []
       requestBody:
         required: true
@@ -56,6 +148,8 @@ paths:
           $ref: "#/components/responses/400"
         "401":
           $ref: "#/components/responses/401"
+        "403":
+          $ref: "#/components/responses/403"
         "429":
           $ref: "#/components/responses/429"
         "500":
@@ -666,21 +760,30 @@ paths:
           $ref: "#/components/responses/500"
   /votings:
     get:
-      tags:
-        - votings
-      summary: Listar votações
-      description: "Perfis permitidos: ADMIN, FUNCIONARIO, MORADOR (inclui a síndica)."
+      tags: [votings]
+      summary: Listar votações e o voto da unidade
+      description: >-
+        ADMIN, FUNCIONARIO e MORADOR (incluindo síndica). myVote corresponde ao voto
+        da unidade atual do usuário, mesmo que outro morador tenha votado. É null
+        sem unidade ou sem voto. Somente o painel (ADMIN/FUNCIONARIO/síndica)
+        recebe options[].votes antes do encerramento. Para moradores comuns,
+        votes é omitido enquanto agora <= endDate. Status é derivado das datas
+        pelo cliente. A unidade não é um parâmetro.
       responses:
-        "200":
-          description: Operação concluída.
-        "400":
-          $ref: "#/components/responses/400"
-        "401":
-          $ref: "#/components/responses/401"
-        "403":
-          $ref: "#/components/responses/403"
-        "500":
-          $ref: "#/components/responses/500"
+        '200':
+          description: Array de votações, sem paginação.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ResidentVoting'
+        '400':
+          $ref: '#/components/responses/400'
+        '401':
+          $ref: '#/components/responses/401'
+        '403':
+          $ref: '#/components/responses/403'
     post:
       tags:
         - votings
@@ -2438,6 +2541,249 @@ components:
                   nullable: true
                 number:
                   type: string
+    ReportPeriod:
+      type: "object"
+      required: ["startDate","endDate"]
+      properties:
+        startDate:
+          type: "string"
+          format: "date"
+          example: "2026-01-01"
+        endDate:
+          type: "string"
+          format: "date"
+          example: "2026-11-07"
+    ReportMoney:
+      type: "string"
+      pattern: "^[0-9]+\\.[0-9]{2}$"
+      description: "Valor monetário decimal exato em reais, com duas casas; pode ser zero ou exceder o teto de uma fatura."
+      example: "12345.67"
+    ReportOccupancyTotals:
+      type: "object"
+      required: ["total","occupied","occupancyRate"]
+      properties:
+        total:
+          type: "integer"
+          minimum: 0
+        occupied:
+          type: "integer"
+          minimum: 0
+        occupancyRate:
+          type: "number"
+          minimum: 0
+          maximum: 100
+          example: 33.3
+    ReportOccupancy:
+      type: "object"
+      required: ["byBlock","total"]
+      properties:
+        byBlock:
+          type: "array"
+          items:
+            type: "object"
+            required: ["block","total","occupied","occupancyRate"]
+            properties:
+              block:
+                type: "string"
+                example: "Sem bloco"
+              total:
+                type: "integer"
+                minimum: 0
+              occupied:
+                type: "integer"
+                minimum: 0
+              occupancyRate:
+                type: "number"
+                minimum: 0
+                maximum: 100
+                example: 33.3
+        total:
+          "$ref": "#/components/schemas/ReportOccupancyTotals"
+    ReportChargeBucket:
+      type: "object"
+      required: ["count","amount"]
+      properties:
+        count:
+          type: "integer"
+          minimum: 0
+        amount:
+          "$ref": "#/components/schemas/ReportMoney"
+    ReportChargeSummary:
+      type: "object"
+      required: ["paid","pending","overdue","total","delinquencyRate"]
+      properties:
+        paid:
+          "$ref": "#/components/schemas/ReportChargeBucket"
+        pending:
+          "$ref": "#/components/schemas/ReportChargeBucket"
+        overdue:
+          "$ref": "#/components/schemas/ReportChargeBucket"
+        total:
+          "$ref": "#/components/schemas/ReportChargeBucket"
+        delinquencyRate:
+          type: "number"
+          minimum: 0
+          maximum: 100
+          example: 33.3
+    ReportCharges:
+      type: "object"
+      required: ["period","summary","byMonth"]
+      properties:
+        period:
+          "$ref": "#/components/schemas/ReportPeriod"
+        summary:
+          "$ref": "#/components/schemas/ReportChargeSummary"
+        byMonth:
+          type: "array"
+          items:
+            allOf: [{"$ref":"#/components/schemas/ReportChargeSummary"},{"type":"object","required":["month"],"properties":{"month":{"type":"string","pattern":"^[0-9]{4}-[0-9]{2}$","example":"2026-11"}}}]
+    ReportIncidents:
+      type: "object"
+      required: ["period","total","byCategory","byStatus"]
+      properties:
+        period:
+          "$ref": "#/components/schemas/ReportPeriod"
+        total:
+          type: "integer"
+          minimum: 0
+        byCategory:
+          type: "array"
+          items:
+            type: "object"
+            required: ["category","count"]
+            properties:
+              category:
+                type: "string"
+                enum: ["BARULHO","MANUTENCAO","SEGURANCA","LIMPEZA","OUTRO"]
+              count:
+                type: "integer"
+                minimum: 0
+        byStatus:
+          type: "array"
+          items:
+            type: "object"
+            required: ["status","count"]
+            properties:
+              status:
+                type: "string"
+                enum: ["OPEN","IN_PROGRESS","RESOLVED","CLOSED"]
+              count:
+                type: "integer"
+                minimum: 0
+    ReportReservations:
+      type: "object"
+      required: ["period","total","byArea","byStatus"]
+      properties:
+        period:
+          "$ref": "#/components/schemas/ReportPeriod"
+        total:
+          type: "integer"
+          minimum: 0
+        byArea:
+          type: "array"
+          items:
+            type: "object"
+            required: ["areaId","areaName","count","byStatus"]
+            properties:
+              areaId:
+                type: "string"
+                format: "uuid"
+              areaName:
+                type: "string"
+              count:
+                type: "integer"
+                minimum: 0
+              byStatus:
+                type: "array"
+                items:
+                  type: "object"
+                  required: ["status","count"]
+                  properties:
+                    status:
+                      type: "string"
+                      enum: ["PENDING","APPROVED","REJECTED","CANCELLED"]
+                    count:
+                      type: "integer"
+                      minimum: 0
+        byStatus:
+          type: "array"
+          items:
+            type: "object"
+            required: ["status","count"]
+            properties:
+              status:
+                type: "string"
+                enum: ["PENDING","APPROVED","REJECTED","CANCELLED"]
+              count:
+                type: "integer"
+                minimum: 0
+    ResidentVoting:
+      type: object
+      required: [id, title, description, startDate, endDate, author, options, myVote]
+      properties:
+        id: { type: string, format: uuid }
+        title: { type: string }
+        description: { type: string }
+        startDate: { type: string, format: date-time }
+        endDate: { type: string, format: date-time }
+        authorId: { type: string, format: uuid }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+        author:
+          type: object
+          required: [name, role]
+          properties:
+            name: { type: string }
+            role: { type: string, enum: [ADMIN, FUNCIONARIO, MORADOR] }
+        options:
+          type: array
+          items:
+            type: object
+            required: [id, text]
+            properties:
+              id: { type: string, format: uuid }
+              text: { type: string }
+              votes:
+                type: integer
+                minimum: 0
+                description: Omitido antes do encerramento para quem não tem acesso ao painel.
+              votingId: { type: string, format: uuid }
+              createdAt: { type: string, format: date-time }
+        myVote:
+          type: object
+          nullable: true
+          required: [optionId, votedAt, votedBy]
+          properties:
+            optionId: { type: string, format: uuid }
+            votedAt: { type: string, format: date-time }
+            votedBy:
+              type: string
+              nullable: true
+              description: Nome de quem votou; null se o usuário foi removido.
+    Notification:
+      type: object
+      required: [id, type, sourceId, title, description, createdAt, isRead]
+      properties:
+        id:
+          type: string
+          description: Identificador composto TYPE:UUID, usado como chave na lista.
+          example: NOTICE:ba382bf4-653b-4b7e-b0c0-d22d53657d39
+        type:
+          type: string
+          enum: [NOTICE, EVENT]
+        sourceId:
+          type: string
+          format: uuid
+        title:
+          type: string
+        description:
+          type: string
+          enum: [Novo comunicado, Evento publicado, Evento cancelado]
+        createdAt:
+          type: string
+          format: date-time
+        isRead:
+          type: boolean
     PetUpdate:
       type: "object"
       minProperties: 1
@@ -2585,6 +2931,7 @@ components:
           type: string
           enum:
             - mobile
+            - panel
       required:
         - email
         - password
