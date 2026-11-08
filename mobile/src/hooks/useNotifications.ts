@@ -2,14 +2,15 @@ import { useCallback, useRef, useState } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
 import { useAuth } from '../contexts/AuthContext';
 import { toApiFailure, type ApiFailure } from '../services/api';
-import { listNotifications, markNotificationRead } from '../services/notificationService';
+import { listNotifications, resolveNotificationTarget, type NotificationTarget } from '../services/notificationService';
 import type { AppNotification } from '../types/notification';
 
 export function useNotifications() {
   const { user } = useAuth();
   const userId = user?.id;
-  const [inbox, setInbox] = useState<{ userId: string; items: AppNotification[] } | null>(null);
-  const items = inbox && inbox.userId === userId ? inbox.items : [];
+  const unitId = user?.unitId ?? null;
+  const [inbox, setInbox] = useState<{ userId: string; unitId: string | null; items: AppNotification[] } | null>(null);
+  const items = inbox && inbox.userId === userId && inbox.unitId === unitId ? inbox.items : [];
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [failure, setFailure] = useState<ApiFailure | null>(null);
@@ -27,7 +28,7 @@ export function useNotifications() {
     try {
       const data = await listNotifications();
       if (id !== request.current || !active.current) return;
-      setInbox({ userId, items: data });
+      setInbox({ userId, unitId, items: data });
       setFailure(null);
     } catch (error) {
       if (id === request.current && active.current) {
@@ -39,7 +40,7 @@ export function useNotifications() {
         setIsRefreshing(false);
       }
     }
-  }, [userId]);
+  }, [userId, unitId]);
 
   useFocusEffect(useCallback(() => {
     active.current = true;
@@ -58,38 +59,30 @@ export function useNotifications() {
 
   const reload = useCallback(() => { void load(true); }, [load]);
 
-  const markRead = useCallback(async (item: AppNotification): Promise<boolean> => {
-    if (!active.current || opening.current) return false;
-    if (item.isRead) return true;
+  const loadTarget = useCallback(async (item: AppNotification): Promise<NotificationTarget | null> => {
+    if (!active.current || opening.current || !userId) return null;
     const currentFocus = focus.current;
     opening.current = true;
     setOpeningId(item.id);
     try {
-      await markNotificationRead(item);
-      if (!active.current || currentFocus !== focus.current) return false;
-      // Uma consulta iniciada antes da leitura não pode desfazer o resultado.
-      request.current += 1;
-      setInbox(current => current ? { ...current,
-        items: current.items.map(entry => entry.id === item.id ? { ...entry, isRead: true } : entry),
-      } : null);
-      setIsLoading(false);
-      setIsRefreshing(false);
+      const target = await resolveNotificationTarget(item, unitId);
+      if (!active.current || currentFocus !== focus.current) return null;
       setFailure(null);
-      return true;
+      return target;
     } catch (error) {
       if (active.current && currentFocus === focus.current) {
         setFailure(toApiFailure(error, 'Não foi possível abrir a notificação.'));
       }
-      return false;
+      return null;
     } finally {
       if (currentFocus === focus.current) {
         opening.current = false;
         setOpeningId(null);
       }
     }
-  }, []);
+  }, [userId, unitId]);
 
-  return { items, isLoading, isRefreshing, failure, openingId, reload, markRead,
+  return { items, isLoading, isRefreshing, failure, openingId, reload, loadTarget,
     unreadCount: items.filter(item => !item.isRead).length };
 }
 

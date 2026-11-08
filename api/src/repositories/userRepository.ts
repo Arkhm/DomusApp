@@ -6,7 +6,8 @@ export const userRepository = {
     select: { id: true, status: true, role: true, isSyndic: true, tokenVersion: true },
   }),
 
-  revokeTokens: async (id: string, expectedVersion?: number) => {
+  revokeTokens: async (id: string, expectedVersion: number) => {
+    if (!Number.isInteger(expectedVersion) || expectedVersion < 0) throw new Error('Versão de sessão inválida.');
     return prisma.user.updateMany({ where: { id, tokenVersion: expectedVersion },
       data: { tokenVersion: { increment: 1 } } });
   },

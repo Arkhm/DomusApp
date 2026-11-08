@@ -155,7 +155,7 @@ test('relatórios: HTTP exige sessão atual e papel, valida filtros e oculta err
   assert.equal(response.body.error, 'Não foi possível carregar o relatório.');
 });
 
-test('relatórios: consultas usam agregação, parâmetros e limites mensais locais', async t => {
+test('relatórios: cobranças usam limites civis UTC sem deslocar vencimentos para o mês anterior', async t => {
   const queries: Prisma.Sql[] = [];
   const original = prisma.$queryRaw;
   t.after(() => { prisma.$queryRaw = original; });
@@ -165,12 +165,17 @@ test('relatórios: consultas usam agregação, parâmetros e limites mensais loc
     return [];
   }) as typeof prisma.$queryRaw;
   await reportRepository.occupancy();
-  await reportRepository.charges({ startDate: '2035-01-31', endDate: '2035-02-01' }, new Date('2035-02-01T03:00Z'));
+  const now = new Date('2035-03-15T12:00Z');
+  await reportRepository.charges({ startDate: '2035-01-31', endDate: '2035-02-01' }, now);
   await reportRepository.reservations({ startDate: '2035-01-31', endDate: '2035-02-01' });
   assert.match(queries[0]!.sql, /EXISTS/);
   assert.match(queries[0]!.sql, /r.role = 'MORADOR' AND r.status = 'ACTIVE'/);
   assert.match(queries[1]!.sql, /SUM\(classified.amount\)/);
   assert.match(queries[1]!.sql, /i.dueDate < \?/);
-  assert.ok(queries[1]!.values.some((value: unknown) => value instanceof Date && value.toISOString() === '2035-02-01T03:00:00.000Z'));
+  assert.deepEqual(queries[1]!.values.filter((value): value is Date => value instanceof Date)
+    .map(value => value.toISOString()).sort(), [
+    '2035-01-31T00:00:00.000Z', '2035-02-01T00:00:00.000Z',
+    '2035-02-01T00:00:00.000Z', '2035-02-02T00:00:00.000Z', now.toISOString(),
+  ].sort());
   assert.ok(queries[2]!.values.some((value: unknown) => value instanceof Date && value.toISOString() === '2035-01-31T00:00:00.000Z'));
 });

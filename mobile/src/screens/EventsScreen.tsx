@@ -1,4 +1,5 @@
-import React, { useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
 import { ActivityIndicator, SectionList, Pressable, RefreshControl, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -6,6 +7,8 @@ import { StatusBanner } from '../components';
 import { useEvents } from '../hooks/useEvents';
 import { colors, elevation, layout, radius, spacing, typography } from '../theme';
 import { formatEventDateTime, splitEvents } from '../services/eventService';
+import { markNotificationRead } from '../services/notificationService';
+import { toApiFailure } from '../services/api';
 import type { CondoEvent, EventCategory } from '../types';
 
 interface EventsScreenProps {
@@ -102,6 +105,20 @@ export function EventsScreen({ navigation }: EventsScreenProps) {
 
 export function EventDetailScreen({ route, navigation }: EventDetailScreenProps) {
   const { event } = route.params;
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [revision, setRevision] = useState(0);
+  useFocusEffect(useCallback(() => {
+    let active = true;
+    setSaving(true);
+    setError(null);
+    void markNotificationRead({ type: 'EVENT', sourceId: event.id }).catch((failure: unknown) => {
+      if (active) setError(toApiFailure(failure, 'Não foi possível registrar a leitura.').message);
+    }).finally(() => {
+      if (active) setSaving(false);
+    });
+    return () => { active = false; };
+  }, [event.id, revision]));
   const cancelled = event.status === 'CANCELLED';
   const meta = CATEGORY_META[event.category];
   return <SafeAreaView style={styles.screen} edges={['top', 'bottom']}>
@@ -117,6 +134,8 @@ export function EventDetailScreen({ route, navigation }: EventDetailScreenProps)
         <Text selectable style={styles.articleBody}>{event.content}</Text>
       </View>
       {cancelled && <StatusBanner tone="error" title="Evento cancelado" message="Este evento não vai mais acontecer." />}
+      {saving && <ActivityIndicator color={colors.brand} accessibilityLabel="Registrando leitura" />}
+      {error && <StatusBanner tone="error" title="Leitura não registrada" message={error} actionLabel="Tentar novamente" onAction={() => setRevision(value => value + 1)} />}
     </ScrollView>
   </SafeAreaView>;
 }

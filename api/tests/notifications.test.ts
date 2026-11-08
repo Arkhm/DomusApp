@@ -1,6 +1,8 @@
 import test from 'node:test';
 import type { TestContext } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { parseDocument } from 'yaml';
 import { randomUUID } from 'node:crypto';
 import request from 'supertest';
 import type { Prisma, User } from '@prisma/client';
@@ -19,6 +21,24 @@ const unitId = randomUUID();
 const sourceId = randomUUID();
 const actor = { id: userId, status: 'ACTIVE', role: 'MORADOR', isSyndic: true, unitId, tokenVersion: 0 } as User;
 const notFound = (error: unknown) => error instanceof HttpError && error.statusCode === 404;
+
+test('notificações: OpenAPI preserva as operações de notificações, relatórios e vagas', () => {
+  const yaml = parseDocument(readFileSync('docs/openapi.yaml', 'utf8'));
+  assert.deepEqual(yaml.errors, []);
+  const document = yaml.toJS();
+  for (const [path, method] of [
+    ['/notifications', 'get'], ['/notifications/{type}/{id}/read', 'post'],
+    ...['occupancy', 'charges-summary', 'incidents', 'reservations'].map(name => ['/reports/' + name, 'get']),
+    ['/parking-spots', 'get'], ['/parking-spots', 'post'], ['/parking-spots/me', 'get'],
+    ['/parking-spots/{id}', 'put'], ['/parking-spots/{id}', 'delete'], ['/parking-spots/{id}/assign', 'put'],
+  ]) assert.ok(document.paths[path!]?.[method!], `${method} ${path}`);
+  function check(value: any) {
+    if (!value || typeof value !== 'object') return;
+    if (value.$ref) assert.ok(value.$ref.split('/').slice(1).reduce((node: any, key: string) => node?.[key], document), value.$ref);
+    for (const child of Object.values(value)) check(child);
+  }
+  check(document);
+});
 
 // Os métodos do Prisma são proxies sem descriptor.value para mock.method.
 function mockPrismaMethod<T, K extends keyof T, F extends (...args: never[]) => unknown>(t: TestContext, target: T, key: K, implementation: F) {

@@ -37,7 +37,7 @@ paths:
     get:
       tags: ["Relatórios"]
       summary: "Cobranças por mês de vencimento"
-      description: "Acesso exclusivo a ADMIN, FUNCIONARIO e MORADOR com isSyndic=true. Filtra Invoice.dueDate por dias inclusivos em America/Sao_Paulo; agrega por mês local de vencimento. PAID é paga; OVERDUE é vencida independentemente da data; PENDING é vencida somente quando dueDate < instante atual (comparação estrita), caso contrário pendente. Outros estados (canceladas, expiradas, rejeitadas, estornadas, contestadas e parcialmente estornadas) são excluídos. Não altera status nem consulta o provedor. Valores são strings decimais exatas. Taxa de inadimplência = valor vencido ÷ total pago/pendente/vencido × 100, com uma casa decimal; denominador zero resulta em 0. Retorna somente meses com cobranças elegíveis."
+      description: "Acesso exclusivo a ADMIN, FUNCIONARIO e MORADOR com isSyndic=true. Filtra Invoice.dueDate por dias inclusivos no calendário UTC usado no cadastro das faturas (AAAA-MM-DD); agrega pelo mês de vencimento nesse mesmo calendário. PAID é paga; OVERDUE é vencida independentemente da data; PENDING é vencida somente quando dueDate < instante atual (comparação estrita), caso contrário pendente. Outros estados (canceladas, expiradas, rejeitadas, estornadas, contestadas e parcialmente estornadas) são excluídos. Não altera status nem consulta o provedor. Valores são strings decimais exatas. Taxa de inadimplência = valor vencido ÷ total pago/pendente/vencido × 100, com uma casa decimal; denominador zero resulta em 0. Retorna somente meses com cobranças elegíveis."
       parameters: [{"name":"startDate","in":"query","required":false,"description":"Primeiro dia civil incluído (AAAA-MM-DD). Padrão: primeiro dia do mês de endDate menos 11 meses.","schema":{"type":"string","format":"date"}},{"name":"endDate","in":"query","required":false,"description":"Último dia civil incluído (AAAA-MM-DD). Padrão: hoje em America/Sao_Paulo. Início ≤ fim; máximo de 24 meses, sem incluir o aniversário de dois anos. Datas entre 1000-01-01 e 9998-12-31.","schema":{"type":"string","format":"date"}}]
       responses:
         "200":
@@ -2248,6 +2248,82 @@ paths:
           $ref: "#/components/responses/404"
         "500":
           $ref: "#/components/responses/500"
+  /notifications:
+    get:
+      tags: [notifications]
+      summary: Listar a central pessoal de notificações
+      description: >-
+        Retorna comunicados PUBLISHED e eventos PUBLISHED ou CANCELLED destinados a ALL
+        ou à unidade atual do usuário, inclusive para síndicos. Sem unidade, retorna
+        apenas ALL. Ordenação por createdAt decrescente, com desempate pelo id.
+        isRead de NOTICE usa NoticeRead, compartilhado com POST /notices/{id}/read;
+        edições do comunicado podem invalidar essa leitura. Não envia rascunhos.
+      responses:
+        '200':
+          description: Notificações visíveis, ou uma lista vazia.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Notification'
+        '401':
+          $ref: '#/components/responses/401'
+        '503':
+          description: Não foi possível validar a sessão.
+        '500':
+          $ref: '#/components/responses/500'
+  /notifications/{type}/{id}/read:
+    post:
+      tags: [notifications]
+      summary: Marcar uma notificação visível como lida
+      description: >-
+        Operação idempotente e individual. O id é o sourceId (UUID do comunicado ou
+        evento), não o id composto da notificação. NOTICE também grava NoticeRead
+        na mesma transação. Não concede a visão de painel para síndicos.
+      parameters:
+        - in: path
+          name: type
+          required: true
+          schema:
+            type: string
+            enum: [NOTICE, EVENT]
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Leitura confirmada.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [message]
+                properties:
+                  message:
+                    type: string
+                    example: Notificação lida.
+        '400':
+          $ref: '#/components/responses/400'
+        '401':
+          $ref: '#/components/responses/401'
+        '404':
+          description: Item inexistente, rascunho ou não destinado ao usuário.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: Notificação não encontrada.
+        '503':
+          description: Não foi possível validar a sessão.
+        '500':
+          $ref: '#/components/responses/500'
   /parking-spots:
     get:
       tags: [parking-spots]

@@ -215,7 +215,7 @@ test('usuários: HTTP e repository com MySQL isolado', { skip: process.env.RUN_D
     assert.equal(consumed?.resetTokenExpiry, null);
     assert.equal(consumed?.password, 'nova-senha-hash');
     assert.equal(consumed?.tokenVersion, versionBefore + 1);
-    await userRepository.revokeTokens(createdId);
+    await userRepository.revokeTokens(createdId, versionBefore + 1);
     assert.equal((await userRepository.findById(createdId))?.tokenVersion, versionBefore + 2);
     const expired = randomUUID();
     await userRepository.update(createdId, { resetToken: expired, resetTokenExpiry: new Date(Date.now() - 60000) });

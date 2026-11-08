@@ -23,10 +23,10 @@ export const reportRepository = {
       const following = monthStart(date, 1);
       const end = following > period.endDate ? nextDay(period.endDate) : following;
       months.push(Prisma.sql`SELECT ${date.slice(0, 7)} AS month,
-        CAST(${saoPauloDayStart(start)} AS DATETIME(3)) AS startsAt,
-        CAST(${saoPauloDayStart(end)} AS DATETIME(3)) AS endsAt`);
+        CAST(${new Date(start + 'T00:00:00Z')} AS DATETIME(3)) AS startsAt,
+        CAST(${new Date(end + 'T00:00:00Z')} AS DATETIME(3)) AS endsAt`);
     }
-    // Limites mensais calculados com America/Sao_Paulo: não depende das tabelas de fusos do MySQL.
+    // Vencimentos seguem o calendário UTC usado ao cadastrar faturas com AAAA-MM-DD.
     return prisma.$queryRaw<ChargeRow[]>(Prisma.sql`
       SELECT classified.month, classified.status, COUNT(*) AS count, SUM(classified.amount) AS amount
       FROM (SELECT calendar.month,
