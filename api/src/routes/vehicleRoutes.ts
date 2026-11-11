@@ -1,5 +1,5 @@
 import { updateVehicleSchema } from '../schemas/updateSchemas';
-import { createVehicleSchema, vehicleQuerySchema } from '../schemas/vehicleSchema';
+import { createVehicleRequestSchema, vehicleQuerySchema } from '../schemas/vehicleSchema';
 import { idParamsSchema } from '../schemas/common';
 import { validate } from '../middlewares/validate';
 import { Router } from 'express';
@@ -13,7 +13,7 @@ router.use(authMiddleware);
 
 router.get('/', authorizeRole(['ADMIN', 'FUNCIONARIO']), validate(vehicleQuerySchema, 'query'), vehicleController.list);
 router.get('/me', authorizeRole(['MORADOR']), vehicleController.listMine);
-router.post('/', authorizeRole(['MORADOR']), validate(createVehicleSchema), vehicleController.create);
+router.post('/', authorizeRole(['ADMIN', 'MORADOR']), validate(createVehicleRequestSchema), vehicleController.create);
 router.put('/:id', authorizeRole(['ADMIN']), validate(idParamsSchema, 'params'), validate(updateVehicleSchema), vehicleController.update);
 router.delete('/:id', authorizeRole(['ADMIN', 'MORADOR']), validate(idParamsSchema, 'params'), vehicleController.delete);
 

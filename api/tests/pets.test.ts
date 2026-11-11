@@ -5,117 +5,151 @@ import request from 'supertest';
 import app from '../src/app';
 import { createAuthTokens } from '../src/lib/authTokens';
 import { prisma } from '../src/lib/prisma';
-import { petService } from '../src/services/petService';
-import { petRepository } from '../src/repositories/petRepository';
+import { petService as service } from '../src/services/petService';
+import { petRepository as repo } from '../src/repositories/petRepository';
+import { userRepository } from '../src/repositories/userRepository';
+import { createPetSchema, createManagedPetSchema, petQuerySchema } from '../src/schemas/petSchema';
 
-const enabled = process.env.RUN_DB_INTEGRATION === 'true';
-const bearer = (id: string, role = 'MORADOR') =>
-  `Bearer ${createAuthTokens({ id, role, isSyndic: false, tokenVersion: 0 }).token}`;
+const ownerId = randomUUID();
+const unitId = randomUUID();
+const pet = { id: randomUUID(), ownerId, name: 'Bolinha', species: 'CACHORRO', size: 'PEQUENO' };
 const input = { name: ' Bolinha ', species: 'cachorro', size: 'pequeno' };
+const status = (code: number) => (error: any) => error.statusCode === code;
+const bearer = (actor: { id: string; role: string; isSyndic?: boolean }) =>
+  `Bearer ${createAuthTokens({ ...actor, isSyndic: actor.isSyndic ?? false, tokenVersion: 0 }).token}`;
 
-test('pets: validações do serviço', async t => {
-  for (const [name, data, message] of [
-    ['nome vazio', { ...input, name: ' ' }, /obrigatórios/],
-    ['espécie ausente', { name: 'Bolinha', size: 'MEDIO' }, /obrigatórios/],
-    ['porte ausente', { name: 'Bolinha', species: 'GATO' }, /obrigatórios/],
-    ['espécie inválida', { ...input, species: 'DINOSSAURO' }, /Espécie inválida/],
-    ['porte inválido', { ...input, size: 'GIGANTE' }, /Porte inválido/],
-  ] as const) {
-    await t.test(`recusa ${name} antes de persistir`, async t => {
-      const persist = t.mock.method(petRepository, 'create', async () => {
-        assert.fail('Pet inválido não pode chegar ao repositório.');
-      });
-      await assert.rejects(() => petService.create(randomUUID(), data), message);
-      assert.equal(persist.mock.callCount(), 0);
-    });
+test('pets: schemas validam filtros e preservam a entrada mobile', async t => {
+  assert.deepEqual(createPetSchema.parse({ ...input, ownerId: 'descartado' }), {
+    name: 'Bolinha', species: 'CACHORRO', size: 'PEQUENO',
+  });
+  assert.equal(createManagedPetSchema.parse({ ...input, ownerId }).ownerId, ownerId);
+  assert.deepEqual(petQuerySchema.parse({ species: 'gato', size: 'medio', block: ' A ', search: ' Luna ', unitId }), {
+    species: 'GATO', size: 'MEDIO', block: 'A', search: 'Luna', unitId,
+  });
+  for (const filters of [{ species: 'COELHO' }, { size: 'GIGANTE' }, { unitId: 'x' }, { block: {} },
+    { block: ' ' }, { search: ['Luna'] }, { search: 'x'.repeat(192) }, { species: { contains: '' } }]) {
+    assert.equal(petQuerySchema.safeParse(filters).success, false);
   }
+  const create = t.mock.method(repo, 'create', async () => pet as any);
+  for (const data of [{ ...input, name: ' ' }, { ...input, name: 'x'.repeat(192) }, { species: 'GATO' },
+    { ...input, species: 'COELHO' }, { ...input, size: 'GIGANTE' }, { ...input, ownerId: {} }]) {
+    await assert.rejects(service.create(ownerId, data));
+  }
+  assert.equal(create.mock.callCount(), 0);
 });
 
-test('pets: HTTP, propriedade e repositório com MySQL isolado', { skip: !enabled }, async t => {
-  assert.match(process.env.DATABASE_NAME ?? '', /_test$/, 'Integração só pode usar banco terminado em _test.');
-  const suffix = randomUUID();
-  const unitId = randomUUID();
-  const otherUnitId = randomUUID();
-  const ownerId = randomUUID();
-  const otherId = randomUUID();
-  const adminId = randomUUID();
-  const employeeId = randomUUID();
-  const ids = [ownerId, otherId, adminId, employeeId];
-  t.after(async () => {
-    try {
-      await prisma.pet.deleteMany({ where: { ownerId: { in: ids } } });
-      await prisma.user.deleteMany({ where: { id: { in: ids } } });
-      await prisma.unit.deleteMany({ where: { id: { in: [unitId, otherUnitId] } } });
-    } finally { await prisma.$disconnect(); }
+test('pets: filtros combinam espécie, porte, unidade, bloco e busca parcial', async t => {
+  const find = t.mock.method(repo, 'findAll', async () => []);
+  await service.listAll({ species: 'gato', size: 'medio', unitId, block: ' A ', search: ' Luna ' });
+  assert.deepEqual(find.mock.calls[0].arguments[0], {
+    species: 'GATO', size: 'MEDIO', owner: { unitId, unit: { block: 'A' } },
+    OR: [{ name: { contains: 'Luna' } }, { owner: { name: { contains: 'Luna' } } }],
   });
-  await prisma.unit.createMany({ data: [
-    { id: unitId, number: `pets-${suffix}` },
-    { id: otherUnitId, number: `pets-outra-${suffix}` },
-  ] });
-  await prisma.user.createMany({ data: ids.map((id, index) => ({
-    id, name: 'Pessoa dos pets', email: `${index}-pets-${suffix}@example.com`,
-    cpf: `${index}-${suffix}`, password: 'hash-apenas-para-teste',
-    role: index === 2 ? 'ADMIN' : index === 3 ? 'FUNCIONARIO' : 'MORADOR',
-    unitId: index === 1 ? otherUnitId : unitId,
-  })) });
-  const owner = bearer(ownerId);
-  const other = bearer(otherId);
-  const admin = bearer(adminId, 'ADMIN');
-  const employee = bearer(employeeId, 'FUNCIONARIO');
-  const ownPet = await petService.create(ownerId, input);
-  const foreignPet = await petService.create(otherId, { name: 'Mimi', species: 'gato', size: 'medio' });
+  await service.listAll();
+  assert.deepEqual(find.mock.calls[1].arguments[0], {});
+});
 
-  await t.test('sem token retorna 401 em todas as operações', async () => {
-    await request(app).get('/pets').expect(401);
-    await request(app).get('/pets/me').expect(401);
-    await request(app).post('/pets').send(input).expect(401);
-    await request(app).delete(`/pets/${ownPet.id}`).expect(401);
+test('pets: repositório limita dados pessoais e ordena por bloco, unidade e nome', async t => {
+  const original = prisma.pet.findMany;
+  const find = t.mock.fn(async (_args: Parameters<typeof prisma.pet.findMany>[0]) => []);
+  prisma.pet.findMany = find as typeof original;
+  t.after(() => { prisma.pet.findMany = original; });
+  await repo.findAll({ species: 'GATO' });
+  const args = find.mock.calls[0].arguments[0]!;
+  assert.deepEqual(args.where, { species: 'GATO' });
+  assert.deepEqual(args.include, { owner: { select: {
+    id: true, name: true, phone: true,
+    unit: { select: { id: true, type: true, block: true, number: true } },
+  } } });
+  assert.deepEqual(args.orderBy, [{ owner: { unit: { block: 'asc' } } }, { owner: { unit: { number: 'asc' } } }, { name: 'asc' }, { id: 'asc' }]);
+});
+
+test('pets: cadastro admin exige dono morador ativo; morador ignora ownerId', async t => {
+  const lookup = t.mock.method(repo, 'findOwner', async () => ({ id: ownerId, role: 'MORADOR', status: 'ACTIVE' }));
+  const create = t.mock.method(repo, 'create', async (data: Parameters<typeof repo.create>[0]) => ({ ...pet, ...data }) as any);
+  const adminId = randomUUID();
+  assert.equal((await service.create(adminId, { ...input, ownerId }, 'ADMIN')).ownerId, ownerId);
+  assert.deepEqual(create.mock.calls[0].arguments[0], { name: 'Bolinha', species: 'CACHORRO', size: 'PEQUENO', ownerId });
+  await assert.rejects(service.create(adminId, input, 'ADMIN'), status(400));
+  for (const owner of [null, { id: ownerId, role: 'MORADOR', status: 'INACTIVE' },
+    { id: ownerId, role: 'ADMIN', status: 'ACTIVE' }, { id: ownerId, role: 'FUNCIONARIO', status: 'ACTIVE' }]) {
+    lookup.mock.mockImplementation(async () => owner as any);
+    await assert.rejects(service.create(adminId, { ...input, ownerId }, 'ADMIN'), status(400));
+  }
+  assert.equal(create.mock.callCount(), 1);
+  const before = lookup.mock.callCount();
+  const own = await service.create(adminId, { ...input, ownerId });
+  assert.equal(own.ownerId, adminId);
+  assert.equal(lookup.mock.callCount(), before);
+  await assert.rejects(service.create(adminId, input, 'FUNCIONARIO'), status(403));
+});
+
+test('pets: edição e remoção verificam propriedade e não alteram dono', async t => {
+  const find = t.mock.method(repo, 'findById', async () => pet as any);
+  const update = t.mock.method(repo, 'update', async (_id: string, data: Parameters<typeof repo.update>[1]) => ({ ...pet, ...data }) as any);
+  const remove = t.mock.method(repo, 'delete', async () => pet as any);
+  const owner = { id: ownerId, role: 'MORADOR' };
+  const foreign = { id: randomUUID(), role: 'MORADOR' };
+  await service.update(pet.id, { name: 'Luna', ownerId: foreign.id }, owner);
+  assert.deepEqual(update.mock.calls[0].arguments[1], { name: 'Luna' });
+  await assert.rejects(service.update(pet.id, { ownerId: foreign.id }, owner));
+  await assert.rejects(service.update(pet.id, { name: 'Luna' }, foreign), status(403));
+  await assert.rejects(service.delete(pet.id, foreign.id, foreign.role), status(403));
+  await assert.rejects(service.delete(pet.id, owner.id, 'FUNCIONARIO'), status(403));
+  assert.equal(remove.mock.callCount(), 0);
+  await service.delete(pet.id, foreign.id, 'ADMIN');
+  await service.delete(pet.id, owner.id, owner.role);
+  assert.equal(remove.mock.callCount(), 2);
+  find.mock.mockImplementation(async () => null);
+  await assert.rejects(service.delete(pet.id, owner.id, owner.role), status(404));
+  await assert.rejects(service.update(pet.id, { name: 'Luna' }, owner), status(404));
+});
+
+test('pets: HTTP valida filtros, permissões e cadastro sem banco', async t => {
+  const actors = [
+    { id: randomUUID(), role: 'ADMIN' }, { id: randomUUID(), role: 'FUNCIONARIO' },
+    { id: ownerId, role: 'MORADOR' }, { id: randomUUID(), role: 'MORADOR', isSyndic: true },
+  ];
+  t.mock.method(userRepository, 'findAuthState', async (id: string) => ({ ...actors.find(actor => actor.id === id),
+    id, tokenVersion: 0, status: 'ACTIVE' }) as any);
+  const find = t.mock.method(repo, 'findAll', async () => []);
+  const mine = t.mock.method(repo, 'findByOwner', async () => [pet] as any);
+  const lookup = t.mock.method(repo, 'findOwner', async () => ({ id: ownerId, role: 'MORADOR', status: 'ACTIVE' }));
+  const create = t.mock.method(repo, 'create', async (data: Parameters<typeof repo.create>[0]) => ({ ...pet, ...data }) as any);
+  t.mock.method(repo, 'findById', async () => pet as any);
+  const update = t.mock.method(repo, 'update', async (_id: string, data: Parameters<typeof repo.update>[1]) => ({ ...pet, ...data }) as any);
+  t.mock.method(repo, 'delete', async () => pet as any);
+  for (const [method, path] of [['get', '/pets'], ['get', '/pets/me'], ['post', '/pets'],
+    ['put', `/pets/${pet.id}`], ['delete', `/pets/${pet.id}`]] as const) {
+    await request(app)[method](path).send(input).expect(401);
+  }
+  for (const actor of actors) {
+    const auth = bearer(actor);
+    await request(app).get('/pets').set('Authorization', auth).expect(actor.role === 'MORADOR' ? 403 : 200);
+    await request(app).get('/pets/me').set('Authorization', auth).expect(actor.role === 'MORADOR' ? 200 : 403);
+    await request(app).post('/pets').set('Authorization', auth).send({ ...input, ownerId })
+      .expect(actor.role === 'FUNCIONARIO' ? 403 : 201);
+    const canEdit = actor.role === 'ADMIN' || actor.id === ownerId;
+    await request(app).put(`/pets/${pet.id}`).set('Authorization', auth).send({ name: 'Luna', ownerId: randomUUID() }).expect(canEdit ? 200 : 403);
+    await request(app).delete(`/pets/${pet.id}`).set('Authorization', auth).expect(canEdit ? 200 : 403);
+  }
+  assert.equal(create.mock.calls.at(-1)!.arguments[0].ownerId, actors[3]!.id);
+  assert.ok(update.mock.calls.every(call => !('ownerId' in call.arguments[1])));
+  const admin = bearer(actors[0]!);
+  await request(app).post('/pets').set('Authorization', admin).send(input).expect(400);
+  await request(app).post('/pets').set('Authorization', admin).send({ ...input, ownerId: 'invalid' }).expect(400);
+  lookup.mock.mockImplementation(async () => null as any);
+  await request(app).post('/pets').set('Authorization', admin).send({ ...input, ownerId }).expect(400);
+  for (const query of [{ species: 'OTHER' }, { size: 'GIGANTE' }, { unitId: 'x' }, { search: ['a', 'b'] }]) {
+    await request(app).get('/pets').query(query).set('Authorization', admin).expect(400);
+  }
+  await request(app).get('/pets').query({ species: 'gato', size: 'medio', unitId, block: ' A ', search: ' Lu ' }).set('Authorization', admin).expect(200);
+  assert.deepEqual(find.mock.calls.at(-1)!.arguments[0], {
+    species: 'GATO', size: 'MEDIO', owner: { unitId, unit: { block: 'A' } },
+    OR: [{ name: { contains: 'Lu' } }, { owner: { name: { contains: 'Lu' } } }],
   });
-  await t.test('listagem administrativa recusa morador e permite equipe', async () => {
-    await request(app).get('/pets').set('Authorization', owner).expect(403);
-    for (const auth of [admin, employee]) {
-      const response = await request(app).get('/pets').set('Authorization', auth).expect(200);
-      const stored = response.body.find((pet: { id: string }) => pet.id === foreignPet.id);
-      assert.equal(stored.owner.id, otherId);
-      assert.equal(stored.owner.unit.id, otherUnitId);
-      assert.ok(!('password' in stored.owner));
-    }
-    await request(app).post('/pets').set('Authorization', employee).send(input).expect(403);
-    await request(app).delete(`/pets/${ownPet.id}`).set('Authorization', employee).expect(403);
-  });
-  await t.test('morador lista somente seus pets mesmo forçando proprietário ou unidade na query', async () => {
-    const response = await request(app).get('/pets/me').query({ ownerId: otherId, unitId: otherUnitId })
-      .set('Authorization', owner).expect(200);
-    assert.deepEqual(response.body.map((pet: { id: string }) => pet.id), [ownPet.id]);
-    const otherResponse = await request(app).get('/pets/me').set('Authorization', other).expect(200);
-    assert.deepEqual(otherResponse.body.map((pet: { id: string }) => pet.id), [foreignPet.id]);
-    await request(app).get(`/pets/${foreignPet.id}`).set('Authorization', owner).expect(404);
-  });
-  await t.test('IDOR: não remove pet de outra unidade e preserva o registro', async () => {
-    await request(app).delete(`/pets/${foreignPet.id}`).set('Authorization', owner).expect(400)
-      .expect(({ body }) => assert.match(body.error, /permissão/));
-    assert.equal((await petRepository.findById(foreignPet.id))?.ownerId, otherId);
-  });
-  await t.test('criação normaliza campos e ignora proprietário enviado no corpo', async () => {
-    const response = await request(app).post('/pets').set('Authorization', owner)
-      .send({ ...input, ownerId: otherId, unitId: otherUnitId }).expect(201);
-    assert.equal(response.body.ownerId, ownerId);
-    assert.equal(response.body.name, 'Bolinha');
-    assert.equal(response.body.species, 'CACHORRO');
-    assert.equal(response.body.size, 'PEQUENO');
-    await request(app).delete(`/pets/${response.body.id}`).set('Authorization', owner).expect(200);
-    assert.equal(await petRepository.findById(response.body.id), null);
-  });
-  await t.test('admin pode remover pet de outra unidade', async () => {
-    const pet = await petService.create(otherId, { name: 'Piu', species: 'passaro', size: 'pequeno' });
-    await request(app).delete(`/pets/${pet.id}`).set('Authorization', admin).expect(200);
-    assert.equal(await petRepository.findById(pet.id), null);
-  });
-  await t.test('HTTP rejeita dados inválidos e remoção de pet inexistente', async () => {
-    for (const data of [{ ...input, name: ' ' }, { ...input, species: 'COELHO' }, { ...input, size: 'GIGANTE' }]) {
-      await request(app).post('/pets').set('Authorization', owner).send(data).expect(400);
-    }
-    await request(app).delete(`/pets/${randomUUID()}`).set('Authorization', owner).expect(400)
-      .expect(({ body }) => assert.match(body.error, /Pet não encontrado/));
-  });
+  await request(app).get('/pets/me').query({ ownerId: randomUUID(), unitId: randomUUID() }).set('Authorization', bearer(actors[2]!)).expect(200);
+  assert.deepEqual(mine.mock.calls.at(-1)!.arguments, [ownerId]);
+  await request(app).put('/pets/invalid').set('Authorization', admin).send({ name: 'Luna' }).expect(400);
+  await request(app).delete('/pets/invalid').set('Authorization', admin).expect(400);
 });

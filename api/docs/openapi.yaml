@@ -931,20 +931,36 @@ paths:
           $ref: "#/components/responses/500"
   /vehicles:
     get:
-      tags:
-        - vehicles
+      tags: [vehicles]
       summary: Listar veículos
-      description: "Perfis permitidos: ADMIN, FUNCIONARIO. SYNDIC corresponde ao atributo isSyndic."
+      description: "ADMIN e FUNCIONARIO. Filtros combinados; placa parcial normalizada. Ordenação por bloco, número da unidade e placa. A contagem da unidade inclui todos os seus veículos, independentemente dos filtros."
       parameters:
         - name: plate
           in: query
-          required: false
           schema:
             type: string
             maxLength: 20
+        - name: unitId
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: block
+          in: query
+          description: Bloco exato, sem espaços nas extremidades.
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 191
       responses:
         "200":
-          description: Operação concluída.
+          description: Veículos e ocupação total de suas unidades.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/PanelVehicle"
         "400":
           $ref: "#/components/responses/400"
         "401":
@@ -954,10 +970,9 @@ paths:
         "500":
           $ref: "#/components/responses/500"
     post:
-      tags:
-        - vehicles
-      summary: Cadastrar registro em veículos
-      description: "Perfis permitidos: MORADOR. SYNDIC corresponde ao atributo isSyndic."
+      tags: [vehicles]
+      summary: Cadastrar veículo
+      description: "ADMIN deve informar unitId de unidade existente. MORADOR usa a própria unidade; unitId informado é ignorado. FUNCIONARIO não cadastra. Ambos usam o mesmo lock transacional da unidade e o limite Unit.parkingSpots. Unidade cheia ou sem vagas retorna 400; placa duplicada retorna 409."
       requestBody:
         required: true
         content:
@@ -966,13 +981,21 @@ paths:
               $ref: "#/components/schemas/VehicleCreate"
       responses:
         "201":
-          description: Operação concluída.
+          description: Veículo cadastrado.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Vehicle"
         "400":
           $ref: "#/components/responses/400"
         "401":
           $ref: "#/components/responses/401"
         "403":
           $ref: "#/components/responses/403"
+        "404":
+          description: Unidade informada não encontrada.
+        "409":
+          description: Já existe um veículo cadastrado com esta placa.
         "500":
           $ref: "#/components/responses/500"
   /vehicles/me:
@@ -1053,13 +1076,45 @@ paths:
           $ref: "#/components/responses/500"
   /pets:
     get:
-      tags:
-        - pets
-      summary: Listar animais
-      description: "Perfis permitidos: ADMIN, FUNCIONARIO. SYNDIC corresponde ao atributo isSyndic."
+      tags: [pets]
+      summary: Listar pets do condomínio
+      description: "ADMIN e FUNCIONARIO. Filtros combinados por AND; search procura parte do nome do pet ou do dono. Ordena por bloco, número da unidade, nome do pet e id. Dados do dono limitados a id, nome, telefone e unidade, sem CPF ou e-mail."
+      parameters:
+        - name: species
+          in: query
+          schema:
+            type: string
+            enum: [CACHORRO, GATO, PASSARO, OUTRO]
+        - name: size
+          in: query
+          schema:
+            type: string
+            enum: [PEQUENO, MEDIO, GRANDE]
+        - name: unitId
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: block
+          in: query
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 191
+        - name: search
+          in: query
+          schema:
+            type: string
+            maxLength: 191
       responses:
         "200":
-          description: Operação concluída.
+          description: Pets com dono e unidade.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/PetPanel"
         "400":
           $ref: "#/components/responses/400"
         "401":
@@ -1069,10 +1124,9 @@ paths:
         "500":
           $ref: "#/components/responses/500"
     post:
-      tags:
-        - pets
-      summary: Cadastrar registro em animais
-      description: "Perfis permitidos: MORADOR. SYNDIC corresponde ao atributo isSyndic."
+      tags: [pets]
+      summary: Cadastrar pet
+      description: "ADMIN deve informar ownerId de um MORADOR ACTIVE. MORADOR continua cadastrando para si; ownerId válido enviado é ignorado. FUNCIONARIO não pode cadastrar. Espécie e porte aceitam letras minúsculas e são normalizados."
       requestBody:
         required: true
         content:
@@ -1081,7 +1135,11 @@ paths:
               $ref: "#/components/schemas/PetCreate"
       responses:
         "201":
-          description: Operação concluída.
+          description: Pet cadastrado.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PetRecord"
         "400":
           $ref: "#/components/responses/400"
         "401":
@@ -1110,8 +1168,8 @@ paths:
   /pets/{id}:
     put:
       tags: [pets]
-      summary: Editar registro parcialmente
-      description: "ADMIN ou morador proprietário. Proprietário não pode ser alterado. Campos omitidos são preservados; exige pelo menos um campo editável. Campos desconhecidos são descartados."
+      summary: Editar pet parcialmente
+      description: "ADMIN ou MORADOR dono. Apenas name, species e size são editáveis. ownerId e demais campos desconhecidos são descartados."
       parameters:
         - name: id
           in: path
@@ -1124,30 +1182,26 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/PetUpdate'
+              $ref: "#/components/schemas/PetUpdate"
       responses:
-        '200':
-          description: Registro atualizado.
+        "200":
+          description: Pet atualizado.
           content:
             application/json:
               schema:
-                type: object
-        '400':
-          $ref: '#/components/responses/400'
-        '401':
-          $ref: '#/components/responses/401'
-        '403':
-          $ref: '#/components/responses/403'
-        '404':
-          $ref: '#/components/responses/404'
-        '409':
-          $ref: '#/components/responses/409'
+                $ref: "#/components/schemas/PetRecord"
+        "400":
+          $ref: "#/components/responses/400"
+        "401":
+          $ref: "#/components/responses/401"
+        "403":
+          $ref: "#/components/responses/403"
+        "404":
+          $ref: "#/components/responses/404"
     delete:
-      tags:
-        - pets
-      summary: Excluir registro de animais
-      description: "Morador só pode excluir seus próprios registros. Perfis permitidos: ADMIN, MORADOR. SYNDIC corresponde ao
-        atributo isSyndic."
+      tags: [pets]
+      summary: Remover pet
+      description: ADMIN ou MORADOR dono. FUNCIONARIO somente consulta.
       parameters:
         - name: id
           in: path
@@ -1157,15 +1211,23 @@ paths:
             format: uuid
       responses:
         "200":
-          description: Operação concluída.
+          description: Pet removido.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Pet removido com sucesso.
         "400":
           $ref: "#/components/responses/400"
         "401":
           $ref: "#/components/responses/401"
         "403":
           $ref: "#/components/responses/403"
-        "500":
-          $ref: "#/components/responses/500"
+        "404":
+          $ref: "#/components/responses/404"
   /invoices/webhook:
     post:
       tags:
@@ -2522,6 +2584,118 @@ components:
       scheme: bearer
       bearerFormat: JWT
   schemas:
+    PetPanel:
+      allOf:
+        - $ref: "#/components/schemas/PetRecord"
+        - type: object
+          required: [owner]
+          properties:
+            owner:
+              type: object
+              required: [id, name, phone, unit]
+              properties:
+                id:
+                  type: string
+                  format: uuid
+                name:
+                  type: string
+                phone:
+                  type: string
+                  nullable: true
+                unit:
+                  type: object
+                  nullable: true
+                  required: [id, type, block, number]
+                  properties:
+                    id:
+                      type: string
+                      format: uuid
+                    type:
+                      type: string
+                      enum: [APARTMENT, HOUSE]
+                    block:
+                      type: string
+                      nullable: true
+                    number:
+                      type: string
+    PetRecord:
+      type: object
+      required: [id, name, species, size, ownerId, createdAt, updatedAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        species:
+          type: string
+          enum: [CACHORRO, GATO, PASSARO, OUTRO]
+        size:
+          type: string
+          enum: [PEQUENO, MEDIO, GRANDE]
+        ownerId:
+          type: string
+          format: uuid
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    PanelVehicle:
+      allOf:
+        - $ref: "#/components/schemas/Vehicle"
+        - type: object
+          required: [unit]
+          properties:
+            unit:
+              type: object
+              required: [id, type, block, number, parkingSpots, _count]
+              properties:
+                id:
+                  type: string
+                  format: uuid
+                type:
+                  type: string
+                  enum: [APARTMENT, HOUSE]
+                block:
+                  type: string
+                  nullable: true
+                number:
+                  type: string
+                parkingSpots:
+                  type: integer
+                  minimum: 0
+                _count:
+                  type: object
+                  required: [vehicles]
+                  properties:
+                    vehicles:
+                      type: integer
+                      minimum: 0
+    Vehicle:
+      type: object
+      required: [id, plate, model, color, unitId, createdAt, updatedAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        plate:
+          type: string
+        model:
+          type: string
+        color:
+          type: string
+          nullable: true
+        unitId:
+          type: string
+          format: uuid
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
     ParkingType:
       type: string
       enum:
@@ -3277,10 +3451,12 @@ components:
       description: endDate deve ser posterior a startDate.
     VehicleCreate:
       type: object
+      required: [plate, model]
       properties:
         plate:
           type: string
-          description: Placa brasileira antiga ou Mercosul; normalizada sem pontuação e em maiúsculas.
+          description: Placa antiga ou Mercosul, normalizada sem pontuação e em maiúsculas.
+          example: ABC1D23
         model:
           type: string
           minLength: 1
@@ -3288,11 +3464,13 @@ components:
         color:
           type: string
           maxLength: 191
-      required:
-        - plate
-        - model
+        unitId:
+          type: string
+          format: uuid
+          description: Obrigatório para ADMIN; ignorado para MORADOR. Não é editável em PUT.
     PetCreate:
       type: object
+      required: [name, species, size]
       properties:
         name:
           type: string
@@ -3300,21 +3478,14 @@ components:
           maxLength: 191
         species:
           type: string
-          enum:
-            - CACHORRO
-            - GATO
-            - PASSARO
-            - OUTRO
+          enum: [CACHORRO, GATO, PASSARO, OUTRO]
         size:
           type: string
-          enum:
-            - PEQUENO
-            - MEDIO
-            - GRANDE
-      required:
-        - name
-        - species
-        - size
+          enum: [PEQUENO, MEDIO, GRANDE]
+        ownerId:
+          type: string
+          format: uuid
+          description: "Obrigatório para ADMIN: id de um morador ativo. Ignorado para MORADOR."
     InvoiceCreate:
       type: object
       properties:
