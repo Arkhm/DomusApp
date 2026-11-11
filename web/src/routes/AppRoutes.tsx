@@ -9,6 +9,8 @@ import UsersList from '../pages/Users/UsersList';
 import NoticesList from '../pages/Notices/NoticesList';
 import Dashboard from '../pages/Dashboard';
 import ParkingSpotsList from '../pages/ParkingSpots/ParkingSpotsList';
+import VehiclesList from '../pages/Vehicles/VehiclesList';
+import PetsList from '../pages/Pets/PetsList';
 import UnitsList from '../pages/Units/UnitsList';
 import EventsList from '../pages/Events/EventsList';
 import VotingsList from '../pages/Votings/VotingsList';
@@ -47,6 +49,8 @@ export default function AppRoutes() {
                 <Route path="/usuarios" element={<UsersList />} />
                 <Route path="/unidades" element={<UnitsList />} />
                 <Route path="/vagas" element={<ParkingSpotsList />} />
+                <Route path="/veiculos" element={<VehiclesList />} />
+                <Route path="/pets" element={<PetsList />} />
                 <Route path="/comunicados" element={<NoticesList />} />
                 <Route path="/eventos" element={<EventsList />} />
                 <Route path="/votacoes" element={<VotingsList />} />
