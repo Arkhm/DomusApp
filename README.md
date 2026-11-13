@@ -201,7 +201,7 @@ npm test
 npm run test:coverage
 ```
 
-A cobertura inclui todos os serviços e repositórios, mesmo sem teste, e exige **70% das linhas**. Integrações precisam de MySQL descartável com nome terminado em `_test`, migrações aplicadas e `RUN_DB_INTEGRATION=true` / `RUN_PAYMENT_INTEGRATION=true` no ambiente ou no `api/.env` local ignorado. Configure `DATABASE_HOST/PORT/USER/PASSWORD/NAME/URL` e os segredos independentes `JWT_SECRET` / `JWT_REFRESH_SECRET`. Não execute integrações no banco de uso. O CI cria `domusapp_test`, aplica `prisma migrate deploy` e usa credenciais fictícias. Para os clientes: `cd web && npm run build` e `cd mobile && npx tsc --noEmit`.
+A cobertura inclui todos os serviços e repositórios, mesmo sem teste, e exige **70% das linhas**. Integrações precisam de MySQL descartável com nome terminado em `_test`, migrações aplicadas e `RUN_DB_INTEGRATION=true` / `RUN_PAYMENT_INTEGRATION=true` no ambiente ou no `api/.env` local ignorado. Configure `DATABASE_HOST/PORT/USER/PASSWORD/NAME/URL` e os segredos independentes `JWT_SECRET` / `JWT_REFRESH_SECRET`. Não execute integrações no banco de uso. O CI cria `domusapp_test`, aplica `prisma migrate deploy` e usa credenciais fictícias. Para os clientes: `cd web && npm test && npm run build` e `cd mobile && npx tsc --noEmit`.
 
 Swagger UI: **http://localhost:3333/api/docs/**. O contrato central está em [api/docs/openapi.yaml](api/docs/openapi.yaml), também disponível em `/api/docs/openapi.yaml`. Cookie `domusapp_token` e Bearer são alternativas. Para cookie, faça login pelo Swagger; para mobile, use Bearer em Authorize. O Helmet permanece ativo: só a documentação permite seus estilos inline e HTTP local; scripts e assets vêm da própria API.
 
