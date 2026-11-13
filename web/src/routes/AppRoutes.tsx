@@ -15,6 +15,7 @@ import VotingsList from '../pages/Votings/VotingsList';
 import CommonAreasList from '../pages/CommonAreas/CommonAreasList';
 import ReservationsList from '../pages/Reservations/ReservationsList';
 import IncidentsList from '../pages/Incidents/IncidentsList';
+import InvoicesList from '../pages/Invoices/InvoicesList';
 const Reports = lazy(() => import('../pages/Reports'));
 
 export default function AppRoutes() {
@@ -53,6 +54,7 @@ export default function AppRoutes() {
                 <Route path="/areas-comuns" element={<CommonAreasList />} />
                 <Route path="/reservas" element={<ReservationsList />} />
                 <Route path="/ocorrencias" element={<IncidentsList />} />
+                <Route path="/cobrancas" element={<InvoicesList />} />
                 <Route path="/relatorios" element={<Suspense fallback={<p role="status">Carregando relatórios...</p>}><Reports /></Suspense>} />
             </Route>
 
