@@ -19,6 +19,8 @@ export interface Invoice {
     /** Estado da emissão do Pix: QUEUED, RETRY, ACTIVE, REVIEW… ou NOT_ISSUED / LEGACY. */
     issuanceStatus: string;
     paymentEnvironment: string | null;
+    /** Valor efetivamente enviado ao provedor. Em ambiente de teste é sempre "50.00". */
+    paymentAmount: string | null;
     paidAt: string | null;
     createdAt: string;
     userId: string;
@@ -43,6 +45,41 @@ export interface InvoicePage {
     data: Invoice[];
     meta: { total: number; page: number; limit: number; totalPages: number };
 }
+
+/** Dados comuns de uma emissão, já validados e no formato da API. */
+export interface InvoiceDraft {
+    type: InvoiceType;
+    description: string;
+    /** Decimal com ponto ("350.00"). */
+    amount: string;
+    /** AAAA-MM-DD */
+    dueDate: string;
+    /** AAAA-MM-01, ou null. */
+    referenceMonth: string | null;
+}
+
+/** `POST /invoices` — o morador precisa pertencer à unidade informada. */
+export interface InvoiceCreateInput extends InvoiceDraft {
+    userId: string;
+    unitId: string;
+}
+
+/** `POST /invoices/batch` — cada morador é cobrado na própria unidade. */
+export interface InvoiceBatchInput extends InvoiceDraft {
+    userIds: string[];
+}
+
+export interface InvoiceBatchResult {
+    operationId: string;
+    created: Invoice[];
+    errors: unknown[];
+}
+
+/** Limite de moradores por lote imposto pela API. */
+export const MAX_BATCH_SIZE = 100;
+
+/** Estados em que o Pix ainda está sendo gerado em segundo plano. */
+export const ISSUANCE_IN_FLIGHT: ReadonlySet<string> = new Set(['QUEUED', 'RETRY', 'ISSUING']);
 
 export const INVOICE_STATUS_LABELS: Record<InvoiceStatus, string> = {
     PENDING: 'Pendente',

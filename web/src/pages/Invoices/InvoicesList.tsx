@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Plus, RefreshCw, Users } from 'lucide-react';
 import Header from '../../components/layout/Header';
 import PageBody from '../../components/luxury/PageBody';
 import SectionHeader from '../../components/luxury/SectionHeader';
@@ -12,13 +12,19 @@ import { invoiceService } from '../../services/invoiceService';
 import { reportService } from '../../services/reportService';
 import { unitService } from '../../services/unitService';
 import {
-    INVOICE_STATUS_LABELS, INVOICE_TYPE_LABELS, ISSUANCE_LABELS, effectiveInvoiceStatus,
-    type InvoicePage, type InvoiceStatus, type InvoiceType,
+    INVOICE_STATUS_LABELS, INVOICE_TYPE_LABELS, ISSUANCE_IN_FLIGHT, ISSUANCE_LABELS, effectiveInvoiceStatus,
+    type InvoiceFilters, type InvoicePage, type InvoiceStatus, type InvoiceType,
 } from '../../types/invoice';
 import type { ChargesReport } from '../../types/report';
 import { formatUnitDisplay, type Unit } from '../../types/user';
+import InvoiceBatchModal from './InvoiceBatchModal';
+import InvoiceFormModal from './InvoiceFormModal';
 
 const PAGE_SIZE = 20;
+// Enquanto há Pix sendo gerado, a lista se atualiza sozinha a cada 8 s, por no máximo 30 vezes (4 minutos).
+// Depois disso o botão "Atualizar" continua disponível.
+const POLL_INTERVAL_MS = 8000;
+const MAX_POLLS = 30;
 const percentage = new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
 
 interface Filters { status: InvoiceStatus | ''; type: InvoiceType | ''; unitId: string; startDate: string; endDate: string }
@@ -63,6 +69,7 @@ export default function InvoicesList() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
     const [revision, setRevision] = useState(0);
+    const [modal, setModal] = useState<'single' | 'batch' | null>(null);
 
     const filtered = Object.values(filters).some(Boolean);
     const rangeError = filters.startDate && filters.endDate && filters.startDate > filters.endDate
@@ -75,6 +82,12 @@ export default function InvoicesList() {
             endDate: filters.endDate || monthEndShifted(today, 6),
         };
     }, [filters.startDate, filters.endDate]);
+
+    const query = useMemo<InvoiceFilters>(() => ({
+        status: filters.status || undefined, type: filters.type || undefined, unitId: filters.unitId || undefined,
+        startDate: filters.startDate || undefined, endDate: filters.endDate || undefined, page, limit: PAGE_SIZE,
+    }), [filters, page]);
+    const inFlight = result?.data.some(invoice => ISSUANCE_IN_FLIGHT.has(invoice.issuanceStatus)) ?? false;
 
     function changeFilters(patch: Partial<Filters>) {
         setFilters(current => ({ ...current, ...patch }));
@@ -95,10 +108,7 @@ export default function InvoicesList() {
             setLoading(true);
             setError('');
             try {
-                const data = await invoiceService.listAll({
-                    status: filters.status || undefined, type: filters.type || undefined, unitId: filters.unitId || undefined,
-                    startDate: filters.startDate || undefined, endDate: filters.endDate || undefined, page, limit: PAGE_SIZE,
-                });
+                const data = await invoiceService.listAll(query);
                 if (!cancelled) setResult(data);
             } catch (err) {
                 if (!cancelled) setError(apiErrorMessage(err, 'Erro ao carregar cobranças.'));
@@ -108,7 +118,23 @@ export default function InvoicesList() {
         }
         void load();
         return () => { cancelled = true; };
-    }, [canManage, rangeError, filters, page, revision]);
+    }, [canManage, rangeError, query, revision]);
+
+    // Atualização silenciosa (sem trocar a tabela por "Carregando") enquanto algum Pix ainda está sendo gerado.
+    useEffect(() => {
+        if (!canManage || rangeError || !inFlight) return;
+        let cancelled = false;
+        let polls = 0;
+        const timer = window.setInterval(async () => {
+            if (document.hidden) return;
+            if (++polls > MAX_POLLS) { window.clearInterval(timer); return; }
+            try {
+                const data = await invoiceService.listAll(query);
+                if (!cancelled) setResult(data);
+            } catch { /* a próxima rodada tenta de novo */ }
+        }, POLL_INTERVAL_MS);
+        return () => { cancelled = true; window.clearInterval(timer); };
+    }, [canManage, rangeError, inFlight, query, revision]);
 
     useEffect(() => {
         if (!canManage || rangeError) return;
@@ -137,7 +163,16 @@ export default function InvoicesList() {
             <Header title="Cobranças" eyebrow="Financeiro" />
             <PageBody>
                 <SectionHeader title="Cobranças" eyebrow="Financeiro"
-                    subtitle="Acompanhe as cobranças Pix emitidas aos moradores, com valores, vencimentos e situação." />
+                    subtitle="Emita e acompanhe as cobranças Pix dos moradores, com valores, vencimentos e situação."
+                    action={
+                        <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                            <button className="btn-ghost" onClick={() => setRevision(value => value + 1)} disabled={loading}>
+                                <RefreshCw size={14} /> Atualizar
+                            </button>
+                            <button className="btn-ghost" onClick={() => setModal('batch')}><Users size={14} /> Emitir em lote</button>
+                            <button className="btn-gold" onClick={() => setModal('single')}><Plus size={14} /> Nova cobrança</button>
+                        </div>
+                    } />
 
                 {summaryError && !rangeError && <p role="alert" style={{ color: 'var(--color-err)', marginBottom: 12 }}>{summaryError}</p>}
                 {totals && !rangeError && <>
@@ -167,6 +202,11 @@ export default function InvoicesList() {
                 </div>
 
                 {result && !rangeError && <ListMeta count={result.meta.total} singular="cobrança" plural="cobranças" />}
+                {inFlight && !rangeError && (
+                    <p role="status" style={{ fontSize: 12, color: 'var(--color-bone-muted)', marginBottom: 12 }}>
+                        Há Pix sendo gerados. A lista se atualiza sozinha.
+                    </p>
+                )}
                 {rangeError ? <p role="alert" style={{ color: 'var(--color-err)' }}>{rangeError}</p>
                     : error ? <div role="alert" className="luxe-card" style={{ padding: 24, color: 'var(--color-err)' }}>
                         <p>{error}</p><button className="btn-ghost" onClick={() => setRevision(value => value + 1)}>Tentar novamente</button>
@@ -193,6 +233,7 @@ export default function InvoicesList() {
                                                     {ISSUANCE_LABELS[invoice.issuanceStatus] ?? INVOICE_STATUS_LABELS[invoice.issuanceStatus as InvoiceStatus] ?? invoice.issuanceStatus}
                                                 </Tag>
                                                 {invoice.requiresReview && <Tag tone="err">Revisar</Tag>}
+                                                {invoice.paymentEnvironment === 'TEST' && <Tag tone="gold">Teste</Tag>}
                                             </div></td>
                                         </tr>;
                                     })}</tbody>
@@ -207,6 +248,8 @@ export default function InvoicesList() {
                     </div>
                 )}
             </PageBody>
+            {modal === 'single' && <InvoiceFormModal onClose={() => setModal(null)} onCreated={() => setRevision(value => value + 1)} />}
+            {modal === 'batch' && <InvoiceBatchModal onClose={() => setModal(null)} onCreated={() => setRevision(value => value + 1)} />}
         </div>
     );
 }
