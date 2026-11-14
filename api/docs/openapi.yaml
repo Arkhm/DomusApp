@@ -2255,7 +2255,10 @@ paths:
       description: >-
         Retorna comunicados PUBLISHED e eventos PUBLISHED ou CANCELLED destinados a ALL
         ou à unidade atual do usuário, inclusive para síndicos. Sem unidade, retorna
-        apenas ALL. Ordenação por createdAt decrescente, com desempate pelo id.
+        apenas ALL. Inclui as ocorrências do próprio usuário que já têm resposta ou
+        status diferente de OPEN; nelas createdAt é a data da última alteração, e
+        uma alteração depois da leitura volta a deixá-las não lidas.
+        Ordenação por createdAt decrescente, com desempate pelo id.
         isRead de NOTICE usa NoticeRead, compartilhado com POST /notices/{id}/read;
         edições do comunicado podem invalidar essa leitura. Não envia rascunhos.
       responses:
@@ -2278,8 +2281,8 @@ paths:
       tags: [notifications]
       summary: Marcar uma notificação visível como lida
       description: >-
-        Operação idempotente e individual. O id é o sourceId (UUID do comunicado ou
-        evento), não o id composto da notificação. NOTICE também grava NoticeRead
+        Operação idempotente e individual. O id é o sourceId (UUID do comunicado,
+        evento ou ocorrência), não o id composto da notificação. NOTICE também grava NoticeRead
         na mesma transação. Não concede a visão de painel para síndicos.
       parameters:
         - in: path
@@ -2287,7 +2290,7 @@ paths:
           required: true
           schema:
             type: string
-            enum: [NOTICE, EVENT]
+            enum: [NOTICE, EVENT, INCIDENT]
         - in: path
           name: id
           required: true
@@ -2846,7 +2849,7 @@ components:
           example: NOTICE:ba382bf4-653b-4b7e-b0c0-d22d53657d39
         type:
           type: string
-          enum: [NOTICE, EVENT]
+          enum: [NOTICE, EVENT, INCIDENT]
         sourceId:
           type: string
           format: uuid
@@ -2854,7 +2857,7 @@ components:
           type: string
         description:
           type: string
-          enum: [Novo comunicado, Evento publicado, Evento cancelado]
+          enum: [Novo comunicado, Evento publicado, Evento cancelado, Ocorrência respondida, Ocorrência em andamento, Ocorrência resolvida, Ocorrência encerrada]
         createdAt:
           type: string
           format: date-time

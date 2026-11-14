@@ -9,6 +9,6 @@ const router = Router();
 router.use(authMiddleware);
 router.get('/', notificationController.list);
 router.post('/:type/:id/read', validate(idParamsSchema.extend({
-  type: z.enum(['NOTICE', 'EVENT'], { error: 'Use NOTICE ou EVENT.' }),
+  type: z.enum(['NOTICE', 'EVENT', 'INCIDENT'], { error: 'Use NOTICE, EVENT ou INCIDENT.' }),
 }), 'params'), notificationController.markRead);
 export default router;

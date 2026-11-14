@@ -19,7 +19,8 @@ export function NotificationsScreen(): React.JSX.Element {
     const target = await loadTarget(item);
     if (!target) return;
     if (target.type === 'NOTICE') navigation.navigate('Comunicado', { notice: target.notice });
-    else navigation.navigate('Evento', { event: target.event });
+    else if (target.type === 'EVENT') navigation.navigate('Evento', { event: target.event });
+    else navigation.navigate('Ocorrencias');
   }
 
   return (
@@ -31,7 +32,7 @@ export function NotificationsScreen(): React.JSX.Element {
         refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={reload} tintColor={colors.brand} />}
         ListHeaderComponent={
           <View style={styles.header}>
-            <SectionHeader title="Notificações" caption="Acompanhe os comunicados e eventos do seu condomínio." />
+            <SectionHeader title="Notificações" caption="Acompanhe comunicados, eventos e respostas às suas ocorrências." />
             {failure ? <StatusBanner tone="error" title="Não foi possível atualizar" message={failure.message}
               actionLabel="Tentar de novo" onAction={reload} /> : null}
             <Text style={styles.text} accessibilityLiveRegion="polite">

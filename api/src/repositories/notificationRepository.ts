@@ -2,12 +2,12 @@ import type { Prisma } from '@prisma/client';
 import { HttpError } from '../lib/httpError';
 import { prisma } from '../lib/prisma';
 
-export type NotificationType = 'NOTICE' | 'EVENT';
+export type NotificationType = 'NOTICE' | 'EVENT' | 'INCIDENT';
 
 export const notificationRepository = {
   findReads: (userId: string) => prisma.notificationRead.findMany({
-    where: { userId, type: 'EVENT' },
-    select: { sourceId: true },
+    where: { userId, type: { in: ['EVENT', 'INCIDENT'] } },
+    select: { type: true, sourceId: true, readAt: true },
   }),
 
   markRead: (userId: string, type: NotificationType, sourceId: string, unitId: string | null) =>
@@ -25,6 +25,10 @@ export const notificationRepository = {
           where: { noticeId_userId: { noticeId: sourceId, userId } },
           create: { noticeId: sourceId, userId }, update: {},
         });
+      } else if (type === 'INCIDENT') {
+        // Só o autor recebe a atualização da própria ocorrência.
+        const incident = await tx.incident.findFirst({ where: { id: sourceId, authorId: userId }, select: { id: true } });
+        if (!incident) throw new HttpError(404, 'Notificação não encontrada.');
       } else {
         await tx.$queryRaw`SELECT id FROM Event WHERE id = ${sourceId} FOR UPDATE`;
         const event = await tx.event.findFirst({
@@ -35,7 +39,8 @@ export const notificationRepository = {
       }
       return tx.notificationRead.upsert({
         where: { userId_type_sourceId: { userId, type, sourceId } },
-        create: { userId, type, sourceId }, update: {},
+        // readAt avança a cada leitura: uma ocorrência alterada depois volta a ficar não lida.
+        create: { userId, type, sourceId }, update: { readAt: new Date() },
       });
     }),
 };

@@ -69,6 +69,17 @@ test('mobile: notificação resolve o item exato e não registra leitura ao carr
   assert.equal(writes, 0);
 });
 
+test('mobile: abrir notificação de ocorrência registra a leitura e leva à lista', async () => {
+  const posts: string[] = [];
+  const service = loadMobile('services/notificationService.ts', {
+    './api': { api: { post: async (url: string) => { posts.push(url); } } },
+    './noticeService': { listNotices: async () => { throw new Error('Consulta indevida'); } },
+    './eventService': { listEvents: async () => { throw new Error('Consulta indevida'); } },
+  });
+  assert.deepEqual(await service.resolveNotificationTarget({ ...item, type: 'INCIDENT', sourceId: 'oc' }, null), { type: 'INCIDENT' });
+  assert.deepEqual(posts, ['/notifications/INCIDENT/oc/read']);
+});
+
 test('mobile: carregamento não antecipa leitura, bloqueia duplo toque e ignora resposta após sair da tela', async () => {
   const app = hooks();
   let finish!: (value: any) => void;
