@@ -2,6 +2,8 @@ import { useState } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import {
     Car,
+    CarFront,
+    PawPrint,
     LayoutDashboard,
     Users,
     Building2,
@@ -21,11 +23,16 @@ import Monogram from '../luxury/Monogram';
 import { getInitials, roleLabel } from '../luxury/formatters';
 import { hasPanelAccess } from '../../lib/access';
 
+// Gestão operacional: só ADMIN e FUNCIONARIO (a síndica não administra vagas, veículos e pets).
+const STAFF_ONLY = new Set(['/vagas', '/veiculos', '/pets']);
+
 const navItems = [
     { to: '/relatorios', label: 'Relatórios', icon: ChartColumn },
     { to: '/dashboard', label: 'Painel', icon: LayoutDashboard },
     { to: '/usuarios', label: 'Residentes', icon: Users },
     { to: '/vagas', label: 'Vagas', icon: Car },
+    { to: '/veiculos', label: 'Veículos', icon: CarFront },
+    { to: '/pets', label: 'Pets', icon: PawPrint },
     { to: '/unidades', label: 'Unidades', icon: Building2 },
     { to: '/comunicados', label: 'Comunicados', icon: Megaphone },
     { to: '/eventos', label: 'Programação', icon: CalendarDays },
@@ -116,7 +123,7 @@ export default function Sidebar() {
                     gap: 2,
                 }}
             >
-                {navItems.filter(item => item.to !== '/vagas' || user?.role === 'ADMIN' || user?.role === 'FUNCIONARIO').map((item) => {
+                {navItems.filter(item => !STAFF_ONLY.has(item.to) || user?.role === 'ADMIN' || user?.role === 'FUNCIONARIO').map((item) => {
                     if (item.to === '/relatorios' && !hasPanelAccess(user)) return null;
                     if (item.to === '/cobrancas' && user?.role !== 'ADMIN' && user?.role !== 'FUNCIONARIO') return null;
                     const Icon = item.icon;

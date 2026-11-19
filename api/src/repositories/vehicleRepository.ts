@@ -1,3 +1,4 @@
+import type { VehicleFilters } from '../schemas/vehicleSchema';
 import { Prisma } from '@prisma/client';
 import { prisma } from '../lib/prisma';
 
@@ -8,11 +9,18 @@ export const vehicleRepository = {
     return await tx.vehicle.create({ data });
   },
 
-  findAll: async (plate?: string) => {
+  findAll: async ({ plate, unitId, block }: VehicleFilters = {}) => {
     return await prisma.vehicle.findMany({
-      where: plate ? { plate: { contains: plate } } : undefined,
-      include: { unit: true },
-      orderBy: { createdAt: 'desc' },
+      where: {
+        ...(plate ? { plate: { contains: plate } } : {}),
+        ...(unitId ? { unitId } : {}),
+        ...(block ? { unit: { block } } : {}),
+      },
+      include: { unit: { select: {
+        id: true, type: true, block: true, number: true, parkingSpots: true,
+        _count: { select: { vehicles: true } },
+      } } },
+      orderBy: [{ unit: { block: 'asc' } }, { unit: { number: 'asc' } }, { plate: 'asc' }],
     });
   },
 

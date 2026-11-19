@@ -13,6 +13,7 @@ import { prisma } from '../src/lib/prisma';
 import { userRepository } from '../src/repositories/userRepository';
 import { noticeRepository } from '../src/repositories/noticeRepository';
 import { eventRepository } from '../src/repositories/eventRepository';
+import { incidentRepository } from '../src/repositories/incidentRepository';
 import { notificationRepository } from '../src/repositories/notificationRepository';
 import { notificationService } from '../src/services/notificationService';
 
@@ -21,6 +22,13 @@ const unitId = randomUUID();
 const sourceId = randomUUID();
 const actor = { id: userId, status: 'ACTIVE', role: 'MORADOR', isSyndic: true, unitId, tokenVersion: 0 } as User;
 const notFound = (error: unknown) => error instanceof HttpError && error.statusCode === 404;
+
+// readAt muda a cada leitura; o resto do upsert é exato.
+function assertReadUpsert(mock: { mock: { calls: { arguments: unknown[] }[] } }, type: string) {
+  const { update, ...rest } = mock.mock.calls[0]?.arguments[0] as { update: { readAt: unknown } };
+  assert.deepEqual(rest, { where: { userId_type_sourceId: { userId, type, sourceId } }, create: { userId, type, sourceId } });
+  assert.ok(update.readAt instanceof Date);
+}
 
 test('notificações: OpenAPI preserva as operações de notificações, relatórios e vagas', () => {
   const yaml = parseDocument(readFileSync('docs/openapi.yaml', 'utf8'));
@@ -62,7 +70,7 @@ test('notificações: autenticação atual, parâmetros e 404 HTTP', async t => 
     assert.equal((await request(app).post(path).set('Authorization', authorization)).status, 400);
   }
   assert.equal(write.mock.callCount(), 0);
-  for (const type of ['NOTICE', 'EVENT']) {
+  for (const type of ['NOTICE', 'EVENT', 'INCIDENT']) {
     const result = await request(app).post(`/notifications/${type}/${sourceId}/read`).set('Authorization', authorization)
       .send({ userId: randomUUID(), unitId: randomUUID() });
     assert.equal(result.status, 404);
@@ -86,13 +94,28 @@ test('notificações: lista pessoal usa destinatários mesmo para síndico e ser
     { id: sourceId, title: 'Evento cancelado', status: 'CANCELLED', createdAt: later },
     { id: 'event-unread', title: 'Evento publicado', status: 'PUBLISHED', createdAt },
   ] as Awaited<ReturnType<typeof eventRepository.findForUser>>);
-  const reads = t.mock.method(notificationRepository, 'findReads', async () => [{ sourceId }]);
+  const incidentId = randomUUID();
+  const changedAt = new Date('2026-11-03T12:00:00Z');
+  const incidents = t.mock.method(incidentRepository, 'findAll', async () => [
+    { id: incidentId, title: 'Vazamento', status: 'RESOLVED', updatedAt: changedAt },
+    { id: 'incident-reread', title: 'Barulho', status: 'IN_PROGRESS', updatedAt: createdAt },
+  ] as Awaited<ReturnType<typeof incidentRepository.findAll>>);
+  const reads = t.mock.method(notificationRepository, 'findReads', async () => [
+    { type: 'EVENT', sourceId, readAt: createdAt },
+    // Lida antes da última alteração: volta a ser não lida.
+    { type: 'INCIDENT', sourceId: incidentId, readAt: later },
+    { type: 'INCIDENT', sourceId: 'incident-reread', readAt: later },
+  ]);
   const panel = t.mock.method(noticeRepository, 'findAll', async () => { throw new Error('Acesso indevido ao painel'); });
 
   const result = await request(app).get('/notifications').set('Authorization', `Bearer ${createAuthTokens(actor).token}`);
   assert.equal(result.status, 200);
-  assert.equal(result.body.length, 4);
-  assert.deepEqual(result.body[0], { id: `EVENT:${sourceId}`, type: 'EVENT', sourceId, title: 'Evento cancelado',
+  assert.equal(result.body.length, 6);
+  assert.deepEqual(result.body[0], { id: `INCIDENT:${incidentId}`, type: 'INCIDENT', sourceId: incidentId, title: 'Vazamento',
+    description: 'Ocorrência resolvida', createdAt: changedAt.toISOString(), isRead: false });
+  assert.equal(result.body.find((item: { id: string }) => item.id === 'INCIDENT:incident-reread').isRead, true);
+  assert.deepEqual(incidents.mock.calls[0]?.arguments, [{ authorId: userId, OR: [{ status: { not: 'OPEN' } }, { response: { not: null } }] }]);
+  assert.deepEqual(result.body[1], { id: `EVENT:${sourceId}`, type: 'EVENT', sourceId, title: 'Evento cancelado',
     description: 'Evento cancelado', createdAt: later.toISOString(), isRead: true });
   assert.equal(result.body.find((item: { id: string }) => item.id === `NOTICE:${sourceId}`).isRead, true);
   assert.equal(result.body.find((item: { id: string }) => item.id === 'NOTICE:unread').isRead, false);
@@ -154,9 +177,7 @@ test('notificações: leitura idempotente de comunicado grava NoticeRead e Notif
   assert.deepEqual(noticeWrite.mock.calls[0]?.arguments, [{
     where: { noticeId_userId: { noticeId: sourceId, userId } }, create: { noticeId: sourceId, userId }, update: {},
   }]);
-  assert.deepEqual(notificationWrite.mock.calls[0]?.arguments, [{
-    where: { userId_type_sourceId: { userId, type: 'NOTICE', sourceId } }, create: { userId, type: 'NOTICE', sourceId }, update: {},
-  }]);
+  assertReadUpsert(notificationWrite, 'NOTICE');
   mockPrismaMethod(t, prisma.noticeRead, 'upsert', async () => { throw new Error('Falha na leitura'); });
   await assert.rejects(notificationRepository.markRead(userId, 'NOTICE', sourceId, unitId), /Falha na leitura/);
   assert.equal(notificationWrite.mock.callCount(), 2);
@@ -170,10 +191,21 @@ test('notificações: evento visível grava só sua leitura e não reutiliza lei
   const notificationWrite = mockPrismaMethod(t, prisma.notificationRead, 'upsert', async () => ({}));
   await notificationRepository.markRead(userId, 'EVENT', sourceId, null);
   assert.equal(noticeWrite.mock.callCount(), 0);
-  assert.deepEqual(notificationWrite.mock.calls[0]?.arguments, [{
-    where: { userId_type_sourceId: { userId, type: 'EVENT', sourceId } }, create: { userId, type: 'EVENT', sourceId }, update: {},
-  }]);
+  assertReadUpsert(notificationWrite, 'EVENT');
   const read = mockPrismaMethod(t, prisma.notificationRead, 'findMany', async () => []);
   await notificationRepository.findReads(userId);
-  assert.deepEqual(read.mock.calls[0]?.arguments, [{ where: { userId, type: 'EVENT' }, select: { sourceId: true } }]);
+  assert.deepEqual(read.mock.calls[0]?.arguments, [{ where: { userId, type: { in: ['EVENT', 'INCIDENT'] } }, select: { type: true, sourceId: true, readAt: true } }]);
+});
+
+test('notificações: ocorrência só pode ser lida pelo autor e reabre após nova alteração', async t => {
+  mockPrismaMethod(t, prisma, '$transaction', async (run: (tx: Prisma.TransactionClient) => Promise<unknown>) => run(prisma));
+  const lookup = mockPrismaMethod(t, prisma.incident, 'findFirst', async () => null);
+  const write = mockPrismaMethod(t, prisma.notificationRead, 'upsert', async () => ({}));
+  await assert.rejects(notificationRepository.markRead(userId, 'INCIDENT', sourceId, unitId), notFound);
+  assert.deepEqual(lookup.mock.calls[0]?.arguments, [{ where: { id: sourceId, authorId: userId }, select: { id: true } }]);
+  assert.equal(write.mock.callCount(), 0);
+
+  mockPrismaMethod(t, prisma.incident, 'findFirst', async () => ({ id: sourceId }));
+  await notificationRepository.markRead(userId, 'INCIDENT', sourceId, null);
+  assertReadUpsert(write, 'INCIDENT');
 });
