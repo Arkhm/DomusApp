@@ -1,4 +1,5 @@
-import type { DraftErrors, DraftFields } from '../../lib/invoiceForm';
+import { formatMoneyBR } from '../../lib/invoiceFormat';
+import { AMOUNT_FORMAT_HINT, parseAmount, type DraftErrors, type DraftFields } from '../../lib/invoiceForm';
 import { INVOICE_TYPE_LABELS, type InvoiceType } from '../../types/invoice';
 
 interface Props {
@@ -11,6 +12,20 @@ interface Props {
 function FieldError({ text }: { text?: string }) {
     if (!text) return null;
     return <small role="alert" style={{ color: 'var(--color-err)', display: 'block', marginTop: 4 }}>{text}</small>;
+}
+
+/**
+ * Mostra como o valor digitado foi entendido, antes de emitir. Evita que um valor mal digitado seja
+ * descoberto só depois de a cobrança sair (a emissão individual não tem tela de revisão).
+ */
+function AmountReading({ text, error }: { text: string; error?: string }) {
+    if (error) return <FieldError text={error} />;
+    if (!text.trim()) return null;
+    const parsed = parseAmount(text);
+    if (parsed.value === undefined) {
+        return <small style={{ color: 'var(--color-warn)', display: 'block', marginTop: 4 }}>{AMOUNT_FORMAT_HINT}</small>;
+    }
+    return <small role="status" style={{ color: 'var(--color-bone-muted)', display: 'block', marginTop: 4 }}>Será cobrado {formatMoneyBR(parsed.value)}</small>;
 }
 
 /** Campos comuns da emissão individual e em lote. */
@@ -34,7 +49,7 @@ export default function InvoiceFields({ values, errors, disabled, onChange }: Pr
                     <input className="luxe-input" inputMode="decimal" placeholder="350,00"
                         value={values.amount} disabled={disabled} aria-invalid={!!errors.amount}
                         onChange={event => onChange({ amount: event.target.value })} />
-                    <FieldError text={errors.amount} />
+                    <AmountReading text={values.amount} error={errors.amount} />
                 </label>
                 <label>Vencimento
                     <input className="luxe-input" type="date" min="2000-01-01" max="9998-12-31"

@@ -20,18 +20,33 @@ export type DraftErrors = Partial<Record<keyof DraftFields, string>>;
 
 const MAX_AMOUNT = 99999999.99;
 
+export const AMOUNT_FORMAT_HINT = 'Use um valor como 350,00 ou 1.234,50 (até duas casas decimais).';
+
+// Formatos aceitos, e só estes:
+//   com vírgula decimal: "350,5", "1234,50" ou "1.234,50" (pontos apenas como separador de milhar, de 3 em 3 dígitos);
+//   sem vírgula: "350", "350.5" (ponto decimal) ou "1.234" / "1.234.567" (milhar).
+const WITH_COMMA = /^(\d{1,3}(?:\.\d{3})+|\d+),(\d{1,2})$/;
+const THOUSANDS = /^\d{1,3}(?:\.\d{3})+$/;
+const PLAIN = /^\d+(?:\.\d{1,2})?$/;
+
 /**
  * Converte o valor digitado em texto decimal com ponto ("1.234,5" → "1234.50"),
  * o formato que a API exige. Nunca passa por número de ponto flutuante na saída.
+ *
+ * É estrito de propósito: um valor malformado não pode virar outro valor em silêncio.
+ * "350.00,00" e "1.2.3,4" são recusados, em vez de virarem 35000,00 e 123,40.
  */
 export function parseAmount(input: string): { value: string; error?: undefined } | { value?: undefined; error: string } {
-    let text = input.replace(/\s|R\$/g, '');
+    const text = input.replace(/\s|R\$/g, '');
     if (!text) return { error: 'Informe o valor.' };
-    if (text.includes(',')) text = text.replace(/\./g, '').replace(',', '.');
-    else if (/^\d{1,3}(\.\d{3})+$/.test(text)) text = text.replace(/\./g, '');
-    if (!/^\d+(\.\d{1,2})?$/.test(text)) return { error: 'Use um valor como 350,00 (até duas casas decimais).' };
-    const [whole, cents = ''] = text.split('.');
-    const normalized = `${whole.replace(/^0+(?=\d)/, '')}.${cents.padEnd(2, '0')}`;
+    let decimal: string | null = null;
+    const withComma = text.match(WITH_COMMA);
+    if (withComma) decimal = `${withComma[1]!.replace(/\./g, '')}.${withComma[2]}`;
+    else if (!text.includes(',') && THOUSANDS.test(text)) decimal = text.replace(/\./g, '');
+    else if (!text.includes(',') && PLAIN.test(text)) decimal = text;
+    if (decimal === null) return { error: AMOUNT_FORMAT_HINT };
+    const [whole, cents = ''] = decimal.split('.');
+    const normalized = `${whole!.replace(/^0+(?=\d)/, '')}.${cents.padEnd(2, '0')}`;
     if (Number(normalized) <= 0) return { error: 'O valor deve ser maior que zero.' };
     if (Number(normalized) > MAX_AMOUNT) return { error: 'O valor máximo é R$ 99.999.999,99.' };
     return { value: normalized };

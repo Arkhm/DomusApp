@@ -2,23 +2,18 @@ import { useMemo, useState, type FormEvent } from 'react';
 import { Receipt } from 'lucide-react';
 import LuxuryModal, { LuxuryModalFooter } from '../../components/luxury/LuxuryModal';
 import Tag from '../../components/luxury/Tag';
-import { createKeyKeeper } from '../../lib/idempotency';
+import { useAuth } from '../../hooks/useAuth';
+import { describeSingleResult } from '../../lib/emissionResult';
+import { keyLedgerFor, outcomeIsKnown } from '../../lib/idempotency';
 import { formatDueDateBR, formatMoneyBR } from '../../lib/invoiceFormat';
 import { EMPTY_DRAFT, emissionErrorMessage, residentLabel, validateDraft, type DraftErrors, type DraftFields } from '../../lib/invoiceForm';
 import { invoiceService } from '../../services/invoiceService';
-import { INVOICE_TYPE_LABELS, ISSUANCE_IN_FLIGHT, ISSUANCE_LABELS, type Invoice, type InvoiceCreateInput } from '../../types/invoice';
+import { INVOICE_TYPE_LABELS, ISSUANCE_LABELS, type Invoice, type InvoiceCreateInput } from '../../types/invoice';
 import { BlockedResidents, TestEnvironmentNotice } from './EmissionNotes';
 import InvoiceFields from './InvoiceFields';
 import { useResidents } from './useResidents';
 
 interface Props { onClose: () => void; onCreated: () => void }
-
-function outcome(invoice: Invoice) {
-    if (invoice.issuanceStatus === 'ACTIVE') return 'O Pix foi gerado e já está disponível para o morador pagar.';
-    if (ISSUANCE_IN_FLIGHT.has(invoice.issuanceStatus)) return 'A cobrança foi registrada e o Pix está sendo gerado. Acompanhe pela coluna Pix da lista.';
-    if (invoice.issuanceStatus === 'REVIEW') return 'A cobrança foi registrada, mas a geração do Pix precisa de revisão.';
-    return 'A cobrança foi registrada.';
-}
 
 /** Emissão individual: uma cobrança para um morador, na unidade dele. */
 export default function InvoiceFormModal({ onClose, onCreated }: Props) {
@@ -30,7 +25,10 @@ export default function InvoiceFormModal({ onClose, onCreated }: Props) {
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState('');
     const [created, setCreated] = useState<Invoice | null>(null);
-    const [keyFor] = useState(createKeyKeeper);
+    // As chaves de idempotência sobrevivem ao fechamento do modal: se a resposta se perder, reenviar os mesmos dados
+    // (mesmo depois de reabrir) devolve a cobrança já criada em vez de criar outra.
+    const { user } = useAuth();
+    const ledger = keyLedgerFor(user?.id ?? 'anonymous');
 
     const options = useMemo(() => {
         const term = search.trim().toLowerCase();
@@ -57,29 +55,34 @@ export default function InvoiceFormModal({ onClose, onCreated }: Props) {
         if (!resident) { setError('Selecione o morador que receberá a cobrança.'); return; }
         if (!draft) { setError(''); return; }
         const payload: InvoiceCreateInput = { ...draft, userId: resident.id, unitId: resident.unitId! };
+        const fingerprint = `single:${JSON.stringify(payload)}`;
         setBusy(true);
         setError('');
         try {
-            const invoice = await invoiceService.create(payload, keyFor(JSON.stringify(payload)));
+            const invoice = await invoiceService.create(payload, ledger.keyFor(fingerprint));
+            ledger.settle(fingerprint);
             setCreated(invoice);
             onCreated();
         } catch (err) {
+            // Só descarta a chave quando se sabe que nada foi criado; sem resposta, ela é mantida para o reenvio.
+            if (outcomeIsKnown(err)) ledger.settle(fingerprint);
             setError(emissionErrorMessage(err));
         } finally { setBusy(false); }
     }
 
     if (created) {
+        const result = describeSingleResult(created.issuanceStatus);
         return (
             <LuxuryModal open onClose={onClose} icon={<Receipt size={18} />} title="Cobrança criada" size="lg">
                 <div style={{ padding: 28, display: 'grid', gap: 16 }}>
-                    <p>{outcome(created)}</p>
+                    <p role={result.needsAttention ? 'alert' : undefined} style={result.needsAttention ? { color: result.tone === 'err' ? 'var(--color-err)' : 'var(--color-warn)' } : undefined}>{result.text}</p>
                     <dl style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '6px 18px', margin: 0 }}>
                         <dt>Morador</dt><dd style={{ margin: 0 }}>{created.user?.name ?? '—'}</dd>
                         <dt>Descrição</dt><dd style={{ margin: 0, overflowWrap: 'anywhere' }}>{created.description}</dd>
                         <dt>Tipo</dt><dd style={{ margin: 0 }}>{INVOICE_TYPE_LABELS[created.type] ?? created.type}</dd>
                         <dt>Valor</dt><dd style={{ margin: 0 }}>{formatMoneyBR(created.amount)}</dd>
                         <dt>Vencimento</dt><dd style={{ margin: 0 }}>{formatDueDateBR(created.dueDate)}</dd>
-                        <dt>Pix</dt><dd style={{ margin: 0 }}><Tag tone={created.issuanceStatus === 'ACTIVE' ? 'ok' : 'warn'}>{ISSUANCE_LABELS[created.issuanceStatus] ?? created.issuanceStatus}</Tag></dd>
+                        <dt>Pix</dt><dd style={{ margin: 0 }}><Tag tone={result.tone}>{ISSUANCE_LABELS[created.issuanceStatus] ?? created.issuanceStatus}</Tag></dd>
                     </dl>
                     <TestEnvironmentNotice invoices={[created]} />
                     <div style={{ display: 'flex', justifyContent: 'flex-end', paddingTop: 12, borderTop: '1px solid var(--color-line)' }}>

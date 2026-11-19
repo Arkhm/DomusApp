@@ -1,7 +1,9 @@
 import { useMemo, useState } from 'react';
 import { Users } from 'lucide-react';
 import LuxuryModal, { LuxuryModalFooter } from '../../components/luxury/LuxuryModal';
-import { createKeyKeeper } from '../../lib/idempotency';
+import { useAuth } from '../../hooks/useAuth';
+import { describeBatchResult, tallyIssuance } from '../../lib/emissionResult';
+import { keyLedgerFor, outcomeIsKnown } from '../../lib/idempotency';
 import { formatDueDateBR, formatMoneyBR } from '../../lib/invoiceFormat';
 import {
     EMPTY_DRAFT, emissionErrorMessage, multiplyAmount, residentLabel, validateDraft,
@@ -9,7 +11,7 @@ import {
 } from '../../lib/invoiceForm';
 import { invoiceService } from '../../services/invoiceService';
 import {
-    INVOICE_TYPE_LABELS, ISSUANCE_IN_FLIGHT, MAX_BATCH_SIZE,
+    INVOICE_TYPE_LABELS, MAX_BATCH_SIZE,
     type InvoiceBatchInput, type InvoiceBatchResult, type InvoiceDraft,
 } from '../../types/invoice';
 import { formatUnitDisplay } from '../../types/user';
@@ -41,7 +43,9 @@ export default function InvoiceBatchModal({ onClose, onCreated }: Props) {
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState('');
     const [result, setResult] = useState<InvoiceBatchResult | null>(null);
-    const [keyFor] = useState(createKeyKeeper);
+    // Chaves de idempotência persistentes: reenviar o mesmo lote, mesmo depois de fechar o modal, devolve o lote já criado.
+    const { user } = useAuth();
+    const ledger = keyLedgerFor(user?.id ?? 'anonymous');
 
     const visible = useMemo(() => {
         const term = search.trim().toLowerCase();
@@ -97,30 +101,30 @@ export default function InvoiceBatchModal({ onClose, onCreated }: Props) {
 
     async function emit() {
         if (busy || !draft) return;
-        const payload: InvoiceBatchInput = { ...draft, userIds: recipients.map(user => user.id).sort() };
+        const payload: InvoiceBatchInput = { ...draft, userIds: recipients.map(person => person.id).sort() };
+        const fingerprint = `batch:${JSON.stringify(payload)}`;
         setBusy(true);
         setError('');
         try {
-            const created = await invoiceService.createBatch(payload, keyFor(JSON.stringify(payload)));
+            const created = await invoiceService.createBatch(payload, ledger.keyFor(fingerprint));
+            ledger.settle(fingerprint);
             setResult(created);
             setStep('done');
             onCreated();
         } catch (err) {
+            // Só descarta a chave quando se sabe que nada foi criado; sem resposta, ela é mantida para o reenvio.
+            if (outcomeIsKnown(err)) ledger.settle(fingerprint);
             setError(emissionErrorMessage(err));
         } finally { setBusy(false); }
     }
 
     if (step === 'done' && result) {
-        const pending = result.created.filter(invoice => ISSUANCE_IN_FLIGHT.has(invoice.issuanceStatus)).length;
+        // A mensagem confere a situação de cada Pix: não afirma "disponível" quando há itens em revisão ou com outra situação.
+        const summary = describeBatchResult(tallyIssuance(result.created));
         return (
             <LuxuryModal open onClose={onClose} icon={<Users size={18} />} title="Lote emitido" size="lg">
                 <div style={{ padding: 28, display: 'grid', gap: 16 }}>
-                    <p>
-                        <strong>{result.created.length} {result.created.length === 1 ? 'cobrança criada' : 'cobranças criadas'}.</strong>{' '}
-                        {pending > 0
-                            ? `Os Pix de ${pending} delas estão sendo gerados em segundo plano; a lista se atualiza sozinha.`
-                            : 'Os Pix já estão disponíveis.'}
-                    </p>
+                    <p role={summary.needsAttention ? 'alert' : undefined} style={summary.needsAttention ? { color: 'var(--color-warn)' } : undefined}>{summary.text}</p>
                     {result.errors.length > 0 && (
                         <p role="alert" style={{ color: 'var(--color-err)' }}>
                             {result.errors.length} {result.errors.length === 1 ? 'item não foi emitido' : 'itens não foram emitidos'}. Confira a lista.
