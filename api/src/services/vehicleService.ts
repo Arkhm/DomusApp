@@ -1,3 +1,4 @@
+import { vehicleQuerySchema } from '../schemas/vehicleSchema';
 import { Prisma } from '@prisma/client';
 import { HttpError } from '../lib/httpError';
 import { updateVehicleSchema } from '../schemas/updateSchemas';
@@ -35,8 +36,9 @@ export const vehicleService = {
     }
   },
 
-  async listAll(plate?: string) {
-    return await vehicleRepository.findAll(plate ? normalizePlate(plate) : undefined);
+  async listAll(input: unknown = {}) {
+    const filters = vehicleQuerySchema.parse(input);
+    return await vehicleRepository.findAll({ ...filters, plate: filters.plate ? normalizePlate(filters.plate) : undefined });
   },
 
   async listMine(userId: string) {
@@ -44,7 +46,9 @@ export const vehicleService = {
     return await vehicleRepository.findByUnit(unitId);
   },
 
-  async create(userId: string, data: { plate?: string; model?: string; color?: string }) {
+  async create(userId: string, data: { plate?: string; model?: string; color?: string; unitId?: string }, role = 'MORADOR') {
+    if (role !== 'ADMIN' && role !== 'MORADOR') throw new HttpError(403, 'Você não tem permissão para cadastrar veículos.');
+    if (role === 'ADMIN' && !data.unitId) throw new HttpError(400, 'Informe a unidade do veículo.');
     if (!data.plate || !data.model) {
       throw new Error('Placa e modelo são obrigatórios.');
     }
@@ -55,31 +59,44 @@ export const vehicleService = {
     }
 
     const model = data.model.trim();
-    const unitId = await getResidentUnitId(userId);
-    return unitRepository.withLockedUnit(unitId, async tx => {
-      const unit = await unitRepository.findById(unitId, tx);
-      if (!unit) throw new Error('Unidade não encontrada.');
+    if (!model || model.length > 191 || (data.color?.trim().length ?? 0) > 191) {
+      throw new HttpError(400, 'Informe modelo e cor com até 191 caracteres.');
+    }
+    const unitId = role === 'ADMIN' ? data.unitId! : await getResidentUnitId(userId);
+    try {
+      return await unitRepository.withLockedUnit(unitId, async tx => {
+        const unit = await unitRepository.findById(unitId, tx);
+        if (!unit) throw new HttpError(404, 'Unidade não encontrada.');
 
-      if (unit.parkingSpots === 0) {
-        throw new Error('Sua unidade não possui vagas cadastradas. Fale com a administração.');
+        if (await vehicleRepository.findByPlate(plate, tx)) {
+          throw new HttpError(409, 'Já existe um veículo cadastrado com esta placa.');
+        }
+
+        // A gestão cadastra para outra unidade: a mensagem não pode falar em "sua unidade".
+        const subject = role === 'ADMIN' ? 'A unidade' : 'Sua unidade';
+        if (unit.parkingSpots === 0) {
+          throw new Error(role === 'ADMIN' ? 'A unidade não possui vagas atribuídas. Atribua uma vaga antes de cadastrar o veículo.'
+            : 'Sua unidade não possui vagas cadastradas. Fale com a administração.');
+        }
+
+        const count = await vehicleRepository.countByUnit(unitId, tx);
+        if (count >= unit.parkingSpots) {
+          throw new Error(`${subject} tem ${unit.parkingSpots} vaga(s) e todas já estão ocupadas.`);
+        }
+
+        return await vehicleRepository.create({
+          plate,
+          model,
+          color: data.color?.trim() || null,
+          unitId,
+        }, tx);
+      });
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+        throw new HttpError(409, 'Já existe um veículo cadastrado com esta placa.');
       }
-
-      const count = await vehicleRepository.countByUnit(unitId, tx);
-      if (count >= unit.parkingSpots) {
-        throw new Error(`Sua unidade tem ${unit.parkingSpots} vaga(s) e todas já estão ocupadas.`);
-      }
-
-      if (await vehicleRepository.findByPlate(plate, tx)) {
-        throw new Error('Já existe um veículo cadastrado com esta placa.');
-      }
-
-      return await vehicleRepository.create({
-        plate,
-        model,
-        color: data.color?.trim() || null,
-        unitId,
-      }, tx);
-    });
+      throw error;
+    }
   },
 
   async delete(id: string, userId: string, role: string) {
