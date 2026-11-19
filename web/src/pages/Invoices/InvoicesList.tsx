@@ -7,7 +7,9 @@ import Tag from '../../components/luxury/Tag';
 import { EmptyTable, FilterSelect, ListMeta } from '../../components/luxury/ListHelpers';
 import { useAuth } from '../../hooks/useAuth';
 import { apiErrorMessage } from '../../lib/apiError';
-import { formatDueDateBR, formatMoneyBR, monthEndShifted, monthStartShifted, todayBR } from '../../lib/invoiceFormat';
+import { formatDueDateBR, formatMoneyBR, todayBR } from '../../lib/invoiceFormat';
+import { summaryPeriod, summaryPeriodIssue, type SummaryPeriod } from '../../lib/invoicePeriod';
+import { EMPTY_FILTERS, buildInvoiceQuery, filterRangeError, type InvoiceFilterState } from '../../lib/invoiceQuery';
 import { invoiceService } from '../../services/invoiceService';
 import { reportService } from '../../services/reportService';
 import { unitService } from '../../services/unitService';
@@ -20,9 +22,7 @@ import { formatUnitDisplay, type Unit } from '../../types/user';
 
 const PAGE_SIZE = 20;
 const percentage = new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
-
-interface Filters { status: InvoiceStatus | ''; type: InvoiceType | ''; unitId: string; startDate: string; endDate: string }
-const EMPTY_FILTERS: Filters = { status: '', type: '', unitId: '', startDate: '', endDate: '' };
+const emptyPage = (page: number): InvoicePage => ({ data: [], meta: { total: 0, page, limit: PAGE_SIZE, totalPages: 0 } });
 
 function statusTone(status: InvoiceStatus) {
     if (status === 'PAID') return 'ok';
@@ -54,29 +54,31 @@ const count = (value: number) => `${value} ${value === 1 ? 'cobrança' : 'cobran
 export default function InvoicesList() {
     const { user } = useAuth();
     const canManage = user?.role === 'ADMIN' || user?.role === 'FUNCIONARIO';
-    const [filters, setFilters] = useState<Filters>(EMPTY_FILTERS);
+    const [filters, setFilters] = useState<InvoiceFilterState>(EMPTY_FILTERS);
     const [page, setPage] = useState(1);
     const [result, setResult] = useState<InvoicePage | null>(null);
     const [units, setUnits] = useState<Unit[]>([]);
-    const [summary, setSummary] = useState<ChargesReport | null>(null);
+    const [unitsError, setUnitsError] = useState('');
+    const [unitsAttempt, setUnitsAttempt] = useState(0);
+    // O resumo guarda o período a que se refere: a legenda mostra o que os totais cobrem, não o que está digitado.
+    const [summary, setSummary] = useState<{ period: SummaryPeriod; report: ChargesReport } | null>(null);
     const [summaryError, setSummaryError] = useState('');
+    const [summaryLoading, setSummaryLoading] = useState(false);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
-    const [revision, setRevision] = useState(0);
+    // Instante de referência das consultas. Recarregar renova este valor, o que refaz a lista e o resumo
+    // (e atualiza a fronteira "agora" do filtro "Pendente").
+    const [asOf, setAsOf] = useState(() => new Date());
+    const reload = () => setAsOf(new Date());
 
     const filtered = Object.values(filters).some(Boolean);
-    const rangeError = filters.startDate && filters.endDate && filters.startDate > filters.endDate
-        ? 'O vencimento inicial deve ser anterior ou igual ao final.' : '';
+    const rangeError = filterRangeError(filters);
     // O resumo segue o período filtrado; sem filtro, cobre os últimos 12 meses e os próximos 6 (inclui o que ainda vai vencer).
-    const period = useMemo(() => {
-        const today = todayBR();
-        return {
-            startDate: filters.startDate || monthStartShifted(today, -11),
-            endDate: filters.endDate || monthEndShifted(today, 6),
-        };
-    }, [filters.startDate, filters.endDate]);
+    const period = useMemo(() => summaryPeriod(filters, todayBR()), [filters]);
+    const periodIssue = rangeError ? '' : summaryPeriodIssue(period);
+    const query = useMemo(() => buildInvoiceQuery(filters, page, PAGE_SIZE, asOf), [filters, page, asOf]);
 
-    function changeFilters(patch: Partial<Filters>) {
+    function changeFilters(patch: Partial<InvoiceFilterState>) {
         setFilters(current => ({ ...current, ...patch }));
         setPage(1);
     }
@@ -84,21 +86,27 @@ export default function InvoicesList() {
     useEffect(() => {
         if (!canManage) return;
         let cancelled = false;
-        unitService.getAll().then(data => { if (!cancelled) setUnits(data); }).catch(() => undefined);
+        async function load() {
+            setUnitsError('');
+            try {
+                const data = await unitService.getAll();
+                if (!cancelled) setUnits(data);
+            } catch {
+                if (!cancelled) setUnitsError('Não foi possível carregar as unidades.');
+            }
+        }
+        void load();
         return () => { cancelled = true; };
-    }, [canManage]);
+    }, [canManage, unitsAttempt]);
 
     useEffect(() => {
-        if (!canManage || rangeError) return;
+        if (!canManage || rangeError || query.kind === 'empty') return;
         let cancelled = false;
         async function load() {
             setLoading(true);
             setError('');
             try {
-                const data = await invoiceService.listAll({
-                    status: filters.status || undefined, type: filters.type || undefined, unitId: filters.unitId || undefined,
-                    startDate: filters.startDate || undefined, endDate: filters.endDate || undefined, page, limit: PAGE_SIZE,
-                });
+                const data = await invoiceService.listAll(query.kind === 'query' ? query.params : {});
                 if (!cancelled) setResult(data);
             } catch (err) {
                 if (!cancelled) setError(apiErrorMessage(err, 'Erro ao carregar cobranças.'));
@@ -108,30 +116,38 @@ export default function InvoicesList() {
         }
         void load();
         return () => { cancelled = true; };
-    }, [canManage, rangeError, filters, page, revision]);
+    }, [canManage, rangeError, query]);
 
     useEffect(() => {
-        if (!canManage || rangeError) return;
+        if (!canManage || rangeError || periodIssue) return;
         let cancelled = false;
         async function load() {
             setSummaryError('');
+            setSummaryLoading(true);
             try {
-                const data = await reportService.charges(period);
-                if (!cancelled) setSummary(data);
+                const report = await reportService.charges(period);
+                if (!cancelled) setSummary({ period, report });
             } catch (err) {
                 if (!cancelled) { setSummary(null); setSummaryError(apiErrorMessage(err, 'Resumo indisponível.')); }
+            } finally {
+                if (!cancelled) setSummaryLoading(false);
             }
         }
         void load();
         return () => { cancelled = true; };
-    }, [canManage, rangeError, period, revision]);
+    }, [canManage, rangeError, periodIssue, period, asOf]);
 
     if (!canManage) {
         return <div><Header title="Cobranças" /><PageBody><p role="alert">Acesso restrito à administração e aos funcionários.</p></PageBody></div>;
     }
 
+    // Filtro sem resultado possível (ex.: "Pendente" com vencimento final no passado): vazio direto, sem consultar a API.
+    const noPossibleResult = query.kind === 'empty';
+    const shown = noPossibleResult ? emptyPage(page) : result;
+    const shownLoading = noPossibleResult ? false : loading;
+    const shownError = noPossibleResult ? '' : error;
     const now = new Date();
-    const totals = summary?.summary;
+    const totals = summary?.report.summary;
     return (
         <div>
             <Header title="Cobranças" eyebrow="Financeiro" />
@@ -139,16 +155,18 @@ export default function InvoicesList() {
                 <SectionHeader title="Cobranças" eyebrow="Financeiro"
                     subtitle="Acompanhe as cobranças Pix emitidas aos moradores, com valores, vencimentos e situação." />
 
-                {summaryError && !rangeError && <p role="alert" style={{ color: 'var(--color-err)', marginBottom: 12 }}>{summaryError}</p>}
-                {totals && !rangeError && <>
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 16, marginBottom: 12 }}>
+                {summaryError && !rangeError && !periodIssue && <p role="alert" style={{ color: 'var(--color-err)', marginBottom: 12 }}>{summaryError}</p>}
+                {periodIssue && <p role="note" style={{ fontSize: 13, color: 'var(--color-warn)', marginBottom: 28 }}>{periodIssue}</p>}
+                {summary && totals && !rangeError && !periodIssue && <>
+                    <div aria-busy={summaryLoading} style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 16, marginBottom: 12, opacity: summaryLoading ? 0.55 : 1, transition: 'opacity 0.15s' }}>
                         <SummaryCard label="Recebido" amount={formatMoneyBR(totals.paid.amount)} caption={count(totals.paid.count)} color="var(--color-ok)" />
                         <SummaryCard label="A vencer" amount={formatMoneyBR(totals.pending.amount)} caption={count(totals.pending.count)} color="var(--color-warn)" />
                         <SummaryCard label="Vencido" amount={formatMoneyBR(totals.overdue.amount)} caption={count(totals.overdue.count)} color="var(--color-err)" />
                         <SummaryCard label="Inadimplência" amount={`${percentage.format(totals.delinquencyRate)}%`} caption="do valor total do período" color="var(--color-bone)" />
                     </div>
                     <p style={{ fontSize: 12, color: 'var(--color-bone-muted)', marginBottom: 28 }}>
-                        Vencimentos de {formatDueDateBR(period.startDate)} a {formatDueDateBR(period.endDate)}. O resumo soma cobranças pagas, a vencer e vencidas; canceladas e estornadas ficam de fora.
+                        Vencimentos de {formatDueDateBR(summary.period.startDate)} a {formatDueDateBR(summary.period.endDate)}. O resumo soma cobranças pagas, a vencer e vencidas; canceladas e estornadas ficam de fora.
+                        {summaryLoading && ' Atualizando…'}
                     </p>
                 </>}
 
@@ -165,18 +183,24 @@ export default function InvoicesList() {
                         onChange={event => changeFilters({ endDate: event.target.value })} /></label>
                     {filtered && <button className="btn-ghost" onClick={() => { setFilters(EMPTY_FILTERS); setPage(1); }}>Limpar filtros</button>}
                 </div>
+                {unitsError && (
+                    <p role="alert" style={{ color: 'var(--color-err)', marginBottom: 16, fontSize: 13 }}>
+                        {unitsError} O filtro por unidade está indisponível.{' '}
+                        <button className="btn-ghost" onClick={() => setUnitsAttempt(value => value + 1)}>Tentar novamente</button>
+                    </p>
+                )}
 
-                {result && !rangeError && <ListMeta count={result.meta.total} singular="cobrança" plural="cobranças" />}
+                {shown && !rangeError && <ListMeta count={shown.meta.total} singular="cobrança" plural="cobranças" />}
                 {rangeError ? <p role="alert" style={{ color: 'var(--color-err)' }}>{rangeError}</p>
-                    : error ? <div role="alert" className="luxe-card" style={{ padding: 24, color: 'var(--color-err)' }}>
-                        <p>{error}</p><button className="btn-ghost" onClick={() => setRevision(value => value + 1)}>Tentar novamente</button>
-                    </div> : loading ? <p role="status"><Loader2 size={18} className="animate-spin" /> Carregando cobranças...</p>
-                        : !result || result.data.length === 0 ? <div className="luxe-card"><EmptyTable title="Nenhuma cobrança encontrada"
+                    : shownError ? <div role="alert" className="luxe-card" style={{ padding: 24, color: 'var(--color-err)' }}>
+                        <p>{shownError}</p><button className="btn-ghost" onClick={reload}>Tentar novamente</button>
+                    </div> : shownLoading ? <p role="status"><Loader2 size={18} className="animate-spin" /> Carregando cobranças...</p>
+                        : !shown || shown.data.length === 0 ? <div className="luxe-card"><EmptyTable title="Nenhuma cobrança encontrada"
                             hint={filtered ? 'Confira os filtros selecionados.' : 'As cobranças emitidas aparecerão aqui.'} /></div>
                             : <div className="luxe-card" style={{ overflowX: 'auto' }}>
                                 <table className="luxe-table">
                                     <thead><tr><th>Descrição</th><th>Morador</th><th>Unidade</th><th>Vencimento</th><th style={{ textAlign: 'right' }}>Valor</th><th>Status</th><th>Pix</th></tr></thead>
-                                    <tbody>{result.data.map(invoice => {
+                                    <tbody>{shown.data.map(invoice => {
                                         const status = effectiveInvoiceStatus(invoice, now);
                                         return <tr key={invoice.id}>
                                             <td style={{ overflowWrap: 'anywhere', maxWidth: 280 }}>
@@ -199,11 +223,11 @@ export default function InvoicesList() {
                                 </table>
                             </div>}
 
-                {result && result.meta.totalPages > 1 && !rangeError && !error && (
+                {shown && shown.meta.totalPages > 1 && !rangeError && !shownError && (
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 12, marginTop: 16 }}>
-                        <button className="btn-ghost" disabled={page <= 1 || loading} onClick={() => setPage(value => value - 1)}>Anterior</button>
-                        <span style={{ fontSize: 12, color: 'var(--color-bone-muted)' }}>Página {result.meta.page} de {result.meta.totalPages}</span>
-                        <button className="btn-ghost" disabled={page >= result.meta.totalPages || loading} onClick={() => setPage(value => value + 1)}>Próxima</button>
+                        <button className="btn-ghost" disabled={page <= 1 || shownLoading} onClick={() => setPage(value => value - 1)}>Anterior</button>
+                        <span style={{ fontSize: 12, color: 'var(--color-bone-muted)' }}>Página {shown.meta.page} de {shown.meta.totalPages}</span>
+                        <button className="btn-ghost" disabled={page >= shown.meta.totalPages || shownLoading} onClick={() => setPage(value => value + 1)}>Próxima</button>
                     </div>
                 )}
             </PageBody>
