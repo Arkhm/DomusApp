@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Plus, RefreshCw, Users } from 'lucide-react';
 import Header from '../../components/layout/Header';
 import PageBody from '../../components/luxury/PageBody';
 import SectionHeader from '../../components/luxury/SectionHeader';
@@ -14,14 +14,20 @@ import { invoiceService } from '../../services/invoiceService';
 import { reportService } from '../../services/reportService';
 import { unitService } from '../../services/unitService';
 import {
-    INVOICE_STATUS_LABELS, INVOICE_TYPE_LABELS, ISSUANCE_LABELS, effectiveInvoiceStatus,
+    INVOICE_STATUS_LABELS, INVOICE_TYPE_LABELS, ISSUANCE_IN_FLIGHT, ISSUANCE_LABELS, effectiveInvoiceStatus,
     type InvoicePage, type InvoiceStatus, type InvoiceType,
 } from '../../types/invoice';
 import type { ChargesReport } from '../../types/report';
 import { formatUnitDisplay, type Unit } from '../../types/user';
+import InvoiceBatchModal from './InvoiceBatchModal';
+import InvoiceFormModal from './InvoiceFormModal';
 
 const PAGE_SIZE = 20;
 const percentage = new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+// Enquanto há Pix sendo gerado, a lista se atualiza sozinha a cada 8 s, por no máximo 30 vezes (4 minutos).
+// Depois disso o botão "Atualizar" continua disponível.
+const POLL_INTERVAL_MS = 8000;
+const MAX_POLLS = 30;
 const emptyPage = (page: number): InvoicePage => ({ data: [], meta: { total: 0, page, limit: PAGE_SIZE, totalPages: 0 } });
 
 function statusTone(status: InvoiceStatus) {
@@ -66,6 +72,7 @@ export default function InvoicesList() {
     const [summaryLoading, setSummaryLoading] = useState(false);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
+    const [modal, setModal] = useState<'single' | 'batch' | null>(null);
     // Instante de referência das consultas. Recarregar renova este valor, o que refaz a lista e o resumo
     // (e atualiza a fronteira "agora" do filtro "Pendente").
     const [asOf, setAsOf] = useState(() => new Date());
@@ -77,6 +84,8 @@ export default function InvoicesList() {
     const period = useMemo(() => summaryPeriod(filters, todayBR()), [filters]);
     const periodIssue = rangeError ? '' : summaryPeriodIssue(period);
     const query = useMemo(() => buildInvoiceQuery(filters, page, PAGE_SIZE, asOf), [filters, page, asOf]);
+
+    const inFlight = result?.data.some(invoice => ISSUANCE_IN_FLIGHT.has(invoice.issuanceStatus)) ?? false;
 
     function changeFilters(patch: Partial<InvoiceFilterState>) {
         setFilters(current => ({ ...current, ...patch }));
@@ -118,6 +127,23 @@ export default function InvoicesList() {
         return () => { cancelled = true; };
     }, [canManage, rangeError, query]);
 
+    // Atualização silenciosa (sem trocar a tabela por "Carregando") enquanto algum Pix ainda está sendo gerado.
+    useEffect(() => {
+        if (!canManage || rangeError || !inFlight || query.kind !== 'query') return;
+        const params = query.params;
+        let cancelled = false;
+        let polls = 0;
+        const timer = window.setInterval(async () => {
+            if (document.hidden) return;
+            if (++polls > MAX_POLLS) { window.clearInterval(timer); return; }
+            try {
+                const data = await invoiceService.listAll(params);
+                if (!cancelled) setResult(data);
+            } catch { /* a próxima rodada tenta de novo */ }
+        }, POLL_INTERVAL_MS);
+        return () => { cancelled = true; window.clearInterval(timer); };
+    }, [canManage, rangeError, inFlight, query]);
+
     useEffect(() => {
         if (!canManage || rangeError || periodIssue) return;
         let cancelled = false;
@@ -153,7 +179,16 @@ export default function InvoicesList() {
             <Header title="Cobranças" eyebrow="Financeiro" />
             <PageBody>
                 <SectionHeader title="Cobranças" eyebrow="Financeiro"
-                    subtitle="Acompanhe as cobranças Pix emitidas aos moradores, com valores, vencimentos e situação." />
+                    subtitle="Emita e acompanhe as cobranças Pix dos moradores, com valores, vencimentos e situação."
+                    action={
+                        <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                            <button className="btn-ghost" onClick={reload} disabled={loading}>
+                                <RefreshCw size={14} /> Atualizar
+                            </button>
+                            <button className="btn-ghost" onClick={() => setModal('batch')}><Users size={14} /> Emitir em lote</button>
+                            <button className="btn-gold" onClick={() => setModal('single')}><Plus size={14} /> Nova cobrança</button>
+                        </div>
+                    } />
 
                 {summaryError && !rangeError && !periodIssue && <p role="alert" style={{ color: 'var(--color-err)', marginBottom: 12 }}>{summaryError}</p>}
                 {periodIssue && <p role="note" style={{ fontSize: 13, color: 'var(--color-warn)', marginBottom: 28 }}>{periodIssue}</p>}
@@ -191,6 +226,11 @@ export default function InvoicesList() {
                 )}
 
                 {shown && !rangeError && <ListMeta count={shown.meta.total} singular="cobrança" plural="cobranças" />}
+                {inFlight && !rangeError && !noPossibleResult && (
+                    <p role="status" style={{ fontSize: 12, color: 'var(--color-bone-muted)', marginBottom: 12 }}>
+                        Há Pix sendo gerados. A lista se atualiza sozinha.
+                    </p>
+                )}
                 {rangeError ? <p role="alert" style={{ color: 'var(--color-err)' }}>{rangeError}</p>
                     : shownError ? <div role="alert" className="luxe-card" style={{ padding: 24, color: 'var(--color-err)' }}>
                         <p>{shownError}</p><button className="btn-ghost" onClick={reload}>Tentar novamente</button>
@@ -217,6 +257,7 @@ export default function InvoicesList() {
                                                     {ISSUANCE_LABELS[invoice.issuanceStatus] ?? INVOICE_STATUS_LABELS[invoice.issuanceStatus as InvoiceStatus] ?? invoice.issuanceStatus}
                                                 </Tag>
                                                 {invoice.requiresReview && <Tag tone="err">Revisar</Tag>}
+                                                {invoice.paymentEnvironment === 'TEST' && <Tag tone="gold">Teste</Tag>}
                                             </div></td>
                                         </tr>;
                                     })}</tbody>
@@ -231,6 +272,8 @@ export default function InvoicesList() {
                     </div>
                 )}
             </PageBody>
+            {modal === 'single' && <InvoiceFormModal onClose={() => setModal(null)} onCreated={reload} />}
+            {modal === 'batch' && <InvoiceBatchModal onClose={() => setModal(null)} onCreated={reload} />}
         </div>
     );
 }
