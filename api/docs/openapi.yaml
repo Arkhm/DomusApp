@@ -1752,6 +1752,36 @@ paths:
           $ref: "#/components/responses/500"
         "503":
           $ref: "#/components/responses/503"
+  /invoices/{id}/attempts:
+    get:
+      tags:
+        - invoices
+      summary: Consultar histórico de tentativas da fatura
+      description: "Perfis permitidos: ADMIN, FUNCIONARIO, SYNDIC. SYNDIC corresponde ao atributo isSyndic."
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Operação concluída.
+        "400":
+          $ref: "#/components/responses/400"
+        "401":
+          $ref: "#/components/responses/401"
+        "403":
+          $ref: "#/components/responses/403"
+        "404":
+          $ref: "#/components/responses/404"
+        "409":
+          $ref: "#/components/responses/409"
+        "500":
+          $ref: "#/components/responses/500"
+        "503":
+          $ref: "#/components/responses/503"
   /invoices/{id}/reconcile:
     post:
       tags:
@@ -1795,6 +1825,48 @@ paths:
       summary: Reagendar emissão da fatura
       description: "Perfis permitidos: ADMIN, FUNCIONARIO, SYNDIC. SYNDIC corresponde ao atributo isSyndic."
       parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/InvoiceReason"
+      responses:
+        "202":
+          description: Operação aceita para processamento assíncrono.
+        "400":
+          $ref: "#/components/responses/400"
+        "401":
+          $ref: "#/components/responses/401"
+        "403":
+          $ref: "#/components/responses/403"
+        "404":
+          $ref: "#/components/responses/404"
+        "409":
+          $ref: "#/components/responses/409"
+        "500":
+          $ref: "#/components/responses/500"
+        "503":
+          $ref: "#/components/responses/503"
+  /invoices/{id}/reissue:
+    post:
+      tags:
+        - invoices
+      summary: Reemitir Pix encerrado — Reagendar emissão da fatura
+      description: "Perfis permitidos: ADMIN, FUNCIONARIO, SYNDIC. SYNDIC corresponde ao atributo isSyndic."
+      parameters:
+        - name: Idempotency-Key
+          in: header
+          required: true
+          schema:
+            type: string
+
         - name: id
           in: path
           required: true
@@ -2576,6 +2648,41 @@ paths:
           $ref: "#/components/responses/404"
         "409":
           $ref: "#/components/responses/409"
+  /notifications/inbox/{id}/read:
+    post:
+      tags: [notifications]
+      summary: Registrar leitura de evento persistido da caixa pessoal
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200': { description: Leitura confirmada }
+        '401': { $ref: '#/components/responses/401' }
+        '404': { $ref: '#/components/responses/404' }
+  /invoices/payers:
+    get:
+      tags: [invoices]
+      summary: Listar pagadores para emissão financeira
+      description: ADMIN, FUNCIONARIO e síndica; não concede gestão de cadastros.
+      responses:
+        '200': { description: Moradores com dados necessários à emissão }
+        '403': { $ref: '#/components/responses/403' }
+  /invoices/units:
+    get:
+      tags: [invoices]
+      summary: Listar unidades para filtros financeiros
+      responses:
+        '200': { description: Unidades disponíveis }
+        '403': { $ref: '#/components/responses/403' }
+  /units/options:
+    get:
+      tags: [units]
+      summary: Listar identificadores e nomes de unidades para destinatários
+      responses:
+        '200': { description: Opções de unidades sem dados de moradores }
+        '403': { $ref: '#/components/responses/403' }
 components:
   securitySchemes:
     cookieAuth:
@@ -3023,7 +3130,11 @@ components:
           example: NOTICE:ba382bf4-653b-4b7e-b0c0-d22d53657d39
         type:
           type: string
-          enum: [NOTICE, EVENT, INCIDENT]
+          enum: [NOTICE, EVENT, INCIDENT, INVOICE, RESERVATION, VOTING]
+        eventId:
+          type: string
+          format: uuid
+          description: Quando presente, usar este UUID na rota /notifications/inbox/{id}/read.
         sourceId:
           type: string
           format: uuid
@@ -3031,7 +3142,6 @@ components:
           type: string
         description:
           type: string
-          enum: [Novo comunicado, Evento publicado, Evento cancelado, Ocorrência respondida, Ocorrência em andamento, Ocorrência resolvida, Ocorrência encerrada]
         createdAt:
           type: string
           format: date-time
