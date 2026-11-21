@@ -4,6 +4,16 @@ import type { Invoice, InvoiceBatchInput, InvoiceBatchResult, InvoiceCreateInput
 const idempotent = (key: string) => ({ headers: { 'Idempotency-Key': key } });
 
 export const invoiceService = {
+    async detail(id: string) { return (await api.get(`/invoices/${id}`)).data; },
+    async audit(id: string): Promise<{ id: string; action: string; reason: string | null; createdAt: string }[]> {
+        return (await api.get(`/invoices/${id}/audit`)).data;
+    },
+    async health(): Promise<Record<string, number | string | null>> { return (await api.get('/invoices/payments/health')).data; },
+    async action(id: string, action: string, reason: string) {
+        if (action === 'cancel') return (await api.delete(`/invoices/${id}`, { data: { reason } })).data;
+        if (action === 'paid') return (await api.put(`/invoices/${id}/status`, { status: 'PAID', reason })).data;
+        return (await api.post(`/invoices/${id}/${action}`, { reason })).data;
+    },
     /** `GET /invoices/all` — restrito a ADMIN e FUNCIONARIO. Ordenado por vencimento crescente. */
     async listAll(params: InvoiceFilters = {}): Promise<InvoicePage> {
         const response = await api.get<InvoicePage>('/invoices/all', { params });

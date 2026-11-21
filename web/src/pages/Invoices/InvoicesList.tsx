@@ -19,6 +19,7 @@ import {
 } from '../../types/invoice';
 import type { ChargesReport } from '../../types/report';
 import { formatUnitDisplay, type Unit } from '../../types/user';
+import InvoiceDetailModal from './InvoiceDetailModal';
 import InvoiceBatchModal from './InvoiceBatchModal';
 import InvoiceFormModal from './InvoiceFormModal';
 
@@ -72,6 +73,7 @@ export default function InvoicesList() {
     const [summaryLoading, setSummaryLoading] = useState(false);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
+    const [selectedId, setSelectedId] = useState<string | null>(null);
     const [modal, setModal] = useState<'single' | 'batch' | null>(null);
     // Instante de referência das consultas. Recarregar renova este valor, o que refaz a lista e o resumo
     // (e atualiza a fronteira "agora" do filtro "Pendente").
@@ -239,7 +241,7 @@ export default function InvoicesList() {
                             hint={filtered ? 'Confira os filtros selecionados.' : 'As cobranças emitidas aparecerão aqui.'} /></div>
                             : <div className="luxe-card" style={{ overflowX: 'auto' }}>
                                 <table className="luxe-table">
-                                    <thead><tr><th>Descrição</th><th>Morador</th><th>Unidade</th><th>Vencimento</th><th style={{ textAlign: 'right' }}>Valor</th><th>Status</th><th>Pix</th></tr></thead>
+                                    <thead><tr><th>Descrição</th><th>Morador</th><th>Unidade</th><th>Vencimento</th><th style={{ textAlign: 'right' }}>Valor</th><th>Status</th><th>Pix</th><th>Ações</th></tr></thead>
                                     <tbody>{shown.data.map(invoice => {
                                         const status = effectiveInvoiceStatus(invoice, now);
                                         return <tr key={invoice.id}>
@@ -258,7 +260,7 @@ export default function InvoicesList() {
                                                 </Tag>
                                                 {invoice.requiresReview && <Tag tone="err">Revisar</Tag>}
                                                 {invoice.paymentEnvironment === 'TEST' && <Tag tone="gold">Teste</Tag>}
-                                            </div></td>
+                                            </div></td><td><button className="btn-ghost" onClick={() => setSelectedId(invoice.id)}>Gerenciar</button></td>
                                         </tr>;
                                     })}</tbody>
                                 </table>
@@ -272,6 +274,7 @@ export default function InvoicesList() {
                     </div>
                 )}
             </PageBody>
+            {selectedId && <InvoiceDetailModal id={selectedId} onClose={() => setSelectedId(null)} onChanged={reload} />}
             {modal === 'single' && <InvoiceFormModal onClose={() => setModal(null)} onCreated={reload} />}
             {modal === 'batch' && <InvoiceBatchModal onClose={() => setModal(null)} onCreated={reload} />}
         </div>
