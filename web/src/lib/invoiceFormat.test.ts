@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { formatDueDateBR, formatMoneyBR, monthEndShifted, monthStartShifted, todayBR } from './invoiceFormat';
+import { formatDateTimeBR, formatDueDateBR, formatMoneyBR, formatReferenceMonthBR, monthEndShifted, monthStartShifted, todayBR } from './invoiceFormat';
 
 // Em pt-BR o Intl separa "R$" do número com espaço inseparável.
 const brl = (text: string) => text.replace(/\s/g, ' ');
@@ -58,5 +58,27 @@ describe('monthStartShifted / monthEndShifted', () => {
         expect(monthEndShifted('2024-01-31', 1)).toBe('2024-02-29');
         expect(monthEndShifted('2025-01-31', 1)).toBe('2025-02-28');
         expect(monthEndShifted('2026-12-10', 0)).toBe('2026-12-31');
+    });
+});
+
+describe('formatDateTimeBR', () => {
+    it('mostra data e hora no horário de Brasília', () => {
+        expect(formatDateTimeBR('2026-11-14T15:30:00.000Z')).toBe('14/11/2026 12:30');
+        expect(formatDateTimeBR('2026-11-15T02:05:00.000Z')).toBe('14/11/2026 23:05');
+    });
+
+    it('devolve o texto original quando a data é inválida', () => {
+        expect(formatDateTimeBR('não é data')).toBe('não é data');
+    });
+});
+
+describe('formatReferenceMonthBR', () => {
+    it('mostra mês/ano do mês de referência', () => {
+        expect(formatReferenceMonthBR('2026-12-01T00:00:00.000Z')).toBe('12/2026');
+        expect(formatReferenceMonthBR('2026-01-01')).toBe('01/2026');
+    });
+
+    it('usa o traço quando não há mês de referência', () => {
+        expect(formatReferenceMonthBR(null)).toBe('—');
     });
 });

@@ -1,5 +1,5 @@
 import api from './api';
-import type { Invoice, InvoiceBatchInput, InvoiceBatchResult, InvoiceCreateInput, InvoiceFilters, InvoicePage } from '../types/invoice';
+import type { Invoice, InvoiceAudit, InvoiceBatchInput, InvoiceBatchResult, InvoiceCreateInput, InvoiceFilters, InvoicePage } from '../types/invoice';
 
 const idempotent = (key: string) => ({ headers: { 'Idempotency-Key': key } });
 
@@ -17,6 +17,39 @@ export const invoiceService = {
      */
     async create(data: InvoiceCreateInput, key: string): Promise<Invoice> {
         const response = await api.post<Invoice>('/invoices', data, idempotent(key));
+        return response.data;
+    },
+
+    /** `GET /invoices/:id` — dados atuais da cobrança, com o Pix quando ativo. */
+    async getById(id: string): Promise<Invoice> {
+        const response = await api.get<Invoice>(`/invoices/${id}`);
+        return response.data;
+    },
+
+    /** `GET /invoices/:id/audit` — histórico (até 100 registros, do mais novo para o mais antigo). */
+    async audit(id: string): Promise<InvoiceAudit[]> {
+        const response = await api.get<InvoiceAudit[]>(`/invoices/${id}/audit`);
+        return response.data;
+    },
+
+    /** `POST /invoices/:id/reconcile` — confere o pedido no Mercado Pago e aplica o que encontrar. Exige justificativa. */
+    async reconcile(id: string, reason: string): Promise<Invoice> {
+        const response = await api.post<Invoice>(`/invoices/${id}/reconcile`, { reason });
+        return response.data;
+    },
+
+    /** `POST /invoices/:id/retry` (202) — pede nova tentativa de emitir o Pix. Exige justificativa. */
+    async retry(id: string, reason: string): Promise<Invoice> {
+        const response = await api.post<Invoice>(`/invoices/${id}/retry`, { reason });
+        return response.data;
+    },
+
+    /**
+     * `PUT /invoices/:id/status` — baixa manual: só `PAID` ou `CANCELLED`. Exige justificativa.
+     * Cancelar usa este mesmo endpoint (o `DELETE /invoices/:id` da API é um atalho para `CANCELLED`).
+     */
+    async setStatus(id: string, status: 'PAID' | 'CANCELLED', reason: string): Promise<Invoice> {
+        const response = await api.put<Invoice>(`/invoices/${id}/status`, { status, reason });
         return response.data;
     },
 
