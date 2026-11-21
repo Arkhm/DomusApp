@@ -1,11 +1,16 @@
+import type { Prisma } from '@prisma/client';
+import { dueDayCutoff } from '../lib/invoiceDate';
+import { currentAttempt } from '../lib/paymentDomain';
 import { prisma } from '../lib/prisma';
+
+const overdueConditions = (): Prisma.InvoiceWhereInput => ({ OR: [{ status: 'OVERDUE' }, { status: 'PENDING', dueDate: { lt: dueDayCutoff() } }] });
 
 export const invoiceRepository = {
   create: async (data: any) => {
     return await prisma.invoice.create({
       data,
       include: {
-        paymentAttempt: true,
+        paymentAttempts: true,
         user: { select: { id: true, name: true, email: true, cpf: true, phone: true, unit: true } },
         unit: true,
       },
@@ -23,18 +28,18 @@ export const invoiceRepository = {
     return await prisma.invoice.findUnique({
       where: { id },
       include: {
-        paymentAttempt: true,
+        paymentAttempts: true,
         user: { select: { id: true, name: true, email: true, cpf: true, phone: true, unit: true } },
         unit: true,
       },
-    });
+    }).then(invoice => invoice ? currentAttempt(invoice) : null);
   },
 
   findByMpOrderId: async (mpOrderId: string) => {
     return await prisma.invoice.findUnique({
       where: { mpOrderId },
       include: {
-        paymentAttempt: true,
+        paymentAttempts: true,
         user: { select: { id: true, name: true, email: true, cpf: true, phone: true, unit: true } },
         unit: true,
       },
@@ -45,7 +50,7 @@ export const invoiceRepository = {
     return await prisma.invoice.findUnique({
       where: { mpPaymentId },
       include: {
-        paymentAttempt: true,
+        paymentAttempts: true,
         user: { select: { id: true, name: true, email: true, cpf: true, phone: true, unit: true } },
         unit: true,
       },
@@ -63,8 +68,7 @@ export const invoiceRepository = {
     const where: any = { userId };
     
     if (filters?.status === 'OVERDUE') {
-      where.status = { in: ['PENDING', 'OVERDUE'] };
-      where.AND = [{ dueDate: { lt: new Date() } }];
+      Object.assign(where, overdueConditions());
     } else if (filters?.status) where.status = filters.status;
     if (filters?.type) where.type = filters.type;
     if (filters?.startDate || filters?.endDate) {
@@ -83,7 +87,7 @@ export const invoiceRepository = {
         orderBy: { dueDate: 'asc' },
         skip,
         take: limit,
-        include: { paymentAttempt: true, unit: true },
+        include: { paymentAttempts: true, unit: true },
       }),
       prisma.invoice.count({ where }),
     ]);
@@ -110,8 +114,7 @@ export const invoiceRepository = {
     const where: any = { unitId };
     
     if (filters?.status === 'OVERDUE') {
-      where.status = { in: ['PENDING', 'OVERDUE'] };
-      where.AND = [{ dueDate: { lt: new Date() } }];
+      Object.assign(where, overdueConditions());
     } else if (filters?.status) where.status = filters.status;
     if (filters?.type) where.type = filters.type;
     if (filters?.startDate || filters?.endDate) {
@@ -130,7 +133,7 @@ export const invoiceRepository = {
         orderBy: { dueDate: 'asc' },
         skip,
         take: limit,
-        include: { paymentAttempt: true, user: { select: { id: true, name: true, email: true, cpf: true, phone: true } } },
+        include: { paymentAttempts: true, user: { select: { id: true, name: true, email: true, cpf: true, phone: true } } },
       }),
       prisma.invoice.count({ where }),
     ]);
@@ -159,8 +162,7 @@ export const invoiceRepository = {
     const where: any = {};
     
     if (filters?.status === 'OVERDUE') {
-      where.status = { in: ['PENDING', 'OVERDUE'] };
-      where.AND = [{ dueDate: { lt: new Date() } }];
+      Object.assign(where, overdueConditions());
     } else if (filters?.status) where.status = filters.status;
     if (filters?.type) where.type = filters.type;
     if (filters?.userId) where.userId = filters.userId;
@@ -182,7 +184,7 @@ export const invoiceRepository = {
         skip,
         take: limit,
         include: {
-          paymentAttempt: true,
+          paymentAttempts: true,
           user: { select: { id: true, name: true, email: true, cpf: true, phone: true, unit: true } },
           unit: true,
         },
@@ -206,7 +208,7 @@ export const invoiceRepository = {
       where: { id },
       data,
       include: {
-        paymentAttempt: true,
+        paymentAttempts: true,
         user: { select: { id: true, name: true, email: true, cpf: true, phone: true, unit: true } },
         unit: true,
       },
@@ -218,7 +220,7 @@ export const invoiceRepository = {
       where: { mpOrderId },
       data,
       include: {
-        paymentAttempt: true,
+        paymentAttempts: true,
         user: { select: { id: true, name: true, email: true, cpf: true, phone: true, unit: true } },
         unit: true,
       },
@@ -231,13 +233,13 @@ export const invoiceRepository = {
 
   countByUser: async (userId: string, status?: string) => {
     return await prisma.invoice.count({
-      where: { userId, ...(status === 'OVERDUE' ? { status: { in: ['PENDING', 'OVERDUE'] }, dueDate: { lt: new Date() } } : status ? { status } : {}) },
+      where: { userId, ...(status === 'OVERDUE' ? overdueConditions() : status === 'PENDING' ? { status: { in: ['PENDING', 'OVERDUE'] } } : status ? { status } : {}) },
     });
   },
 
   sumAmountByUser: async (userId: string, status?: string) => {
     const result = await prisma.invoice.aggregate({
-      where: { userId, ...(status === 'OVERDUE' ? { status: { in: ['PENDING', 'OVERDUE'] }, dueDate: { lt: new Date() } } : status ? { status } : {}) },
+      where: { userId, ...(status === 'OVERDUE' ? overdueConditions() : status === 'PENDING' ? { status: { in: ['PENDING', 'OVERDUE'] } } : status ? { status } : {}) },
       _sum: { amount: true },
     });
     return result._sum.amount ?? 0;
@@ -247,10 +249,10 @@ export const invoiceRepository = {
     return await prisma.invoice.findMany({
       where: {
         status: { in: ['PENDING', 'OVERDUE'] },
-        dueDate: { lt: new Date() },
+        dueDate: { lt: dueDayCutoff() },
       },
       include: {
-        paymentAttempt: true,
+        paymentAttempts: true,
         user: { select: { id: true, name: true, email: true, cpf: true, phone: true, unit: true } },
         unit: true,
       },
@@ -261,9 +263,9 @@ export const invoiceRepository = {
   getStatsByUnit: async (unitId: string) => {
     const [total, pending, paid, overdue, totalAmount] = await Promise.all([
       prisma.invoice.count({ where: { unitId } }),
-      prisma.invoice.count({ where: { unitId, status: 'PENDING' } }),
+      prisma.invoice.count({ where: { unitId, status: { in: ['PENDING', 'OVERDUE'] } } }),
       prisma.invoice.count({ where: { unitId, status: 'PAID' } }),
-      prisma.invoice.count({ where: { unitId, status: 'PENDING', dueDate: { lt: new Date() } } }),
+      prisma.invoice.count({ where: { unitId, ...overdueConditions() } }),
       prisma.invoice.aggregate({
         where: { unitId },
         _sum: { amount: true },

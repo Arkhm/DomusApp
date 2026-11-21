@@ -1,16 +1,16 @@
 import { Prisma } from '@prisma/client';
 import { randomUUID } from 'node:crypto';
 import { prisma } from '../lib/prisma';
-import { PaymentError } from '../lib/paymentDomain';
+import { currentAttempt, PaymentError } from '../lib/paymentDomain';
 
-const operationInclude = { invoices: { include: { paymentAttempt: true, unit: true } } } satisfies Prisma.PaymentOperationInclude;
+const operationInclude = { invoices: { include: { paymentAttempts: true, unit: true } } } satisfies Prisma.PaymentOperationInclude;
 
 export const paymentRepository = {
   findOperation(keyHash: string) {
-    return prisma.paymentOperation.findUnique({ where: { keyHash }, include: operationInclude });
+    return prisma.paymentOperation.findUnique({ where: { keyHash }, include: operationInclude }).then(operation => operation ? ({ ...operation, invoices: operation.invoices.map(currentAttempt) }) : null);
   },
   createOperation(data: Prisma.PaymentOperationCreateInput) {
-    return prisma.paymentOperation.create({ data, include: operationInclude });
+    return prisma.paymentOperation.create({ data, include: operationInclude }).then(operation => ({ ...operation, invoices: operation.invoices.map(currentAttempt) }));
   },
   async adoptLegacy(input: { invoiceId: string; invoiceVersion: number; actorId: string; reason: string;
     attempt: Prisma.PaymentAttemptCreateWithoutInvoiceInput }) {

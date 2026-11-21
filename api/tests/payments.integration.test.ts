@@ -1,3 +1,4 @@
+import { inboxService } from '../src/services/inboxService';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { randomInt, randomUUID, createHmac } from 'node:crypto';
@@ -61,6 +62,8 @@ test('pagamentos com MySQL isolado', { skip: !enabled }, async t => {
     await prisma.paymentAttempt.deleteMany({ where: { invoiceId: { in: ids } } });
     await prisma.invoice.deleteMany({ where: { id: { in: ids } } });
     await prisma.paymentOperation.deleteMany({ where: { id: { in: invoices.flatMap(i => i.operationId ? [i.operationId] : []) } } });
+    await prisma.paymentOperation.deleteMany({ where: { actorId: actor.id } });
+    await prisma.inboxNotification.deleteMany({ where: { userId: { in: [user.id, actor.id] } } });
     await prisma.user.deleteMany({ where: { id: { in: [user.id, actor.id] } } }); await prisma.unit.delete({ where: { id: unit.id } });
     await prisma.$disconnect();
   });
@@ -68,7 +71,8 @@ test('pagamentos com MySQL isolado', { skip: !enabled }, async t => {
   t.mock.method(mercadoPagoService, 'verifyAccount', async () => {});
   t.mock.method(mercadoPagoService, 'createOrder', async (payload: any, key: string) => {
     if (rejectCreate) throw new MercadoPagoError(400, 'INVALID_PAYER', false);
-    assert.equal(key, payload.external_reference);
+    const persisted = await prisma.paymentAttempt.findUniqueOrThrow({ where: { externalReference: payload.external_reference } });
+    assert.equal(key, persisted.idempotencyKey);
     assert.ok(await prisma.paymentAttempt.findUnique({ where: { externalReference: payload.external_reference } }));
     let order = [...orders.values()].find(o => o.external_reference === payload.external_reference);
     if (!order) { order = newOrder(payload); orders.set(order.id, order); creates++; }
@@ -105,7 +109,7 @@ test('pagamentos com MySQL isolado', { skip: !enabled }, async t => {
     const invoice = await invoiceService.create(input, randomUUID(), actor);
     assert.equal(invoice.issuanceStatus, 'RETRY');
     failCreate = false; const before = creates;
-    const attempt = await prisma.paymentAttempt.findUniqueOrThrow({ where: { invoiceId: invoice.id } });
+    const attempt = await prisma.paymentAttempt.findFirstOrThrow({ where: { invoiceId: invoice.id } });
     await paymentService.issue(attempt.id);
     assert.equal(creates, before);
     assert.equal((await invoiceService.getById(invoice.id, actor)).issuanceStatus, 'ACTIVE');
@@ -203,7 +207,7 @@ test('pagamentos com MySQL isolado', { skip: !enabled }, async t => {
   await t.test('notificação anterior à gravação da resposta recupera a tentativa persistida', async () => {
     const batch = await invoiceService.createBatch({ description: 'Webhook antecipado', amount: 50, dueDate: '2026-11-10', userIds: [user.id] }, randomUUID(), actor);
     const invoice = batch.created[0]!;
-    const attempt = await prisma.paymentAttempt.findUniqueOrThrow({ where: { invoiceId: invoice.id } });
+    const attempt = await prisma.paymentAttempt.findFirstOrThrow({ where: { invoiceId: invoice.id } });
     const order = newOrder(attempt.requestPayload); orders.set(order.id, order);
     const before = creates;
     await paymentService.synchronize(order.id);
@@ -218,7 +222,7 @@ test('pagamentos com MySQL isolado', { skip: !enabled }, async t => {
     const stale = structuredClone(order);
     state(order, 'processed', 'accredited');
     await paymentService.synchronize(order.id);
-    const found = await prisma.paymentAttempt.findUniqueOrThrow({ where: { invoiceId: invoice.id } });
+    const found = await prisma.paymentAttempt.findFirstOrThrow({ where: { invoiceId: invoice.id } });
     const locked = await paymentRepository.claimAttempt(found.id);
     try { await paymentService.applyOrder(locked, stale); }
     finally { await paymentRepository.releaseAttempt(locked.id, locked.lockToken!); }
@@ -228,7 +232,7 @@ test('pagamentos com MySQL isolado', { skip: !enabled }, async t => {
   await t.test('perda de lease impede gravação pelo worker antigo', async () => {
     const batch = await invoiceService.createBatch({ description: 'Lease', amount: 50, dueDate: '2026-11-10', userIds: [user.id] }, randomUUID(), actor);
     const invoice = batch.created[0]!;
-    const found = await prisma.paymentAttempt.findUniqueOrThrow({ where: { invoiceId: invoice.id } });
+    const found = await prisma.paymentAttempt.findFirstOrThrow({ where: { invoiceId: invoice.id } });
     const old = await paymentRepository.claimAttempt(found.id);
     await prisma.paymentAttempt.update({ where: { id: found.id }, data: { lockedUntil: new Date(0) } });
     const current = await paymentRepository.claimAttempt(found.id);
@@ -240,7 +244,7 @@ test('pagamentos com MySQL isolado', { skip: !enabled }, async t => {
 
   await t.test('limite de retries preserva Retry-After e exige conciliação auditada', async () => {
     const invoice = await invoiceService.create(input, randomUUID(), actor);
-    const attempt = await prisma.paymentAttempt.findUniqueOrThrow({ where: { invoiceId: invoice.id } });
+    const attempt = await prisma.paymentAttempt.findFirstOrThrow({ where: { invoiceId: invoice.id } });
     failRead = true;
     try { for (let i = 0; i < 8; i++) await paymentService.issue(attempt.id); }
     finally { failRead = false; }
@@ -257,7 +261,7 @@ test('pagamentos com MySQL isolado', { skip: !enabled }, async t => {
     try { invoice = await invoiceService.create(input, randomUUID(), actor); }
     finally { rejectCreate = false; }
     assert.equal(invoice.issuanceStatus, 'REVIEW');
-    const before = await prisma.paymentAttempt.findUniqueOrThrow({ where: { invoiceId: invoice.id } });
+    const before = await prisma.paymentAttempt.findFirstOrThrow({ where: { invoiceId: invoice.id } });
     await invoiceService.retry(invoice.id, actor, 'Configuração corrigida');
     await paymentService.issue(before.id);
     const after = await prisma.paymentAttempt.findUniqueOrThrow({ where: { id: before.id } });
@@ -273,7 +277,7 @@ test('pagamentos com MySQL isolado', { skip: !enabled }, async t => {
     const before = creates;
     const result = await invoiceService.reconcile(legacy.id, actor, 'Cobrança anterior conferida');
     assert.equal(result.status, 'PAID'); assert.equal(result.requiresReview, false); assert.equal(creates, before);
-    const attempt = await prisma.paymentAttempt.findUniqueOrThrow({ where: { invoiceId: legacy.id } });
+    const attempt = await prisma.paymentAttempt.findFirstOrThrow({ where: { invoiceId: legacy.id } });
     assert.equal(attempt.externalReference, order.external_reference);
     assert.equal((attempt.requestPayload as any).originalRequestUnavailable, true);
   });
@@ -281,10 +285,66 @@ test('pagamentos com MySQL isolado', { skip: !enabled }, async t => {
   await t.test('cancelar lote ainda não emitido impede criação posterior do Pix', async () => {
     const batch = await invoiceService.createBatch({ description: 'Cancelar antes da emissão', amount: 50, dueDate: '2026-11-10', userIds: [user.id] }, randomUUID(), actor);
     const invoice = batch.created[0]!;
-    const attempt = await prisma.paymentAttempt.findUniqueOrThrow({ where: { invoiceId: invoice.id } });
+    const attempt = await prisma.paymentAttempt.findFirstOrThrow({ where: { invoiceId: invoice.id } });
     await invoiceService.cancel(invoice.id, actor, 'Cobrança indevida');
     const before = creates; await paymentService.issue(attempt.id);
     assert.equal(creates, before); assert.equal((await invoiceService.getById(invoice.id, actor)).status, 'CANCELLED');
+  });
+
+  await t.test('reemissão mantém dívida, histórico e idempotência; webhook antigo não substitui Pix', async () => {
+    const invoice = await invoiceService.create(input, randomUUID(), actor);
+    const originalOrder = orders.get(invoice.mpOrderId!)!;
+    state(originalOrder, 'expired', 'expired');
+    const key = randomUUID();
+    await invoiceService.reissue(invoice.id, actor, 'Pix expirado', key);
+    const replay = await invoiceService.reissue(invoice.id, actor, 'Pix expirado', key);
+    assert.equal(replay.id, invoice.id);
+    await assert.rejects(invoiceService.reissue(invoice.id, actor, 'Outra justificativa', key));
+    let attempts = await prisma.paymentAttempt.findMany({ where: { invoiceId: invoice.id } });
+    assert.equal(attempts.length, 2);
+    const next = attempts.find(a => a.id !== originalOrder.external_reference)!;
+    await paymentService.issue(next.id);
+    const before = await invoiceService.getById(invoice.id, actor);
+    await paymentService.synchronize(originalOrder.id);
+    const after = await invoiceService.getById(invoice.id, actor);
+    assert.equal(after.mpOrderId, before.mpOrderId);
+    assert.equal(after.paymentData.qrCode, before.paymentData.qrCode);
+    state(originalOrder, 'processed', 'accredited');
+    await paymentService.synchronize(originalOrder.id);
+    const late = await invoiceService.getById(invoice.id, actor);
+    assert.equal((await prisma.paymentAttempt.findUniqueOrThrow({ where: { id: next.id } })).state, 'CANCELLED');
+    assert.equal(late.status, 'PAID'); assert.equal(late.requiresReview, true);
+    assert.equal(late.paymentData.qrCode, null);
+    await assert.rejects(invoiceService.reissue(invoice.id, actor, 'Novamente', randomUUID()));
+  });
+
+  await t.test('reemissões concorrentes só criam uma nova tentativa', async () => {
+    const invoice = await invoiceService.create(input, randomUUID(), actor);
+    state(orders.get(invoice.mpOrderId!)!, 'expired', 'expired');
+    const results = await Promise.allSettled([invoiceService.reissue(invoice.id, actor, 'Expirou', randomUUID()), invoiceService.reissue(invoice.id, actor, 'Expirou', randomUUID())]);
+    assert.equal(results.filter(result => result.status === 'fulfilled').length, 1);
+    assert.equal(await prisma.paymentAttempt.count({ where: { invoiceId: invoice.id } }), 2);
+  });
+
+  await t.test('caixa persistente deduplica cobranças, mantém leitura e rejeita outro usuário', async () => {
+    const resident = { id: user.id, role: 'MORADOR' };
+    const first = await inboxService.list(resident);
+    assert.ok(first.some(item => item.type === 'INVOICE'));
+    const item = first.find(item => item.type === 'INVOICE')!;
+    await inboxService.read(resident, item.eventId);
+    const second = await inboxService.list(resident);
+    assert.equal(second.length, first.length);
+    assert.equal(second.find(i => i.eventId === item.eventId)?.isRead, true);
+    await assert.rejects(inboxService.read(actor, item.eventId));
+  });
+
+  await t.test('indicadores em aberto incluem OVERDUE explícita e concordam com a unidade', async () => {
+    await prisma.invoice.create({ data: { userId: user.id, unitId: unit.id, description: 'Legado vencido', amount: '10.00', status: 'OVERDUE', dueDate: new Date('2099-01-01') } });
+    const open = await prisma.invoice.count({ where: { userId: user.id, status: { in: ['PENDING', 'OVERDUE'] } } });
+    const personal = await invoiceService.getUserStats(user.id);
+    const perUnit = await invoiceService.getUnitStats(unit.id);
+    assert.equal(personal.pending, open); assert.equal(perUnit.pending, open);
+    assert.equal(personal.overdue, perUnit.overdue);
   });
 
   await t.test('HTTP retorna erros seguros e valida autenticação, filtros e webhook', async () => {

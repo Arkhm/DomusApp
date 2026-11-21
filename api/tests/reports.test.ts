@@ -175,7 +175,7 @@ test('relatórios: cobranças usam limites civis UTC sem deslocar vencimentos pa
   assert.deepEqual(queries[1]!.values.filter((value): value is Date => value instanceof Date)
     .map(value => value.toISOString()).sort(), [
     '2035-01-31T00:00:00.000Z', '2035-02-01T00:00:00.000Z',
-    '2035-02-01T00:00:00.000Z', '2035-02-02T00:00:00.000Z', now.toISOString(),
+    '2035-02-01T00:00:00.000Z', '2035-02-02T00:00:00.000Z', '2035-03-15T00:00:00.000Z',
   ].sort());
   assert.ok(queries[2]!.values.some((value: unknown) => value instanceof Date && value.toISOString() === '2035-01-31T00:00:00.000Z'));
 });

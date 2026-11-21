@@ -1,3 +1,4 @@
+import { inboxService } from './inboxService';
 import { HttpError } from '../lib/httpError';
 import { userRepository } from '../repositories/userRepository';
 import { noticeRepository } from '../repositories/noticeRepository';
@@ -48,7 +49,7 @@ export const notificationService = {
         isRead: (readAt.get(`INCIDENT:${incident.id}`)?.getTime() ?? 0) >= incident.updatedAt.getTime(),
       })),
     ];
-    return items.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime() || a.id.localeCompare(b.id));
+    return [...items, ...await inboxService.list(user)].sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime() || a.id.localeCompare(b.id));
   },
 
   async markRead(userId: string, type: NotificationType, sourceId: string) {

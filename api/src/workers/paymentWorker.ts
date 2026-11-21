@@ -1,3 +1,4 @@
+import { inboxService } from '../services/inboxService';
 import { logger } from '../lib/logger';
 import 'dotenv/config';
 import { paymentRepository } from '../repositories/paymentRepository';
@@ -6,6 +7,7 @@ import { PaymentError, paymentConfig } from '../lib/paymentDomain';
 import { prisma } from '../lib/prisma';
 
 let stopping = false;
+let nextInboxCapture = 0;
 process.once('SIGTERM', () => { stopping = true; });
 process.once('SIGINT', () => { stopping = true; });
 
@@ -13,6 +15,7 @@ async function main() {
   paymentConfig();
   while (!stopping) {
     try {
+      if (Date.now() >= nextInboxCapture) { await inboxService.captureAll().catch(() => logger.error({ code: 'INBOX_CAPTURE_FAILED' }, 'Falha ao atualizar notificações.')); nextInboxCapture = Date.now() + 60000; }
       for (const event of await paymentRepository.dueWebhooks()) {
         if (stopping) break;
         await paymentService.processWebhook(event.id);

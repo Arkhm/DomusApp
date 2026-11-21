@@ -217,7 +217,8 @@ model Invoice {
   version       Int         @default(0)
   operationId   String?
   operation     PaymentOperation? @relation(fields: [operationId], references: [id])
-  paymentAttempt PaymentAttempt?
+  currentPaymentAttemptId String?
+  paymentAttempts PaymentAttempt[]
   audits        InvoiceAudit[]
 
   // Relacionamentos
@@ -249,7 +250,7 @@ model PaymentOperation {
 
 model PaymentAttempt {
   id                String   @id @default(uuid())
-  invoiceId         String   @unique
+  invoiceId         String
   invoice           Invoice  @relation(fields: [invoiceId], references: [id])
   externalReference String   @unique
   idempotencyKey    String   @unique
@@ -272,6 +273,7 @@ model PaymentAttempt {
   updatedAt         DateTime @updatedAt
 
   @@index([state, retryAt])
+  @@index([invoiceId])
 }
 
 model PaymentWebhook {
@@ -399,4 +401,17 @@ model ParkingSpot {
   updatedAt DateTime    @updatedAt
 
   @@index([unitId])
+}
+
+model InboxNotification {
+  id String @id @default(uuid())
+  key String @unique @db.VarChar(191)
+  userId String
+  type String @db.VarChar(16)
+  sourceId String
+  title String
+  description String
+  createdAt DateTime @default(now())
+  readAt DateTime?
+  @@index([userId, createdAt])
 }

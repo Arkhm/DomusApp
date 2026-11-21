@@ -56,11 +56,12 @@ export const paymentService = {
     const receivedAfterManual = invoice.paymentSource === 'MANUAL' && ['PAID', 'PARTIALLY_REFUNDED'].includes(state);
     const newStatus = test || invoice.paymentSource === 'MANUAL' ? invoice.status :
       ['PAID', 'PARTIALLY_REFUNDED', 'REFUNDED', 'CHARGED_BACK'].includes(state) ? state : invoice.status;
-    const changed = invoice.mpStatus !== data.status || invoice.mpStatusDetail !== data.statusDetail || invoice.status !== newStatus;
+    const historicalPayment = !!invoice.currentPaymentAttemptId && invoice.currentPaymentAttemptId !== attempt.id && attempt.state !== state && ['PAID', 'PARTIALLY_REFUNDED', 'REFUNDED', 'CHARGED_BACK'].includes(state);
+    const changed = historicalPayment || invoice.mpStatus !== data.status || invoice.mpStatusDetail !== data.statusDetail || invoice.status !== newStatus;
     const expiration = payment.date_of_expiration ? new Date(payment.date_of_expiration) :
       order.created_date ? new Date(new Date(order.created_date).getTime() + 86_400_000) :
       attempt.expiresAt ?? new Date(attempt.createdAt.getTime() + 86_400_000);
-    const invoiceData: Prisma.InvoiceUpdateManyMutationInput = {
+    let invoiceData: Prisma.InvoiceUpdateManyMutationInput = {
       mpOrderId: order.id, mpPaymentId: data.paymentId, mpStatus: data.status, mpStatusDetail: data.statusDetail,
       mpQrCode: data.qrCode, mpQrCodeBase64: data.qrCodeBase64, mpResponse: JSON.stringify(order),
       status: newStatus,
@@ -69,6 +70,13 @@ export const paymentService = {
         paymentSource: 'MERCADO_PAGO', paidAt: invoice.paidAt ?? validProviderDate ?? new Date(),
       } : {}),
     };
+    // Historical webhooks never replace the current Pix or its provider identifiers.
+    if (invoice.currentPaymentAttemptId && invoice.currentPaymentAttemptId !== attempt.id) {
+      if (['PAID', 'PARTIALLY_REFUNDED'].includes(state)) await this.closeSupersedingAttempt(invoice.currentPaymentAttemptId);
+      invoiceData = ['PAID', 'PARTIALLY_REFUNDED', 'REFUNDED', 'CHARGED_BACK'].includes(state)
+        ? { requiresReview: true, ...(!test && state === 'PAID' && ['PENDING', 'OVERDUE'].includes(invoice.status) ? { status: 'PAID', paymentSource: 'MERCADO_PAGO', paidAt: invoice.paidAt ?? new Date() } : {}), mpQrCode: null, mpQrCodeBase64: null }
+        : {};
+    }
     await paymentRepository.saveAttempt({ id: attempt.id, lockToken: attempt.lockToken!, invoiceId: invoice.id,
       invoiceVersion: invoice.version,
       attempt: { orderId: order.id, state: state === 'PENDING' ? 'ACTIVE' : state,
@@ -78,9 +86,31 @@ export const paymentService = {
         ticketUrl: data.ticketUrl, lastErrorCode: null, retryCount: 0, retryAt: new Date(Date.now() + 900_000) },
       invoice: invoiceData,
       ...(changed ? { audit: { source: test ? 'MERCADO_PAGO_TEST' : 'MERCADO_PAGO',
-        action: receivedAfterManual ? 'PAYMENT_AFTER_MANUAL_SETTLEMENT' : state,
+        action: historicalPayment ? 'HISTORICAL_PAYMENT_RECEIVED' : receivedAfterManual ? 'PAYMENT_AFTER_MANUAL_SETTLEMENT' : state,
         fromStatus: invoice.status, toStatus: newStatus, amount: attempt.amount } } : {}),
     });
+  },
+
+  async closeSupersedingAttempt(id: string) {
+    const current = await paymentRepository.claimAttempt(id);
+    try {
+      assertEnvironment(current);
+      let state = current.state;
+      if (current.orderId) {
+        let order = await mercadoPagoService.getOrder(current.orderId);
+        state = mercadoPagoService.mapPaymentStatus(order.status, order.status_detail);
+        if (state === 'PENDING') {
+          await mercadoPagoService.cancelOrder(order.id, hash(`cancel:${current.id}`));
+          order = await mercadoPagoService.getOrder(order.id);
+          state = mercadoPagoService.mapPaymentStatus(order.status, order.status_detail);
+        }
+        if (!closedStates.has(state)) throw new PaymentError(409, 'Pix atual exige revisão.', 'REVIEW_REQUIRED');
+      } else if (current.state !== 'QUEUED') {
+        throw new PaymentError(409, 'Emissão atual incerta.', 'REVIEW_REQUIRED');
+      } else state = 'CANCELLED';
+      await paymentRepository.saveAttempt({ id: current.id, lockToken: current.lockToken!, invoiceId: current.invoiceId,
+        invoiceVersion: current.invoice.version, attempt: { state } });
+    } finally { await paymentRepository.releaseAttempt(current.id, current.lockToken!); }
   },
 
   async failAttempt(attempt: LockedAttempt, error: unknown) {
@@ -102,6 +132,7 @@ export const paymentService = {
     try {
       assertEnvironment(attempt);
       if (attempt.state === 'REVIEW' || closedStates.has(attempt.state)) return;
+      if (!['PENDING', 'OVERDUE'].includes(attempt.invoice.status) || attempt.invoice.requiresReview) return;
       let order: MercadoPagoOrder | null = null;
       if (attempt.orderId) order = await mercadoPagoService.getOrder(attempt.orderId);
       else if (attempt.state === 'ISSUING' || attempt.retryCount > 0 || Date.now() - attempt.createdAt.getTime() > 60_000) {
@@ -148,6 +179,7 @@ export const paymentService = {
     const attempt = await paymentRepository.claimAttempt(attemptId);
     try {
       assertEnvironment(attempt);
+      if (attempt.invoice.currentPaymentAttemptId && attempt.invoice.currentPaymentAttemptId !== attempt.id) throw new PaymentError(409, 'Tentativa substituída. Atualize a fatura.');
       if (attempt.invoice.requiresReview || attempt.state === 'REVIEW') {
         throw new PaymentError(409, 'Pagamento exige revisão antes da alteração.', 'REVIEW_REQUIRED');
       }
