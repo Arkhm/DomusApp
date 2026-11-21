@@ -97,7 +97,7 @@ export default function VotingsList() {
         <div>
             <Header title="Votações" eyebrow="Deliberações · Participação · Resultados" />
 
-            <PageBody><ContentEditor records={votings} resource="votings" onSaved={load} />
+            <PageBody>
                 {/* Editorial header */}
                 <div
                     style={{
@@ -280,7 +280,7 @@ export default function VotingsList() {
                                 total={total}
                                 delay={i * 0.05}
                                 onDelete={() => setDeletingVoting(voting)}
-                                canMutate={canMutate}
+                                canMutate={canMutate} onSaved={load}
                             />
                         ))}
                     </div>
@@ -398,6 +398,7 @@ function VotingCard({
     delay,
     onDelete,
     canMutate,
+    onSaved,
 }: {
     voting: Voting;
     status: VotingStatus;
@@ -405,6 +406,7 @@ function VotingCard({
     delay: number;
     onDelete: () => void;
     canMutate: boolean;
+    onSaved: () => void;
 }) {
     const winnerId = useMemo(() => {
         if (total === 0) return null;
@@ -442,14 +444,17 @@ function VotingCard({
                         {total} {total === 1 ? 'voto' : 'votos'}
                     </span>
                 </div>
-                {canMutate && (
-                    <IconBtn
-                        icon={<Trash2 size={14} />}
-                        danger
-                        onClick={onDelete}
-                        title="Excluir votação"
-                    />
-                )}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                    <ContentEditor records={[voting]} resource="votings" onSaved={onSaved} />
+                    {canMutate && (
+                        <IconBtn
+                            icon={<Trash2 size={14} />}
+                            danger
+                            onClick={onDelete}
+                            title="Excluir votação"
+                        />
+                    )}
+                </div>
             </div>
 
             {/* Title + description */}

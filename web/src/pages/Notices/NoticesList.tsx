@@ -81,7 +81,7 @@ export default function NoticesList() {
         <div>
             <Header title="Comunicados" eyebrow="Boletim oficial" />
 
-            <PageBody><ContentEditor records={notices} resource="notices" onSaved={load} />
+            <PageBody>
                 {/* Editorial header */}
                 <div
                     style={{
@@ -406,16 +406,19 @@ export default function NoticesList() {
                                                     {n.readCount} de {n.totalAddressees ?? 0} leram
                                                 </div>
                                             )}
-                                            {canMutate && (
-                                                <div style={{ display: 'flex', gap: 4 }}>
-                                                    <IconBtn
-                                                        icon={<Trash2 size={14} />}
-                                                        danger
-                                                        onClick={() => setDeletingNotice(n)}
-                                                        title="Excluir comunicado"
-                                                    />
-                                                </div>
-                                            )}
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                                                <ContentEditor records={[n]} resource="notices" onSaved={load} />
+                                                {canMutate && (
+                                                    <div style={{ display: 'flex', gap: 4 }}>
+                                                        <IconBtn
+                                                            icon={<Trash2 size={14} />}
+                                                            danger
+                                                            onClick={() => setDeletingNotice(n)}
+                                                            title="Excluir comunicado"
+                                                        />
+                                                    </div>
+                                                )}
+                                            </div>
                                         </div>
                                     </div>
                                 </motion.article>

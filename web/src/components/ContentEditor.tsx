@@ -1,3 +1,6 @@
+import { createPortal } from 'react-dom';
+import { Pencil, Trash2 } from 'lucide-react';
+import { IconBtn } from './luxury/ListHelpers';
 import { useEffect, useState } from 'react';
 import api from '../services/api';
 import { apiErrorMessage } from '../lib/apiError';
@@ -10,12 +13,13 @@ export default function ContentEditor({ records, resource, onSaved }: { records:
     const [record, setRecord] = useState<RecordItem | null>(null);
     const [units, setUnits] = useState<{ id: string; block: string | null; number: string }[]>([]);
     const [unitsError, setUnitsError] = useState(false);
+    const recordId = record?.id;
     useEffect(() => {
-        if (resource === 'votings') return;
+        if (!recordId || resource === 'votings') return;
         let active = true;
         api.get('/units/options').then(({ data }) => { if (active) setUnits(data); }).catch(() => { if (active) setUnitsError(true); });
         return () => { active = false; };
-    }, [resource]);
+    }, [resource, recordId]);
     const [error, setError] = useState('');
     const [busy, setBusy] = useState(false);
     const owned = records.filter(item => (user?.role === 'ADMIN' || (user?.role === 'MORADOR' && user.isSyndic && item.authorId === user.id)) );
@@ -38,11 +42,12 @@ export default function ContentEditor({ records, resource, onSaved }: { records:
         finally { setBusy(false); }
     }
     if (!owned.length && !record && !deleting) return null;
-    return <div style={{ marginBottom: 20 }}>
-        <label>Editar registro<select className="luxe-input" value="" onChange={e => { setRecord(structuredClone(editable.find(r => r.id === e.target.value)!)); setError(''); }}><option value="">Selecione um registro</option>{editable.map(r => <option key={r.id} value={r.id}>{r.title}</option>)}</select></label>
-        {user?.role !== 'ADMIN' && <label>Excluir registro próprio<select className="luxe-input" value="" onChange={e => { setDeleting(owned.find(r => r.id === e.target.value) ?? null); setError(''); }}><option value="">Selecione um registro</option>{owned.map(r => <option key={r.id} value={r.id}>{r.title}</option>)}</select></label>}
-        {deleting && <LuxuryModal icon={null} open busy={busy} onClose={() => setDeleting(null)} title="Confirmar exclusão"><div style={{ padding: 28 }}><p>Excluir {deleting.title}? Esta ação não pode ser desfeita.</p>{error && <p role="alert">{error}</p>}<button disabled={busy} className="btn-gold" onClick={() => void remove()}>Excluir registro</button></div></LuxuryModal>}
-        {record && <LuxuryModal icon={null} open busy={busy} onClose={() => setRecord(null)} title="Editar registro" size="lg">
+    const label = { notices: 'comunicado', events: 'evento', votings: 'votação' }[resource];
+    return <div style={{ display: 'inline-flex', gap: 4, flexShrink: 0 }}>
+        {editable.map(item => <IconBtn key={item.id} icon={<Pencil size={14} />} title={`Editar ${label}`} onClick={() => { setRecord(structuredClone(item)); setError(''); }} />)}
+        {user?.role !== 'ADMIN' && owned.map(item => <IconBtn key={item.id} icon={<Trash2 size={14} />} title={`Excluir ${label}`} danger onClick={() => { setDeleting(item); setError(''); }} />)}
+        {deleting && createPortal(<LuxuryModal icon={null} open busy={busy} onClose={() => setDeleting(null)} title="Confirmar exclusão"><div style={{ padding: 28 }}><p>Excluir {deleting.title}? Esta ação não pode ser desfeita.</p>{error && <p role="alert">{error}</p>}<button disabled={busy} className="btn-gold" onClick={() => void remove()}>Excluir registro</button></div></LuxuryModal>, document.body)}
+        {record && createPortal(<LuxuryModal icon={<Pencil size={18} />} open busy={busy} onClose={() => setRecord(null)} title={`Editar ${label}`} size="lg">
             <form style={{ padding: 28, display: 'grid', gap: 16 }} onSubmit={e => { e.preventDefault(); void save(); }}>
                 {error && <p role="alert">{error}</p>}
                 <label>Título<input className="luxe-input" required maxLength={191} value={record.title} onChange={e => setRecord({ ...record, title: e.target.value })} /></label>
@@ -63,6 +68,6 @@ export default function ContentEditor({ records, resource, onSaved }: { records:
                 {resource === 'votings' && <button type="button" className="btn-ghost" onClick={() => setRecord({ ...record, options: [...record.options ?? [], { text: '' }] })}>Adicionar opção</button>}
                 <button className="btn-gold" disabled={busy}>Salvar alterações</button>
             </form>
-        </LuxuryModal>}
+        </LuxuryModal>, document.body)}
     </div>;
 }

@@ -105,7 +105,7 @@ export default function EventsList() {
         <div>
             <Header title="Programação" eyebrow="Cultura · Convívio · Operação" />
 
-            <PageBody><ContentEditor records={events} resource="events" onSaved={load} />
+            <PageBody>
                 {/* Editorial header */}
                 <div
                     style={{
@@ -249,7 +249,7 @@ export default function EventsList() {
                             <FeaturedEvent
                                 event={featured}
                                 onDelete={() => setDeletingEvent(featured)}
-                                canMutate={canMutate}
+                                canMutate={canMutate} onSaved={load}
                             />
                         )}
 
@@ -278,7 +278,7 @@ export default function EventsList() {
                                             event={e}
                                             delay={i * 0.05}
                                             onDelete={() => setDeletingEvent(e)}
-                                            canMutate={canMutate}
+                                            canMutate={canMutate} onSaved={load}
                                         />
                                     ))}
                                 </div>
@@ -341,10 +341,12 @@ function FeaturedEvent({
     event,
     onDelete,
     canMutate,
+    onSaved,
 }: {
     event: EventItem;
     onDelete: () => void;
     canMutate: boolean;
+    onSaved: () => void;
 }) {
     const d = new Date(event.eventDate);
     return (
@@ -503,14 +505,17 @@ function FeaturedEvent({
                             >
                                 Publicado por {event.author?.name?.split(' ')[0] || '—'}
                             </span>
-                            {canMutate && (
-                                <IconBtn
-                                    icon={<Trash2 size={14} />}
-                                    danger
-                                    onClick={onDelete}
-                                    title="Excluir evento"
-                                />
-                            )}
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                                <ContentEditor records={[event]} resource="events" onSaved={onSaved} />
+                                {canMutate && (
+                                    <IconBtn
+                                        icon={<Trash2 size={14} />}
+                                        danger
+                                        onClick={onDelete}
+                                        title="Excluir evento"
+                                    />
+                                )}
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -524,11 +529,13 @@ function EventRow({
     delay,
     onDelete,
     canMutate,
+    onSaved,
 }: {
     event: EventItem;
     delay: number;
     onDelete: () => void;
     canMutate: boolean;
+    onSaved: () => void;
 }) {
     const d = new Date(event.eventDate);
     const dimmed = event.status !== 'PUBLISHED' || d <= new Date();
@@ -662,14 +669,17 @@ function EventRow({
                             </span>
                         </Tag>
                     )}
-                    {canMutate && (
-                        <IconBtn
-                            icon={<Trash2 size={14} />}
-                            danger
-                            onClick={onDelete}
-                            title="Excluir evento"
-                        />
-                    )}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                        <ContentEditor records={[event]} resource="events" onSaved={onSaved} />
+                        {canMutate && (
+                            <IconBtn
+                                icon={<Trash2 size={14} />}
+                                danger
+                                onClick={onDelete}
+                                title="Excluir evento"
+                            />
+                        )}
+                    </div>
                 </div>
             </div>
         </motion.article>
