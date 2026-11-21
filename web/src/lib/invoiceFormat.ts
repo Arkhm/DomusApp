@@ -35,3 +35,19 @@ export function monthEndShifted(date: string, months: number): string {
     value.setUTCDate(0);
     return value.toISOString().slice(0, 10);
 }
+
+const dateTimeFormatter = new Intl.DateTimeFormat('pt-BR', {
+    day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: 'America/Sao_Paulo',
+});
+/** Data e hora de um instante (criação, pagamento, histórico), no horário de Brasília. */
+export function formatDateTimeBR(value: string): string {
+    const date = new Date(value);
+    return Number.isFinite(date.getTime()) ? dateTimeFormatter.format(date).replace(',', '') : value;
+}
+
+/** Mês de referência gravado como dia 1 ("2026-12-01T…") → "12/2026". */
+export function formatReferenceMonthBR(value: string | null): string {
+    if (!value) return '—';
+    const match = value.match(/^(\d{4})-(\d{2})/);
+    return match ? `${match[2]}/${match[1]}` : value;
+}
