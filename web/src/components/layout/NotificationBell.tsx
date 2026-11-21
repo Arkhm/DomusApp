@@ -1,9 +1,11 @@
+import { useNavigate } from 'react-router-dom';
 import { useEffect, useRef, useState } from 'react';
 import { Bell } from 'lucide-react';
 import api from '../../services/api';
 import { useAuth } from '../../hooks/useAuth';
-type Item = { id: string; type: 'NOTICE' | 'EVENT' | 'INCIDENT'; sourceId: string; title: string; description: string; isRead: boolean };
+type Item = { id: string; type: 'NOTICE' | 'EVENT' | 'INCIDENT' | 'INVOICE' | 'RESERVATION' | 'VOTING'; eventId?: string; sourceId: string; title: string; description: string; isRead: boolean };
 export default function NotificationBell() {
+    const navigate = useNavigate();
     const { user } = useAuth();
     const active = useRef(true);
     useEffect(() => { active.current = true; return () => { active.current = false; }; }, []);
@@ -31,13 +33,14 @@ export default function NotificationBell() {
         if (opening) return;
         setOpening(true);
         try {
-            const endpoint = { NOTICE: '/notices', EVENT: '/events', INCIDENT: '/incidents' }[item.type];
+            const endpoint = { NOTICE: '/notices', EVENT: '/events', INCIDENT: '/incidents', INVOICE: `/invoices/${encodeURIComponent(item.sourceId)}`, RESERVATION: '/reservations', VOTING: '/votings' }[item.type];
             const { data } = await api.get(endpoint);
             if (!active.current) return;
-            const record = data.find((value: { id: string }) => value.id === item.sourceId);
+            const record = item.type === 'INVOICE' ? data : data.find((value: { id: string }) => value.id === item.sourceId);
             if (!record) throw new Error('Conteúdo indisponível');
-            setDetail({ title: record.title, content: record.content ?? [record.description, record.response].filter(Boolean).join(' — ') });
-            await api.post(`/notifications/${item.type}/${encodeURIComponent(item.sourceId)}/read`);
+            setDetail({ title: record.title ?? record.description ?? record.commonArea?.name, content: record.content ?? [record.description, record.response, record.status, record.rejectionReason].filter(Boolean).join(' — ') });
+            await api.post(item.eventId ? `/notifications/inbox/${item.eventId}/read` : `/notifications/${item.type}/${encodeURIComponent(item.sourceId)}/read`);
+            if (item.type === 'INVOICE') { setOpen(false); navigate(`/cobrancas?invoice=${encodeURIComponent(item.sourceId)}`); }
             if (active.current) setRevision(value => value + 1);
         } catch { if (active.current) setError('Não foi possível abrir a notificação. Tente novamente.'); } finally { if (active.current) setOpening(false); }
     }

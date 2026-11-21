@@ -5,6 +5,8 @@ const idempotent = (key: string) => ({ headers: { 'Idempotency-Key': key } });
 
 export const invoiceService = {
     async detail(id: string) { return (await api.get(`/invoices/${id}`)).data; },
+    async attempts(id: string): Promise<{ id: string; state: string; environment: string; amount: string; createdAt: string }[]> { return (await api.get(`/invoices/${id}/attempts`)).data; },
+    async reissue(id: string, reason: string, key: string) { return (await api.post(`/invoices/${id}/reissue`, { reason }, idempotent(key))).data; },
     async audit(id: string): Promise<{ id: string; action: string; reason: string | null; createdAt: string }[]> {
         return (await api.get(`/invoices/${id}/audit`)).data;
     },

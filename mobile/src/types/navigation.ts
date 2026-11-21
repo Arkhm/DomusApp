@@ -6,7 +6,7 @@ import type { CondoEvent, Notice } from './domain';
 
 export type MainTabParamList = {
   Inicio: undefined;
-  Reservas: undefined;
+  Reservas: { sourceId?: string } | undefined;
   Cobrancas: undefined;
   Perfil: undefined;
 };
@@ -18,7 +18,7 @@ export type RootStackParamList = {
   Comunicado: { notice: Notice };
   Eventos: undefined;
   Evento: { event: CondoEvent };
-  Votacoes: undefined;
+  Votacoes: { sourceId?: string } | undefined;
   FaturaDetalhe: { invoiceId: string };
   VeiculosPets: undefined;
   Notificacoes: undefined;

@@ -1,3 +1,4 @@
+import PaymentHealth from './PaymentHealth';
 import { useEffect, useMemo, useState } from 'react';
 import { Loader2, Plus, RefreshCw, Users } from 'lucide-react';
 import Header from '../../components/layout/Header';
@@ -12,7 +13,7 @@ import { summaryPeriod, summaryPeriodIssue, type SummaryPeriod } from '../../lib
 import { EMPTY_FILTERS, buildInvoiceQuery, filterRangeError, type InvoiceFilterState } from '../../lib/invoiceQuery';
 import { invoiceService } from '../../services/invoiceService';
 import { reportService } from '../../services/reportService';
-import { unitService } from '../../services/unitService';
+import api from '../../services/api';
 import {
     INVOICE_STATUS_LABELS, INVOICE_TYPE_LABELS, ISSUANCE_IN_FLIGHT, ISSUANCE_LABELS, effectiveInvoiceStatus,
     type InvoicePage, type InvoiceStatus, type InvoiceType,
@@ -60,7 +61,7 @@ const count = (value: number) => `${value} ${value === 1 ? 'cobrança' : 'cobran
 
 export default function InvoicesList() {
     const { user } = useAuth();
-    const canManage = user?.role === 'ADMIN' || user?.role === 'FUNCIONARIO';
+    const canManage = user?.role === 'ADMIN' || user?.role === 'FUNCIONARIO' || (user?.role === 'MORADOR' && user.isSyndic);
     const [filters, setFilters] = useState<InvoiceFilterState>(EMPTY_FILTERS);
     const [page, setPage] = useState(1);
     const [result, setResult] = useState<InvoicePage | null>(null);
@@ -73,7 +74,7 @@ export default function InvoicesList() {
     const [summaryLoading, setSummaryLoading] = useState(false);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
-    const [selectedId, setSelectedId] = useState<string | null>(null);
+    const [selectedId, setSelectedId] = useState<string | null>(() => new URLSearchParams(window.location.search).get('invoice'));
     const [modal, setModal] = useState<'single' | 'batch' | null>(null);
     // Instante de referência das consultas. Recarregar renova este valor, o que refaz a lista e o resumo
     // (e atualiza a fronteira "agora" do filtro "Pendente").
@@ -100,7 +101,7 @@ export default function InvoicesList() {
         async function load() {
             setUnitsError('');
             try {
-                const data = await unitService.getAll();
+                const data = (await api.get<Unit[]>('/invoices/units')).data;
                 if (!cancelled) setUnits(data);
             } catch {
                 if (!cancelled) setUnitsError('Não foi possível carregar as unidades.');
@@ -166,7 +167,7 @@ export default function InvoicesList() {
     }, [canManage, rangeError, periodIssue, period, asOf]);
 
     if (!canManage) {
-        return <div><Header title="Cobranças" /><PageBody><p role="alert">Acesso restrito à administração e aos funcionários.</p></PageBody></div>;
+        return <div><Header title="Cobranças" /><PageBody><p role="alert">Acesso restrito à gestão financeira.</p></PageBody></div>;
     }
 
     // Filtro sem resultado possível (ex.: "Pendente" com vencimento final no passado): vazio direto, sem consultar a API.
@@ -192,6 +193,7 @@ export default function InvoicesList() {
                         </div>
                     } />
 
+                <PaymentHealth revision={asOf} />
                 {summaryError && !rangeError && !periodIssue && <p role="alert" style={{ color: 'var(--color-err)', marginBottom: 12 }}>{summaryError}</p>}
                 {periodIssue && <p role="note" style={{ fontSize: 13, color: 'var(--color-warn)', marginBottom: 28 }}>{periodIssue}</p>}
                 {summary && totals && !rangeError && !periodIssue && <>

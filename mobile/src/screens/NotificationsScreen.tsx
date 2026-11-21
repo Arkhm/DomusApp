@@ -20,6 +20,9 @@ export function NotificationsScreen(): React.JSX.Element {
     if (!target) return;
     if (target.type === 'NOTICE') navigation.navigate('Comunicado', { notice: target.notice });
     else if (target.type === 'EVENT') navigation.navigate('Evento', { event: target.event });
+    else if (target.type === 'INVOICE') navigation.navigate('FaturaDetalhe', { invoiceId: target.invoiceId });
+    else if (target.type === 'VOTING') navigation.navigate('Votacoes', { sourceId: target.sourceId });
+    else if (target.type === 'RESERVATION') navigation.navigate('Main', { screen: 'Reservas', params: { sourceId: target.sourceId } });
     else navigation.navigate('Ocorrencias');
   }
 

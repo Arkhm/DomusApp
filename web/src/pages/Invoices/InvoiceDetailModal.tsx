@@ -1,3 +1,5 @@
+import { keyLedgerFor, outcomeIsKnown } from '../../lib/idempotency';
+import { useAuth } from '../../hooks/useAuth';
 import { useEffect, useState } from 'react';
 import LuxuryModal from '../../components/luxury/LuxuryModal';
 import { invoiceService } from '../../services/invoiceService';
@@ -7,6 +9,8 @@ import type { Invoice } from '../../types/invoice';
 
 type Detail = Invoice & { paymentExpiresAt?: string; paymentData?: { qrCode?: string; ticketUrl?: string } };
 export default function InvoiceDetailModal({ id, onClose, onChanged }: { id: string; onClose: () => void; onChanged: () => void }) {
+    const { user } = useAuth();
+    const [attempts, setAttempts] = useState<Awaited<ReturnType<typeof invoiceService.attempts>>>([]);
     const [data, setData] = useState<Detail | null>(null);
     const [audits, setAudits] = useState<Awaited<ReturnType<typeof invoiceService.audit>>>([]);
     const [error, setError] = useState('');
@@ -16,21 +20,26 @@ export default function InvoiceDetailModal({ id, onClose, onChanged }: { id: str
     const [revision, setRevision] = useState(0);
     useEffect(() => {
         let active = true;
-        Promise.all([invoiceService.detail(id), invoiceService.audit(id)]).then(([invoice, history]) => {
-            if (active) { setData(invoice); setAudits(history); setError(''); }
+        Promise.all([invoiceService.detail(id), invoiceService.audit(id), invoiceService.attempts(id)]).then(([invoice, history, payments]) => {
+            if (active) { setData(invoice); setAudits(history); setAttempts(payments); setError(''); }
         }).catch(err => { if (active) setError(apiErrorMessage(err, 'Não foi possível carregar a cobrança.')); });
         return () => { active = false; };
     }, [id, revision]);
     async function submit() {
         if (busy || !reason.trim() || !action) return;
         setBusy(true); setError('');
-        try { await invoiceService.action(id, action, reason.trim()); setAction(''); setReason(''); onChanged(); }
-        catch (err) { setError(apiErrorMessage(err, 'Operação não concluída.')); }
+        const fingerprint = `reissue:${id}:${reason.trim()}`;
+        const ledger = keyLedgerFor(user?.id ?? 'anonymous');
+        try {
+            if (action === 'reissue') { await invoiceService.reissue(id, reason.trim(), ledger.keyFor(fingerprint)); ledger.settle(fingerprint); }
+            else await invoiceService.action(id, action, reason.trim()); setAction(''); setReason(''); onChanged(); }
+        catch (err) { if (action === 'reissue' && outcomeIsKnown(err)) ledger.settle(fingerprint); setError(apiErrorMessage(err, 'Operação não concluída.')); }
         finally { setRevision(value => value + 1); setBusy(false); }
     }
     const actions = data ? [
         ...(!data.requiresReview && ['PENDING', 'OVERDUE'].includes(data.status) ? [['paid', 'Registrar pagamento manual'], ['cancel', 'Cancelar cobrança']] : []),
         ['reconcile', 'Conciliar com o provedor'],
+        ...(!data.requiresReview && ['PENDING', 'OVERDUE'].includes(data.status) && ['EXPIRED', 'REJECTED', 'CANCELLED'].includes(data.issuanceStatus) ? [['reissue', 'Emitir novo Pix']] : []),
         ...(['RETRY', 'REVIEW'].includes(data.issuanceStatus) ? [['retry', 'Recuperar emissão']] : []),
     ] : [];
     return <LuxuryModal icon={null} open onClose={onClose} busy={busy} title="Gerenciar cobrança" size="lg">
@@ -47,7 +56,7 @@ export default function InvoiceDetailModal({ id, onClose, onChanged }: { id: str
                     <button className="btn-gold" disabled={busy || !reason.trim()} onClick={() => void submit()}>Confirmar operação</button>
                     <button disabled={busy} onClick={() => setAction('')}>Voltar</button>
                 </>}
-                <h3>Auditoria</h3>{audits.length === 0 ? <p>Nenhum registro.</p> : audits.map(a => <p key={a.id}>{new Date(a.createdAt).toLocaleString('pt-BR')} · {a.action} {a.reason && `· ${a.reason}`}</p>)}
+                <h3>Tentativas de pagamento</h3>{attempts.map(a => <p key={a.id}>{new Date(a.createdAt).toLocaleString('pt-BR')} · {a.state} · {a.environment} · {formatMoneyBR(a.amount)}</p>)}<h3>Auditoria</h3>{audits.length === 0 ? <p>Nenhum registro.</p> : audits.map(a => <p key={a.id}>{new Date(a.createdAt).toLocaleString('pt-BR')} · {a.action} {a.reason && `· ${a.reason}`}</p>)}
             </>}
         </div>
     </LuxuryModal>;
