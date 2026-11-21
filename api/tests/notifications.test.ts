@@ -91,7 +91,7 @@ test('notificações: lista pessoal usa destinatários mesmo para síndico e ser
     { id: 'unread', title: 'Comunicado editado', createdAt, readBy: [] },
   ] as Awaited<ReturnType<typeof noticeRepository.findForUser>>);
   const events = t.mock.method(eventRepository, 'findForUser', async () => [
-    { id: sourceId, title: 'Evento cancelado', status: 'CANCELLED', createdAt: later },
+    { id: sourceId, title: 'Evento cancelado', status: 'CANCELLED', createdAt: later, updatedAt: later },
     { id: 'event-unread', title: 'Evento publicado', status: 'PUBLISHED', createdAt },
   ] as Awaited<ReturnType<typeof eventRepository.findForUser>>);
   const incidentId = randomUUID();
@@ -116,7 +116,7 @@ test('notificações: lista pessoal usa destinatários mesmo para síndico e ser
   assert.equal(result.body.find((item: { id: string }) => item.id === 'INCIDENT:incident-reread').isRead, true);
   assert.deepEqual(incidents.mock.calls[0]?.arguments, [{ authorId: userId, OR: [{ status: { not: 'OPEN' } }, { response: { not: null } }] }]);
   assert.deepEqual(result.body[1], { id: `EVENT:${sourceId}`, type: 'EVENT', sourceId, title: 'Evento cancelado',
-    description: 'Evento cancelado', createdAt: later.toISOString(), isRead: true });
+    description: 'Evento cancelado', createdAt: later.toISOString(), isRead: false });
   assert.equal(result.body.find((item: { id: string }) => item.id === `NOTICE:${sourceId}`).isRead, true);
   assert.equal(result.body.find((item: { id: string }) => item.id === 'NOTICE:unread').isRead, false);
   assert.equal(result.body.find((item: { id: string }) => item.id === 'EVENT:event-unread').isRead, false);
