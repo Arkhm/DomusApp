@@ -125,7 +125,7 @@ export default function Sidebar() {
             >
                 {navItems.filter(item => !STAFF_ONLY.has(item.to) || user?.role === 'ADMIN' || user?.role === 'FUNCIONARIO').map((item) => {
                     if (item.to === '/relatorios' && !hasPanelAccess(user)) return null;
-                    if (item.to === '/cobrancas' && user?.role !== 'ADMIN' && user?.role !== 'FUNCIONARIO') return null;
+                    if (['/usuarios', '/unidades'].includes(item.to) && user?.role !== 'ADMIN' && user?.role !== 'FUNCIONARIO') return null;
                     const Icon = item.icon;
                     return (
                         <NavLink

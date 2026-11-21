@@ -77,8 +77,7 @@ export default function Reports() {
     useEffect(() => {
         if (!allowed) return;
         let cancelled = false;
-        setLoading(true);
-        setError('');
+        queueMicrotask(() => { if (!cancelled) { setLoading(true); setError(''); } });
         Promise.all([reportService.occupancy(), reportService.charges(period), reportService.incidents(period), reportService.reservations(period)])
             .then(([occupancy, charges, incidents, reservations]) => { if (!cancelled) setData({ occupancy, charges, incidents, reservations }); })
             .catch(err => { if (!cancelled) setError(apiErrorMessage(err, 'Não foi possível carregar os relatórios.')); })

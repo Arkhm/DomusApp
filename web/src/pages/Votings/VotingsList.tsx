@@ -1,3 +1,4 @@
+import ContentEditor from '../../components/ContentEditor';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { motion } from 'motion/react';
 import { Plus, Trash2, Loader2, Vote as VoteIcon, Users, BarChart3, Activity } from 'lucide-react';
@@ -96,7 +97,7 @@ export default function VotingsList() {
         <div>
             <Header title="Votações" eyebrow="Deliberações · Participação · Resultados" />
 
-            <PageBody>
+            <PageBody><ContentEditor records={votings} resource="votings" onSaved={load} />
                 {/* Editorial header */}
                 <div
                     style={{
@@ -144,7 +145,7 @@ export default function VotingsList() {
                             Decisões coletivas, transparência de votos e acompanhamento ao vivo dos resultados.
                         </p>
                     </div>
-                    {canMutate && (
+                    {(canMutate || (user?.role === 'MORADOR' && user.isSyndic)) && (
                         <button onClick={() => setIsModalOpen(true)} className="btn-gold">
                             <Plus size={12} />
                             Nova votação

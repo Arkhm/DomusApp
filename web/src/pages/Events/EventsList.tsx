@@ -1,3 +1,4 @@
+import ContentEditor from '../../components/ContentEditor';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { motion } from 'motion/react';
 import { Plus, Trash2, Loader2, MapPin, Users } from 'lucide-react';
@@ -104,7 +105,7 @@ export default function EventsList() {
         <div>
             <Header title="Programação" eyebrow="Cultura · Convívio · Operação" />
 
-            <PageBody>
+            <PageBody><ContentEditor records={events} resource="events" onSaved={load} />
                 {/* Editorial header */}
                 <div
                     style={{
@@ -152,7 +153,7 @@ export default function EventsList() {
                             Recitais, assembleias, soirées e encontros privativos curados para a comunidade Domus.
                         </p>
                     </div>
-                    {canMutate && (
+                    {(canMutate || (user?.role === 'MORADOR' && user.isSyndic)) && (
                         <button onClick={() => setIsModalOpen(true)} className="btn-gold">
                             <Plus size={12} />
                             Novo evento

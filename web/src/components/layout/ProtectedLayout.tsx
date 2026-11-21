@@ -1,9 +1,10 @@
-import { Navigate, Outlet } from 'react-router-dom';
+import { Navigate, Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import { hasPanelAccess } from '../../lib/access';
 import Sidebar from './Sidebar';
 
 export default function ProtectedLayout() {
+    const location = useLocation();
     const { isAuthenticated, user } = useAuth();
 
     if (!isAuthenticated) {
@@ -14,6 +15,8 @@ export default function ProtectedLayout() {
     if (!hasPanelAccess(user)) {
         return <Navigate to="/login" replace />;
     }
+
+    if (user?.role === 'MORADOR' && ['/usuarios', '/unidades', '/vagas', '/veiculos', '/pets'].includes(location.pathname)) return <Navigate to="/dashboard" replace />;
 
     return (
         // `app-shell` class ativa o swap automático de .serif/.serif-it → Inter
