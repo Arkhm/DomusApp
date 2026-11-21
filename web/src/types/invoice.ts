@@ -6,6 +6,16 @@ export type InvoiceStatus =
     | 'REJECTED' | 'REFUNDED' | 'CHARGED_BACK' | 'PARTIALLY_REFUNDED';
 export type InvoiceType = 'MONTHLY_FEE' | 'EXTRAORDINARY' | 'FINE' | 'OTHER';
 
+export interface InvoicePaymentData {
+    /** Pix "copia e cola". */
+    qrCode: string | null;
+    /** Imagem PNG do QR Code, em base64. */
+    qrCodeBase64: string | null;
+    ticketUrl: string | null;
+    mpOrderId: string | null;
+    mpStatus: string | null;
+}
+
 export interface Invoice {
     id: string;
     description: string;
@@ -22,6 +32,12 @@ export interface Invoice {
     paymentEnvironment: string | null;
     /** Valor efetivamente enviado ao provedor. Em ambiente de teste é sempre "50.00". */
     paymentAmount: string | null;
+    /** Quando o Pix atual expira (só com Pix ativo). */
+    paymentExpiresAt: string | null;
+    /** MANUAL (baixa pela equipe) ou MERCADO_PAGO; vazio enquanto não foi paga. */
+    paymentSource: string | null;
+    /** Dados do Pix; o código e a imagem só vêm preenchidos com o Pix ativo. */
+    paymentData: InvoicePaymentData;
     paidAt: string | null;
     createdAt: string;
     userId: string;
@@ -118,4 +134,20 @@ export const ISSUANCE_LABELS: Record<string, string> = {
 export function effectiveInvoiceStatus(invoice: Pick<Invoice, 'status' | 'dueDate'>, now: Date = new Date()): InvoiceStatus {
     if (invoice.status === 'PENDING' && invoice.dueDate.slice(0, 10) < todayBR(now)) return 'OVERDUE';
     return invoice.status;
+}
+
+/** Uma linha do histórico de uma cobrança (`GET /invoices/:id/audit`, da mais nova para a mais antiga). */
+export interface InvoiceAudit {
+    id: string;
+    invoiceId: string;
+    /** Quem fez; vazio quando foi o sistema ou o provedor. */
+    actorId: string | null;
+    /** SYSTEM, MANUAL, MERCADO_PAGO ou MERCADO_PAGO_TEST. */
+    source: string;
+    action: string;
+    reason: string | null;
+    fromStatus: string;
+    toStatus: string;
+    amount: string | null;
+    createdAt: string;
 }

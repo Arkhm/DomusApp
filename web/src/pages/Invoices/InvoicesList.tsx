@@ -1,3 +1,5 @@
+import { useSearchParams } from 'react-router-dom';
+import InvoiceDetailModal from './InvoiceDetailModal';
 import PaymentHealth from './PaymentHealth';
 import { useEffect, useMemo, useState } from 'react';
 import { Loader2, Plus, RefreshCw, Users } from 'lucide-react';
@@ -8,6 +10,7 @@ import Tag from '../../components/luxury/Tag';
 import { EmptyTable, FilterSelect, ListMeta } from '../../components/luxury/ListHelpers';
 import { useAuth } from '../../hooks/useAuth';
 import { apiErrorMessage } from '../../lib/apiError';
+import { issuanceLabel, issuanceTone, statusTone } from '../../lib/invoiceDisplay';
 import { formatDueDateBR, formatMoneyBR, todayBR } from '../../lib/invoiceFormat';
 import { summaryPeriod, summaryPeriodIssue, type SummaryPeriod } from '../../lib/invoicePeriod';
 import { EMPTY_FILTERS, buildInvoiceQuery, filterRangeError, type InvoiceFilterState } from '../../lib/invoiceQuery';
@@ -15,12 +18,11 @@ import { invoiceService } from '../../services/invoiceService';
 import { reportService } from '../../services/reportService';
 import api from '../../services/api';
 import {
-    INVOICE_STATUS_LABELS, INVOICE_TYPE_LABELS, ISSUANCE_IN_FLIGHT, ISSUANCE_LABELS, effectiveInvoiceStatus,
+    INVOICE_STATUS_LABELS, INVOICE_TYPE_LABELS, ISSUANCE_IN_FLIGHT, effectiveInvoiceStatus,
     type InvoicePage, type InvoiceStatus, type InvoiceType,
 } from '../../types/invoice';
 import type { ChargesReport } from '../../types/report';
 import { formatUnitDisplay, type Unit } from '../../types/user';
-import InvoiceDetailModal from './InvoiceDetailModal';
 import InvoiceBatchModal from './InvoiceBatchModal';
 import InvoiceFormModal from './InvoiceFormModal';
 
@@ -31,21 +33,6 @@ const percentage = new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 1, ma
 const POLL_INTERVAL_MS = 8000;
 const MAX_POLLS = 30;
 const emptyPage = (page: number): InvoicePage => ({ data: [], meta: { total: 0, page, limit: PAGE_SIZE, totalPages: 0 } });
-
-function statusTone(status: InvoiceStatus) {
-    if (status === 'PAID') return 'ok';
-    if (status === 'PENDING') return 'warn';
-    if (status === 'OVERDUE') return 'err';
-    if (status === 'REFUNDED' || status === 'CHARGED_BACK' || status === 'PARTIALLY_REFUNDED') return 'purple';
-    return 'neutral';
-}
-
-function issuanceTone(state: string) {
-    if (state === 'ACTIVE') return 'ok';
-    if (state === 'QUEUED' || state === 'RETRY' || state === 'ISSUING') return 'warn';
-    if (state === 'REVIEW') return 'err';
-    return 'neutral';
-}
 
 function SummaryCard({ label, amount, caption, color }: { label: string; amount: string; caption: string; color: string }) {
     return (
@@ -74,7 +61,13 @@ export default function InvoicesList() {
     const [summaryLoading, setSummaryLoading] = useState(false);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
-    const [selectedId, setSelectedId] = useState<string | null>(() => new URLSearchParams(window.location.search).get('invoice'));
+    const [searchParams, setSearchParams] = useSearchParams();
+    const selectedId = searchParams.get('invoice');
+    const setSelectedId = (id: string | null) => setSearchParams(previous => {
+        const next = new URLSearchParams(previous);
+        if (id) next.set('invoice', id); else next.delete('invoice');
+        return next;
+    }, { replace: true });
     const [modal, setModal] = useState<'single' | 'batch' | null>(null);
     // Instante de referência das consultas. Recarregar renova este valor, o que refaz a lista e o resumo
     // (e atualiza a fronteira "agora" do filtro "Pendente").
@@ -257,9 +250,7 @@ export default function InvoicesList() {
                                             <td style={{ textAlign: 'right' }}>{formatMoneyBR(invoice.amount)}</td>
                                             <td><Tag tone={statusTone(status)}>{INVOICE_STATUS_LABELS[status]}</Tag></td>
                                             <td><div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                                                <Tag tone={issuanceTone(invoice.issuanceStatus)}>
-                                                    {ISSUANCE_LABELS[invoice.issuanceStatus] ?? INVOICE_STATUS_LABELS[invoice.issuanceStatus as InvoiceStatus] ?? invoice.issuanceStatus}
-                                                </Tag>
+                                                <Tag tone={issuanceTone(invoice.issuanceStatus)}>{issuanceLabel(invoice)}</Tag>
                                                 {invoice.requiresReview && <Tag tone="err">Revisar</Tag>}
                                                 {invoice.paymentEnvironment === 'TEST' && <Tag tone="gold">Teste</Tag>}
                                             </div></td><td><button className="btn-ghost" onClick={() => setSelectedId(invoice.id)}>Gerenciar</button></td>
@@ -276,7 +267,7 @@ export default function InvoicesList() {
                     </div>
                 )}
             </PageBody>
-            {selectedId && <InvoiceDetailModal id={selectedId} onClose={() => setSelectedId(null)} onChanged={reload} />}
+            {selectedId && <InvoiceDetailModal key={selectedId} id={selectedId} initialInvoice={result?.data.find(invoice => invoice.id === selectedId)} onClose={() => setSelectedId(null)} onChanged={reload} />}
             {modal === 'single' && <InvoiceFormModal onClose={() => setModal(null)} onCreated={reload} />}
             {modal === 'batch' && <InvoiceBatchModal onClose={() => setModal(null)} onCreated={reload} />}
         </div>

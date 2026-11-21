@@ -13,7 +13,7 @@ const noteStyle = {
  * Em ambiente de teste a API gera todo Pix com valor fixo (R$ 50,00), seja qual
  * for o valor da cobrança. O aviso evita que isso pareça um erro de valor.
  */
-export function TestEnvironmentNotice({ invoices }: { invoices: Invoice[] }) {
+export function TestEnvironmentNotice({ invoices, extra }: { invoices: Invoice[]; extra?: string }) {
     const test = invoices.find(invoice => invoice.paymentEnvironment === 'TEST');
     if (!test) return null;
     return (
@@ -21,7 +21,7 @@ export function TestEnvironmentNotice({ invoices }: { invoices: Invoice[] }) {
             <TriangleAlert size={16} style={{ flexShrink: 0, marginTop: 2 }} />
             <span>
                 <strong>Ambiente de teste do Mercado Pago.</strong> Os Pix são gerados com o valor de{' '}
-                {formatMoneyBR(test.paymentAmount ?? '50.00')}, qualquer que seja o valor da cobrança, e nenhum dinheiro real é cobrado.
+                {formatMoneyBR(test.paymentAmount ?? '50.00')}, qualquer que seja o valor da cobrança, e nenhum dinheiro real é cobrado.{extra && ` ${extra}`}
             </span>
         </p>
     );
