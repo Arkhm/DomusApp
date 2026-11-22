@@ -1,3 +1,4 @@
+import { useAuth } from '../hooks/useAuth';
 import { useState, type FormEvent } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowRight, ArrowLeft, Loader2, MailCheck } from 'lucide-react';
@@ -18,7 +19,10 @@ const backLinkStyle: React.CSSProperties = {
 };
 
 export default function ForgotPassword() {
-    const [email, setEmail] = useState('');
+    const { user, isAuthenticated } = useAuth();
+    const [email, setEmail] = useState(() => user?.email ?? '');
+    const backTo = isAuthenticated ? '/dashboard' : '/login';
+    const backLabel = isAuthenticated ? 'Voltar para o painel' : 'Voltar para o login';
     const [emailFocus, setEmailFocus] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
     // A API sempre responde 200 com a mesma mensagem genérica (exista ou não
@@ -66,9 +70,9 @@ export default function ForgotPassword() {
                             receber um e-mail com as instruções para redefinir sua senha. O link expira em 1 hora.
                         </p>
                     </div>
-                    <Link to="/login" style={backLinkStyle}>
+                    <Link to={backTo} style={backLinkStyle}>
                         <ArrowLeft size={13} />
-                        Voltar para o login
+                        {backLabel}
                     </Link>
                 </div>
             </AuthShell>
@@ -77,7 +81,7 @@ export default function ForgotPassword() {
 
     return (
         <AuthShell
-            title="Esqueceu sua senha?"
+            title={isAuthenticated ? 'Alterar senha' : 'Esqueceu sua senha?'}
             subtitle="Informe o e-mail da sua conta e enviaremos um link para redefinir sua senha."
         >
             <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 28 }}>
@@ -132,9 +136,9 @@ export default function ForgotPassword() {
                     )}
                 </button>
 
-                <Link to="/login" style={{ ...backLinkStyle, justifyContent: 'center', marginTop: -8 }}>
+                <Link to={backTo} style={{ ...backLinkStyle, justifyContent: 'center', marginTop: -8 }}>
                     <ArrowLeft size={13} />
-                    Voltar para o login
+                    {backLabel}
                 </Link>
             </form>
         </AuthShell>

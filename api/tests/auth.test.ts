@@ -112,6 +112,8 @@ test('logout revoga access expirado assinado, mas rejeita adulteração, issuer 
 
 test('forgot salva só hash com validade de 1h e não envia e-mail inexistente', async t => {
   process.env.SMTP_HOST = 'unit.invalid';
+  process.env.SMTP_FROM = 'DomusApp <unit@example.com>';
+  process.env.FRONTEND_URL = 'http://localhost:5173';
   const user = { ...baseUser }; let sent = ''; let updates = 0;
   t.mock.method(nodemailer, 'createTransport', (() => ({ sendMail: async (mail: any) => { sent = mail.text; return {}; } })) as any);
   t.mock.method(nodemailer, 'getTestMessageUrl', () => false);

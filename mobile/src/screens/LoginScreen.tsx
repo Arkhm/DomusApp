@@ -1,3 +1,5 @@
+import { Button, Input, StatusBanner } from '../components';
+import type { RootStackScreenProps } from '../types';
 import React, { useState } from 'react';
 import {
   Image,
@@ -10,7 +12,6 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Button, ConfirmSheet, Input, StatusBanner } from '../components';
 import { useAuth } from '../contexts/AuthContext';
 import { colors, elevation, layout, radius, spacing, typography } from '../theme';
 import type { ApiFailure } from '../services/api';
@@ -36,14 +37,13 @@ function validatePassword(password: string): string | null {
   return null;
 }
 
-export function LoginScreen(): React.JSX.Element {
+export function LoginScreen({ navigation }: RootStackScreenProps<'Login'>): React.JSX.Element {
   const { signIn, isAuthenticating } = useAuth();
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>(NO_FIELD_ERRORS);
   const [failure, setFailure] = useState<ApiFailure | null>(null);
-  const [isPasswordHelpVisible, setIsPasswordHelpVisible] = useState(false);
 
   async function handleSubmit(): Promise<void> {
     const errors: FieldErrors = {
@@ -156,7 +156,7 @@ export function LoginScreen(): React.JSX.Element {
             />
 
             <Pressable
-              onPress={() => setIsPasswordHelpVisible(true)}
+              onPress={() => navigation.navigate('ForgotPassword', { email })}
               accessibilityRole="button"
               accessibilityLabel="Esqueci minha senha"
               style={styles.forgotLink}
@@ -170,15 +170,7 @@ export function LoginScreen(): React.JSX.Element {
           </Text>
         </ScrollView>
 
-        <ConfirmSheet
-          visible={isPasswordHelpVisible}
-          title="Esqueci minha senha"
-          message="Contate a administração local do condomínio para renovar a sua senha. A redefinição é sempre feita por lá."
-          confirmLabel="Entendi"
-          hideCancel
-          onConfirm={() => setIsPasswordHelpVisible(false)}
-          onCancel={() => setIsPasswordHelpVisible(false)}
-        />
+
       </KeyboardAvoidingView>
     </SafeAreaView>
   );

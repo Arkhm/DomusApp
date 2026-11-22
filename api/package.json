@@ -5,6 +5,7 @@
   "main": "index.js",
   "scripts": {
     "test": "tsx --test --test-concurrency=1 tests/*.test.ts",
+    "mail:verify": "tsx scripts/verify-mail.ts",
     "dev": "tsx watch src/server.ts",
     "check:security": "node scripts/security-check.mjs",
     "typecheck": "tsc --noEmit",

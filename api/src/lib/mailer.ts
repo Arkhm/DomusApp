@@ -1,3 +1,4 @@
+import { mailConfig } from './mailConfig';
 import { logger } from './logger';
 import nodemailer from 'nodemailer';
 
@@ -7,18 +8,12 @@ import nodemailer from 'nodemailer';
 let transporterPromise: ReturnType<typeof buildTransporter> | null = null;
 
 async function buildTransporter() {
-  if (process.env.SMTP_HOST) {
-    return nodemailer.createTransport({
-      host: process.env.SMTP_HOST,
-      port: Number(process.env.SMTP_PORT ?? 587),
-      secure: process.env.SMTP_SECURE === 'true',
-      auth: process.env.SMTP_USER
-        ? { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS }
-        : undefined,
-    });
+  const config = mailConfig();
+  if (config.host) {
+    const { frontendUrl, from, ...smtp } = config;
+    return nodemailer.createTransport(smtp);
   }
 
-  if (process.env.NODE_ENV === 'production') throw new Error('SMTP_HOST obrigatório em produção.');
   const testAccount = await nodemailer.createTestAccount();
   logger.warn({ provider: 'ethereal' }, 'SMTP não configurado; usando caixa de teste sem envio real.');
   return nodemailer.createTransport({
@@ -30,7 +25,7 @@ async function buildTransporter() {
 }
 
 function getTransporter() {
-  if (!transporterPromise) transporterPromise = buildTransporter();
+  if (!transporterPromise) transporterPromise = buildTransporter().catch(error => { transporterPromise = null; throw error; });
   return transporterPromise;
 }
 
@@ -38,7 +33,7 @@ export async function sendPasswordResetEmail(to: string, resetUrl: string): Prom
   const transporter = await getTransporter();
 
   const info = await transporter.sendMail({
-    from: process.env.SMTP_FROM ?? '"DomusApp" <no-reply@domusapp.local>',
+    from: mailConfig().from,
     to,
     subject: 'Redefinição de senha — DomusApp',
     text: `Recebemos uma solicitação para redefinir sua senha.\n\nAcesse o link abaixo (válido por 1 hora):\n${resetUrl}\n\nSe você não solicitou isso, ignore este e-mail.`,
@@ -49,4 +44,10 @@ export async function sendPasswordResetEmail(to: string, resetUrl: string): Prom
   if (previewUrl) {
     logger.info({ previewUrl }, 'Preview do e-mail de teste no Ethereal.');
   }
+}
+
+export async function verifyMailConnection(): Promise<void> {
+  if (!mailConfig().host) throw new Error('Configure SMTP_HOST para verificar o SMTP externo.');
+  const transporter = await getTransporter();
+  try { await transporter.verify(); } finally { transporter.close(); transporterPromise = null; }
 }

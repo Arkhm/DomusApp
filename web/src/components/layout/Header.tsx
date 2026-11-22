@@ -198,7 +198,7 @@ export default function Header({ title, eyebrow }: HeaderProps) {
                                 </div>
                                 <div style={{ padding: 4 }}>
                                     <DropdownItem icon={<UserIcon size={14} />} label="Meu perfil" onClick={() => handleComingSoon('Meu perfil')} />
-                                    <DropdownItem icon={<Lock size={14} />} label="Alterar senha" onClick={() => handleComingSoon('Alterar senha')} />
+                                    <DropdownItem icon={<Lock size={14} />} label="Alterar senha" onClick={() => { setMenuOpen(false); navigate('/esqueci-senha'); }} />
                                 </div>
                                 <div style={{ borderTop: '1px solid var(--color-line)', padding: 4 }}>
                                     <DropdownItem

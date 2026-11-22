@@ -3,31 +3,32 @@
 App do morador do DomusApp, em Expo + React Native + TypeScript.
 Consome a API REST do monorepo (`../api`).
 
-Esta rodada entrega Login, Home (dashboard), Reservas e Ocorrências. Os demais
-módulos aparecem no grid e levam a um placeholder "Em breve" que explica o que
-ainda falta do lado da API.
+## Funcionalidades atuais
 
----
+O app utiliza os dados da API. O grid da Home oferece oito acessos:
+Comunicados, Eventos, Votações, Cobranças, Reservas, Ocorrências,
+Notificações e Veículos e pets. As abas são Início, Reservas, Cobranças e Perfil.
+Visitantes, portaria e encomendas não fazem parte do menu atual.
 
-## O que está pronto
+- Login, restauração e renovação de sessão; tokens no SecureStore no app nativo.
+- Comunicados e eventos com telas de lista/detalhe e controle de leitura.
+- Votações com participação por unidade e visibilidade dos resultados conforme a API.
+- Cobranças com detalhes, instruções Pix e acompanhamento dos estados de pagamento.
+- Solicitação e cancelamento das próprias reservas; acompanhamento da avaliação.
+- Registro de ocorrências e acompanhamento da resposta e do status.
+- Caixa de notificações internas com leitura e navegação ao conteúdo.
+- Consulta e gestão de veículos e pets conforme as permissões e limites da unidade.
+- Perfil, identificação da unidade e encerramento da sessão.
 
-| Item | Situação |
-| --- | --- |
-| Login com e-mail + senha | ✅ integrado a `POST /auth/login` |
-| Validação de campos, loading, erro de credencial, erro de rede | ✅ |
-| Token em `expo-secure-store` (Keychain / EncryptedSharedPreferences) | ✅ |
-| Sessão restaurada ao abrir o app | ✅ consulta perfil atualizado via `GET /auth/me` |
-| Home com saudação + identificação do morador | ✅ |
-| Resumo do topo (comunicados e próximo evento) | ✅ `GET /notices` + `GET /events` |
-| Grid com os 15 módulos | ✅ (Reservas e Ocorrências prontas; demais em "Em breve") |
-| Bottom tabs: Início / Reservas / Acessos / Encomendas / Perfil | ✅ (Acessos e Encomendas são placeholders) |
-| Comportamento com a API fora do ar | ✅ banner de erro + "Tentar de novo" |
-| Design tokens centralizados, fonte Inter, alvo 390×844 | ✅ |
+Não há autocadastro: a administração cria a conta no painel e fornece as
+credenciais iniciais. Em “Esqueci minha senha”, o morador informa o e-mail
+cadastrado, recebe um link e define a nova senha no navegador. Depois volta
+ao app para entrar. O link vale uma hora, só pode ser usado uma vez e a
+redefinição revoga as sessões anteriores. A confirmação da solicitação é genérica.
 
-Sem link de "Criar conta": moradores são cadastrados pela administração no
-painel web. "Esqueci minha senha" abre um aviso orientando a procurar a
-administração do condomínio: a redefinição de senha é feita sempre por ela,
-não pelo app.
+O envio real depende de SMTP configurado na API; sem SMTP em desenvolvimento,
+o Ethereal captura as mensagens sem entregá-las. Veja a seção de recuperação
+por e-mail no [README principal](../README.md#recuperação-de-senha-por-e-mail).
 
 ---
 
@@ -137,12 +138,12 @@ mobile/
 └── src/
     ├── components/            Button, ConfirmSheet, Input, ModuleCard,
     │                          SectionHeader, StatusBanner, SummaryTile
-    ├── config/modules.ts      catálogo dos 15 módulos do grid
+    ├── config/modules.ts      catálogo dos oito acessos do grid
     ├── contexts/AuthContext   sessão, login, logout, restauração
     ├── hooks/                 useAppFonts, useHomeSummary
-    ├── navigation/            Stack (Login → Tabs) + placeholder "Em breve"
+    ├── navigation/            Stack de autenticação, recuperação e telas do morador
     ├── screens/               LoginScreen, HomeScreen, ProfileScreen,
-    │                          ComingSoonScreen
+    │                          ForgotPasswordScreen e telas dos módulos
     ├── services/              api.ts (axios + interceptors), authService,
     │                          noticeService, eventService, secureStorage
     ├── theme/                 colors, spacing/radius/elevation, typography
@@ -164,53 +165,31 @@ Regras seguidas:
 
 ---
 
-## TODO / limitações conhecidas
+## Limitações e validação
 
-### 3. Contagem de "não lidos" só existe na visão de morador
+- As notificações são internas; não há push com o aplicativo fechado. A caixa
+  persistente de cobranças, reservas e votações depende do `notification-worker`,
+  executado separadamente da API. Não é um histórico completo das transições.
+- O ambiente de teste Pix não quita a dívida por aprovação simulada. A API
+  diferencia o estado da tentativa de pagamento do estado da cobrança.
+- O alvo de entrega é o app nativo. No target web de desenvolvimento, o
+  armazenamento usa `localStorage` porque SecureStore não está disponível.
+- Falhas de rede têm tratamento na interface; não existe sincronização completa
+  para operar offline. Ações e permissões continuam sendo validadas pela API.
+- A entrega exige validação dos fluxos em aparelho e no endereço público após
+  hospedar; checagem de tipos e export não substituem essa homologação.
 
-`GET /notices` devolve `isRead` por aviso apenas para morador comum. Para
-perfis de painel a API manda `readCount`/`totalAddressees`, que não dizem se
-*aquele* usuário leu. Por isso o bloco de resumo mostra "N comunicados
-publicados" em vez de inventar um número de não lidos.
+Os endpoints utilizados incluem `/auth`, `/notices`, `/events`, `/votings`,
+`/invoices`, `/common-areas`, `/reservations`, `/incidents`, `/notifications`,
+`/vehicles` e `/pets`. Consulte o Swagger para contratos e permissões.
+Contas de síndico veem apenas os próprios registros de reservas e ocorrências
+neste canal, mesmo quando a API permite uma visão administrativa.
 
-### 4. Módulos sem endpoint na API
-
-Existem hoje: `/auth`, `/users`, `/notices`, `/units`, `/events`, `/votings`,
-`/common-areas`, `/reservations` e `/incidents`.
-
-**Reservas e Ocorrências estão prontas no mobile:**
-
-- Reservas: lista das próprias reservas com status e motivo de rejeição; nova
-  solicitação com área ativa; cancelamento de PENDING/APPROVED futura com confirmação.
-  Datas `YYYY-MM-DD` e horários `HH:mm` são validados no fuso de Brasília (UTC-03 fixo),
-  sem dependências novas. Erros da API, inclusive conflito 409, aparecem na tela.
-- Ocorrências: lista das próprias ocorrências com categoria, status e resposta da
-  administração; registro com título (até 200), descrição e categoria.
-  Autor e unidade vêm da API, nunca do formulário.
-- Reservas abre pela aba e pelo cartão da Home; Ocorrências abre pelo cartão da Home.
-  Contas de síndico também veem apenas os próprios registros neste canal.
-
-Os testes de validação rodam em `mobile/` com
-`node --test src/utils/residentForms.test.cjs`, usando o runner nativo do Node e o
-TypeScript já instalado. A checagem de tipos continua com `npx tsc --noEmit`.
-A integração em aparelho e as notificações de mudança de status ficam de fora desta entrega.
-
-**Ainda não existem**: `/charges`, `/visitors`, `/packages`, `/notifications`,
-`/permissions`, além de documentos, multas, achados e perdidos, pagamentos e histórico.
-
-`GET /votings` já é liberado para morador e `POST /votings/:id/votes` registra
-um voto por unidade. Falta a tela de votações no app.
-
-Os demais cartões do grid levam ao placeholder com a nota correspondente
-(`src/config/modules.ts`).
-
-### 5. Outros TODOs do app
-
-- Telas próprias de Comunicados, Acessos e Encomendas.
-- Push notifications.
-- No target **web** o token cai em `localStorage`, porque `expo-secure-store`
-  não existe no browser (`src/services/secureStorage.ts`). O alvo de entrega é
-  o app nativo; o web serve só para desenvolvimento.
+Para testar o e-mail em celular físico, `FRONTEND_URL` na API precisa apontar
+para o web acessível pelo aparelho (IP LAN local ou URL pública HTTPS).
+`DOMUS_API_URL` aponta para a API, não para a página de redefinição. Alinhe
+`VITE_API_URL` e CORS com os endereços acessíveis. Mudanças no ambiente da API
+via Docker exigem recriar o contêiner, não apenas reiniciá-lo.
 
 ## Perfil e sessão atuais
 

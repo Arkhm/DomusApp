@@ -13,6 +13,7 @@ export type MainTabParamList = {
 
 export type RootStackParamList = {
   Login: undefined;
+  ForgotPassword: { email?: string } | undefined;
   Ocorrencias: undefined;
   Comunicados: undefined;
   Comunicado: { notice: Notice };

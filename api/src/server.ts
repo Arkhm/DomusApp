@@ -1,5 +1,8 @@
+import { mailConfig } from './lib/mailConfig';
 import { logger } from './lib/logger';
 import app from './app';
+
+mailConfig();
 
 const PORT = process.env.PORT || 3333;
 

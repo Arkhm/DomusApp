@@ -70,7 +70,7 @@ O `.env.example` reúne as variáveis de banco, autenticação, pagamentos e fer
 
 **3. Confira o banco e suba os contêineres:**
 
-O fluxo local usa `db push`; o serviço `migrations` é opcional. Confira a estratégia de banco em [report.md](report.md#2-containers-e-inicialização).
+O fluxo local usa `db push`; o serviço `migrations` é opcional.
 
 ```bash
 docker compose up -d --build
@@ -107,7 +107,7 @@ docker compose up -d --build
 docker compose logs --tail=100 api payment-worker
 ```
 
-Ao alterar o schema local, execute `docker compose exec api npx prisma db push`, `docker compose exec api npx prisma generate` e reinicie API e worker. Não repita o seed. O volume `api_node_modules` é compartilhado, e os volumes persistem em `docker compose down` sem `-v`. O perfil opcional `migrations` mantém o caminho de migrações versionadas; consulte o relatório antes de trocar de estratégia.
+Ao alterar o schema local, execute `docker compose exec api npx prisma db push`, `docker compose exec api npx prisma generate` e reinicie API e worker. Não repita o seed. O volume `api_node_modules` é compartilhado, e os volumes persistem em `docker compose down` sem `-v`. O perfil opcional `migrations` mantém o caminho de migrações versionadas; confira as migrações antes de trocar de estratégia.
 
 ---
 
@@ -245,3 +245,57 @@ A migração `20261122010000_review_integrity` valida a existência e o pertenci
 O worker financeiro retira da fila automática tentativas de cobranças bloqueadas, registrando revisão e auditoria. O worker de notificações opera separadamente e não depende de credenciais do Mercado Pago. Após atualizar, aplique a migração, gere o Prisma Client e inicie `docker compose up -d notification-worker`, reiniciando API e payment-worker. A justificativa financeira é limitada uniformemente a 191 caracteres.
 
 A suíte da API executa arquivos sequencialmente: as integrações compartilham a mesma base de teste e algumas consultas usam agregações globais, portanto execução simultânea pode causar interferência entre fixtures e deadlocks de limpeza. Os testes de concorrência dentro de cada cenário permanecem ativos.
+
+## Recuperação de senha por e-mail
+
+A API usa SMTP genérico (Nodemailer), tanto localmente quanto hospedada. No Brevo,
+configure o remetente autorizado em **Transactional**, copie o login SMTP e gere
+uma **chave SMTP** (diferente da chave API). Configure no `.env` ignorado:
+
+```dotenv
+SMTP_HOST="smtp-relay.brevo.com"
+SMTP_PORT="587"
+SMTP_SECURE="false"
+SMTP_USER="login-do-painel-smtp"
+SMTP_PASS="chave-smtp"
+SMTP_FROM='"DomusApp" <remetente-autorizado@seudominio.com>'
+FRONTEND_URL="http://localhost:5173"
+```
+
+A porta 587/2525 exige STARTTLS; na 465 use `SMTP_SECURE=true`. Não desative a
+verificação de certificados. Para outros provedores, use as credenciais próprias.
+Autentique seu domínio conforme as instruções do provedor para melhorar a entrega.
+
+Após alterar o ambiente, recrie a API (restart não atualiza as variáveis):
+
+```bash
+docker compose up -d --force-recreate api
+docker compose exec api npm run mail:verify
+```
+
+O diagnóstico verifica conexão/autenticação, sem enviar e sem comprovar entrega.
+Para execução direta, exporte as variáveis ou use `node --env-file=../.env --import tsx scripts/verify-mail.ts`
+a partir de `api`. Sem SMTP em desenvolvimento, o Ethereal captura o e-mail e
+registra um preview; ele não entrega ao destinatário. Em produção, SMTP e
+`FRONTEND_URL` com HTTPS são obrigatórios e validados na inicialização da API.
+Falhas de envio são registradas sem dados sensíveis; a resposta pública permanece genérica.
+Não há fila persistente nem retentativa automática: em falha, solicite outro link.
+Uma nova solicitação invalida o link anterior.
+
+No celular físico, `localhost` aponta para o próprio aparelho: use o IP LAN da
+máquina em `FRONTEND_URL` e `DOMUS_API_URL`; ajuste `VITE_API_URL` e `ALLOWED_ORIGIN`
+para os endereços acessíveis. O mobile solicita o link; a nova senha é definida
+no navegador. Após concluir, volte ao app e entre. Não há autocadastro.
+
+No servidor, use a URL pública HTTPS do web em `FRONTEND_URL`, ajuste CORS,
+URL da API e cookies/proxy conforme a hospedagem. Sirva `/redefinir-senha`
+diretamente com fallback do React Router. Libere saída para a porta SMTP;
+se houver lista de IPs no Brevo, adicione o IP público de saída do servidor.
+É possível usar a mesma conta Brevo localmente e no servidor, com chaves separadas.
+O deploy completo e a configuração de DNS/HTTPS da hospedagem são etapas externas.
+
+Para aceitar a integração, teste com um usuário de demonstração cujo e-mail você
+controla: solicite pelo web/app, confira o recebimento e o destino do link,
+redefina a senha e entre no app com a nova senha. Confirme que o link usado não
+funciona novamente e que as sessões anteriores são revogadas. Repita com a URL
+pública após hospedar. Nunca versione credenciais nem links de recuperação.
