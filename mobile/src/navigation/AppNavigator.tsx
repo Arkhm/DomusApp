@@ -1,3 +1,4 @@
+import { ForgotPasswordScreen } from '../screens/ForgotPasswordScreen';
 import React from 'react';
 import { ActivityIndicator, StyleSheet, View } from 'react-native';
 import { NavigationContainer, type Theme } from '@react-navigation/native';
@@ -131,7 +132,10 @@ export function AppNavigator(): React.JSX.Element {
             />
           </>
         ) : (
-          <Stack.Screen name="Login" component={LoginScreen} options={{ headerShown: false }} />
+          <>
+            <Stack.Screen name="Login" component={LoginScreen} options={{ headerShown: false }} />
+            <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} options={{ title: 'Recuperar senha' }} />
+          </>
         )}
       </Stack.Navigator>
     </NavigationContainer>

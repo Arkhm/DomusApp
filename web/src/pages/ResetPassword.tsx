@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react';
-import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { Eye, EyeOff, ArrowRight, ArrowLeft, Loader2, TriangleAlert } from 'lucide-react';
 import toast from 'react-hot-toast';
 import AuthShell from '../components/luxury/AuthShell';
@@ -20,7 +20,8 @@ const backLinkStyle: React.CSSProperties = {
 export default function ResetPassword() {
     const [searchParams] = useSearchParams();
     const token = searchParams.get('token');
-    const navigate = useNavigate();
+    const [completed, setCompleted] = useState(false);
+    const [resetFailed, setResetFailed] = useState(false);
 
     const [password, setPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
@@ -28,6 +29,13 @@ export default function ResetPassword() {
     const [pwFocus, setPwFocus] = useState(false);
     const [confirmFocus, setConfirmFocus] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
+
+    if (completed) return (
+        <AuthShell title="Senha redefinida." subtitle="Sua nova senha já pode ser utilizada.">
+            <p>Se você usa o aplicativo do morador, volte ao app e entre com a nova senha.</p>
+            <Link to="/login" style={backLinkStyle}>Acessar o painel web</Link>
+        </AuthShell>
+    );
 
     // Link sem token (aberto direto, copiado errado, etc.) — nem tenta
     // renderizar o formulário, já orienta a pedir um link novo.
@@ -76,8 +84,10 @@ export default function ResetPassword() {
         try {
             await authService.resetPassword(token, password);
             toast.success('Senha redefinida com sucesso.');
-            navigate('/login');
+            setCompleted(true);
+            window.history.replaceState(null, '', window.location.pathname);
         } catch (error) {
+            setResetFailed(true);
             toast.error(apiErrorMessage(error, 'Não foi possível redefinir sua senha. Tente novamente.'));
         } finally {
             setIsLoading(false);
@@ -87,6 +97,7 @@ export default function ResetPassword() {
     return (
         <AuthShell title="Redefinir senha." subtitle="Escolha uma nova senha para acessar sua conta.">
             <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 28 }}>
+                {resetFailed && <Link to="/esqueci-senha" style={backLinkStyle}>Link inválido ou expirado? Solicitar novo link</Link>}
                 <FloatingField
                     id="password"
                     label="Nova senha"
