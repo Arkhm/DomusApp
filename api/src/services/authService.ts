@@ -1,3 +1,4 @@
+import { mailConfig } from '../lib/mailConfig';
 import { HttpError } from '../lib/httpError';
 import bcrypt from 'bcryptjs';
 import { createAuthTokens, verifyLogoutToken, verifyRefreshToken } from '../lib/authTokens';
@@ -76,15 +77,10 @@ export const authService = {
       resetTokenExpiry: new Date(Date.now() + RESET_TOKEN_TTL_MS),
     });
 
-    // ALLOWED_ORIGIN já existe pra CORS (server.ts) — reaproveitado aqui como
-    // a URL do front, em vez de criar uma variável de ambiente nova só pra
-    // isso. Pega a primeira origem se houver mais de uma configurada.
-    const frontendUrl = (process.env.ALLOWED_ORIGIN ?? 'http://localhost:5173')
-      .split(',')[0]
-      .trim();
-    const resetUrl = `${frontendUrl}/redefinir-senha?token=${token}`;
+    const resetUrl = new URL('/redefinir-senha', mailConfig().frontendUrl);
+    resetUrl.searchParams.set('token', token);
 
-    await sendPasswordResetEmail(user.email, resetUrl);
+    await sendPasswordResetEmail(user.email, resetUrl.toString());
   },
 
   // RF-007. `userRepository.update` é chamado direto (não `userService.update`)
