@@ -1,7 +1,8 @@
-export type NotificationType = 'NOTICE' | 'EVENT' | 'INCIDENT';
+export type NotificationType = 'NOTICE' | 'EVENT' | 'INCIDENT' | 'INVOICE' | 'RESERVATION' | 'VOTING';
 
 export interface AppNotification {
   id: string;
+  eventId?: string;
   type: NotificationType;
   sourceId: string;
   title: string;

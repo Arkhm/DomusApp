@@ -1,3 +1,4 @@
+import { inboxService } from '../services/inboxService';
 import type { Response } from 'express';
 import type { AuthRequest } from '../middlewares/authMiddleware';
 import { HttpError } from '../lib/httpError';
@@ -10,6 +11,10 @@ function respondError(res: Response, error: unknown) {
 }
 
 export const notificationController = {
+  async readInbox(req: AuthRequest, res: Response) {
+    try { await inboxService.read(req.user!, req.params.id as string); res.json({ message: 'Notificação lida.' }); }
+    catch (error: any) { res.status(error.statusCode ?? 503).json({ error: error.statusCode ? error.message : 'Não foi possível registrar leitura.' }); }
+  },
   async list(req: AuthRequest, res: Response) {
     try { res.json(await notificationService.list(req.user!.id)); }
     catch (error) { respondError(res, error); }

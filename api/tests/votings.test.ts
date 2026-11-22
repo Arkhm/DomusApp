@@ -310,6 +310,6 @@ test('votações: HTTP e repositório com MySQL isolado', { skip: !enabled }, as
     await request(app).delete(`/votings/${response.body.id}`).set('Authorization', syndic).expect(200);
   });
   await t.test('remoção de votação inexistente falha explicitamente', async () => {
-    await assert.rejects(() => votingService.delete(randomUUID()), /Votação não encontrada/);
+    await assert.rejects(() => votingService.delete(randomUUID(), { id: randomUUID(), role: 'ADMIN' }), /Votação não encontrada/);
   });
 });

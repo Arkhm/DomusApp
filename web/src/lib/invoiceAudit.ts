@@ -2,6 +2,8 @@ import { INVOICE_STATUS_LABELS, type InvoiceAudit } from '../types/invoice';
 
 /** Ações que a API grava no histórico, com o texto que a administração entende. */
 export const AUDIT_ACTION_LABELS: Record<string, string> = {
+    REISSUE: 'Novo Pix solicitado',
+    HISTORICAL_PAYMENT_RECEIVED: 'Atualização financeira de tentativa anterior',
     CREATE: 'Cobrança criada',
     SEED: 'Dado de demonstração',
     PENDING: 'Pix aguardando pagamento',

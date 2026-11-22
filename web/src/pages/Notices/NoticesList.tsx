@@ -1,3 +1,4 @@
+import ContentEditor from '../../components/ContentEditor';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { motion } from 'motion/react';
 import { Plus, Trash2, Loader2 } from 'lucide-react';
@@ -129,7 +130,7 @@ export default function NoticesList() {
                             condomínio.
                         </p>
                     </div>
-                    {canMutate && (
+                    {(canMutate || (user?.role === 'MORADOR' && user.isSyndic)) && (
                         <button onClick={() => setIsModalOpen(true)} className="btn-gold">
                             <Plus size={12} />
                             Novo comunicado
@@ -405,16 +406,19 @@ export default function NoticesList() {
                                                     {n.readCount} de {n.totalAddressees ?? 0} leram
                                                 </div>
                                             )}
-                                            {canMutate && (
-                                                <div style={{ display: 'flex', gap: 4 }}>
-                                                    <IconBtn
-                                                        icon={<Trash2 size={14} />}
-                                                        danger
-                                                        onClick={() => setDeletingNotice(n)}
-                                                        title="Excluir comunicado"
-                                                    />
-                                                </div>
-                                            )}
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                                                <ContentEditor records={[n]} resource="notices" onSaved={load} />
+                                                {canMutate && (
+                                                    <div style={{ display: 'flex', gap: 4 }}>
+                                                        <IconBtn
+                                                            icon={<Trash2 size={14} />}
+                                                            danger
+                                                            onClick={() => setDeletingNotice(n)}
+                                                            title="Excluir comunicado"
+                                                        />
+                                                    </div>
+                                                )}
+                                            </div>
                                         </div>
                                     </div>
                                 </motion.article>

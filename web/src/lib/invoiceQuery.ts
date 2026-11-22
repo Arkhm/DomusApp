@@ -1,3 +1,4 @@
+import { todayBR } from './invoiceFormat';
 import type { InvoiceFilters, InvoiceStatus, InvoiceType } from '../types/invoice';
 
 /** Filtros como a tela os guarda: datas AAAA-MM-DD, vazios como ''. */
@@ -34,6 +35,7 @@ export type InvoiceQuery =
  *   vencem de agora em diante, a mesma fronteira que a API usa para "vencida" (`vencimento < agora`).
  */
 export function buildInvoiceQuery(filters: InvoiceFilterState, page: number, limit: number, now: Date = new Date()): InvoiceQuery {
+    now = new Date(`${todayBR(now)}T00:00:00.000Z`);
     const endsAt = filters.endDate ? new Date(`${filters.endDate}T23:59:59.999Z`) : null;
     let startParam = filters.startDate || undefined;
     let startsAt = startParam ? new Date(`${startParam}T00:00:00.000Z`) : null;

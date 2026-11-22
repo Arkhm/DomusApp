@@ -2,7 +2,7 @@ import { useEffect, useState, type FormEvent } from 'react';
 import { Megaphone, Users as UsersIcon, Send, FileText, CheckCircle2, Bell, AlertTriangle } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { noticeService } from '../../services/noticeService';
-import { unitService } from '../../services/unitService';
+import api from '../../services/api';
 import type { NoticeFormData } from '../../types/notice';
 import type { Unit } from '../../types/user';
 import { formatUnitDisplay } from '../../types/user';
@@ -32,7 +32,7 @@ export default function NoticeFormModal({ isOpen, onClose, onSuccess }: NoticeFo
         if (isOpen) {
             setForm(emptyForm);
             setIsSubmitting(false);
-            unitService.getAll().then(setUnits).catch(() => {});
+            api.get<Unit[]>('/units/options').then(response => response.data).then(setUnits).catch(() => {});
         }
     }, [isOpen]);
 

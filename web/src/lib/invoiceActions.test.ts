@@ -29,12 +29,12 @@ describe('validateReason', () => {
 
 describe('availableActions', () => {
     it('Pix ativo e em aberto: conciliar, baixa e cancelamento; não reenvia (o pedido já existe)', () => {
-        expect(allowed(subject({ mpOrderId: 'ORD1' }))).toEqual({ reconcile: true, retry: false, markPaid: true, cancel: true });
+        expect(allowed(subject({ mpOrderId: 'ORD1' }))).toEqual({ reconcile: true, retry: false, markPaid: true, cancel: true, reissue: false });
     });
 
     it('cobrança sem Pix (demonstração): só baixa e cancelamento', () => {
         const actions = availableActions(subject({ issuanceStatus: 'NOT_ISSUED' }));
-        expect(allowed(subject({ issuanceStatus: 'NOT_ISSUED' }))).toEqual({ reconcile: false, retry: false, markPaid: true, cancel: true });
+        expect(allowed(subject({ issuanceStatus: 'NOT_ISSUED' }))).toEqual({ reconcile: false, retry: false, markPaid: true, cancel: true, reissue: false });
         expect(actions.reconcile.hint).toMatch(/sem Pix/);
     });
 
@@ -147,4 +147,13 @@ describe('loadErrorMessage', () => {
         const error = new AxiosError('falhou', 'ERR_BAD_RESPONSE', undefined, undefined, { status: 404, data: { error: 'Fatura não encontrada.' } } as AxiosResponse);
         expect(loadErrorMessage(error, 'Não foi possível carregar o histórico.')).toBe('Fatura não encontrada.');
     });
+});
+
+it('novo Pix exige dívida em aberto, pedido encerrado e ausência de revisão', () => {
+    for (const issuanceStatus of ['EXPIRED', 'CANCELLED', 'REJECTED']) {
+        expect(availableActions(subject({ issuanceStatus, mpOrderId: 'ORD1' })).reissue.allowed).toBe(true);
+    }
+    for (const patch of [{ issuanceStatus: 'ACTIVE' }, { status: 'PAID' as const }, { requiresReview: true }, { mpOrderId: null }]) {
+        expect(availableActions(subject({ issuanceStatus: 'EXPIRED', mpOrderId: 'ORD1', ...patch })).reissue.allowed).toBe(false);
+    }
 });

@@ -1,3 +1,4 @@
+import { useAuth } from '../../hooks/useAuth';
 import { useEffect, useState } from 'react';
 import { userService } from '../../services/userService';
 
@@ -6,9 +7,12 @@ import { userService } from '../../services/userService';
  * Enquanto carrega, ou se a consulta falhar, devolve `null` e o histórico mostra só a origem do registro.
  */
 export function useActorNames(): Record<string, string> | null {
+    const { user } = useAuth();
+    const allowed = user?.role === 'ADMIN' || user?.role === 'FUNCIONARIO';
     const [names, setNames] = useState<Record<string, string> | null>(null);
 
     useEffect(() => {
+        if (!allowed) return;
         let cancelled = false;
         async function load() {
             try {
@@ -18,7 +22,7 @@ export function useActorNames(): Record<string, string> | null {
         }
         void load();
         return () => { cancelled = true; };
-    }, []);
+    }, [allowed]);
 
-    return names;
+    return allowed ? names : null;
 }

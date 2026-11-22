@@ -3,7 +3,7 @@ import { motion } from 'motion/react';
 import { CalendarDays } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { eventService } from '../../services/eventService';
-import { unitService } from '../../services/unitService';
+import api from '../../services/api';
 import {
     EVENT_CATEGORY_LABEL,
     EVENT_STATUS_LABEL,
@@ -146,7 +146,7 @@ export default function EventFormModal({ isOpen, onClose, onSuccess }: Props) {
             setYear('');
             setHour('');
             setMinute('');
-            unitService.getAll().then(setUnits).catch(() => {});
+            api.get<Unit[]>('/units/options').then(response => response.data).then(setUnits).catch(() => {});
         }
     }, [isOpen]);
 

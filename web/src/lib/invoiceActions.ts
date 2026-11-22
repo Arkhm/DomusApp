@@ -2,7 +2,7 @@ import axios from 'axios';
 import { apiErrorMessage } from './apiError';
 import { INVOICE_STATUS_LABELS, type Invoice } from '../types/invoice';
 
-export type ActionKind = 'reconcile' | 'retry' | 'markPaid' | 'cancel';
+export type ActionKind = 'reconcile' | 'retry' | 'markPaid' | 'cancel' | 'reissue';
 
 export interface ActionAvailability {
     allowed: boolean;
@@ -63,10 +63,12 @@ export function availableActions(invoice: Pick<Invoice, 'status' | 'requiresRevi
         manual = no('O Mercado Pago registrou pagamento ou estorno. Use Conciliar para revisar.');
     }
 
-    return { reconcile, retry, markPaid: manual, cancel: manual };
+    const reissue = ['PENDING', 'OVERDUE'].includes(status) && !requiresReview && hasOrder && ['EXPIRED', 'REJECTED', 'CANCELLED'].includes(issuanceStatus) ? ok : no('Um novo Pix só pode ser emitido após o encerramento do anterior, com a dívida em aberto e sem revisão pendente.');
+    return { reconcile, retry, markPaid: manual, cancel: manual, reissue };
 }
 
 export const ACTION_LABELS: Record<ActionKind, string> = {
+    reissue: 'Emitir novo Pix',
     reconcile: 'Conciliar com o Mercado Pago',
     retry: 'Reenviar emissão do Pix',
     markPaid: 'Marcar como paga',
@@ -75,6 +77,7 @@ export const ACTION_LABELS: Record<ActionKind, string> = {
 
 /** O que cada ação faz, em linguagem de quem vai confirmar. */
 export const ACTION_EXPLANATIONS: Record<ActionKind, string> = {
+    reissue: 'Emite um novo Pix para a mesma dívida após conferir o encerramento do anterior. Todas as tentativas permanecem no histórico.',
     reconcile: 'Consulta o pedido no Mercado Pago e atualiza a cobrança com o que foi encontrado. Não emite nada novo.',
     retry: 'Pede ao sistema que tente gerar o Pix de novo, em segundo plano. Só é possível enquanto o pedido ainda não existe no Mercado Pago.',
     markPaid: 'Registra um pagamento recebido por fora do Pix (dinheiro, transferência...). Se houver Pix ativo, ele será encerrado no Mercado Pago. A ação não pode ser desfeita pela tela.',
@@ -82,6 +85,7 @@ export const ACTION_EXPLANATIONS: Record<ActionKind, string> = {
 };
 
 export const ACTION_CONFIRM_LABELS: Record<ActionKind, string> = {
+    reissue: 'Confirmar novo Pix',
     reconcile: 'Conciliar',
     retry: 'Reenviar emissão',
     markPaid: 'Confirmar pagamento',
@@ -89,6 +93,7 @@ export const ACTION_CONFIRM_LABELS: Record<ActionKind, string> = {
 };
 
 export const ACTION_SUCCESS: Record<ActionKind, string> = {
+    reissue: 'Novo Pix solicitado. A emissão será processada em segundo plano.',
     reconcile: 'Conciliação concluída com o Mercado Pago.',
     retry: 'Reenvio solicitado. O Pix será gerado em segundo plano.',
     markPaid: 'Cobrança marcada como paga.',

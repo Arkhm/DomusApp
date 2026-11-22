@@ -43,11 +43,11 @@ describe('buildInvoiceQuery', () => {
 
     describe('status "Pendente" (a vencer)', () => {
         it('exclui as já vencidas: só entram vencimentos de agora em diante', () => {
-            expect(paramsOf(filters({ status: 'PENDING' })).startDate).toBe(NOW.toISOString());
+            expect(paramsOf(filters({ status: 'PENDING' })).startDate).toBe('2026-11-14T00:00:00.000Z');
         });
 
         it('um início passado é elevado para agora; um início futuro é respeitado', () => {
-            expect(paramsOf(filters({ status: 'PENDING', startDate: '2026-01-01' })).startDate).toBe(NOW.toISOString());
+            expect(paramsOf(filters({ status: 'PENDING', startDate: '2026-01-01' })).startDate).toBe('2026-11-14T00:00:00.000Z');
             expect(paramsOf(filters({ status: 'PENDING', startDate: '2026-12-01' })).startDate).toBe('2026-12-01');
         });
 

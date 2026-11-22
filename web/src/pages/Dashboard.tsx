@@ -47,9 +47,9 @@ export default function Dashboard() {
         const load = async () => {
             setIsLoading(true);
             const [usersR, noticesR, unitsR, eventsR] = await Promise.allSettled([
-                userService.getAll(),
+                user?.role === 'MORADOR' ? Promise.resolve([]) : userService.getAll(),
                 noticeService.getAll(),
-                unitService.getAll(),
+                user?.role === 'MORADOR' ? Promise.resolve([]) : unitService.getAll(),
                 eventService.getAll(),
             ]);
 
@@ -93,7 +93,7 @@ export default function Dashboard() {
             }
         };
         load();
-    }, []);
+    }, [user?.role]);
 
     const occupancy = useMemo(() => {
         if (!stats.units) return 0;
@@ -206,7 +206,7 @@ export default function Dashboard() {
                                     maxWidth: 540,
                                 }}
                             >
-                                {stats.residents} residentes ativos em {stats.units} unidades.{' '}
+                                {user?.role !== 'MORADOR' && <>{stats.residents} residentes ativos em {stats.units} unidades. </>}
                                 {upcomingEvents.length} eventos próximos na programação e {stats.notices} comunicados
                                 publicados.
                             </p>
@@ -224,7 +224,7 @@ export default function Dashboard() {
                         </div>
 
                         {/* Health card */}
-                        <HealthCard occupancy={occupancy} stats={stats} />
+                        {user?.role !== 'MORADOR' && <HealthCard occupancy={occupancy} stats={stats} />}
                     </div>
                 </section>
 
@@ -243,6 +243,7 @@ export default function Dashboard() {
                         marginBottom: 64,
                     }}
                 >
+                    {user?.role !== 'MORADOR' && <>
                     <StatCard
                         eyebrow="Residentes"
                         value={isLoading ? '—' : stats.residents}
@@ -258,6 +259,7 @@ export default function Dashboard() {
                         value={isLoading ? '—' : `${occupancy}%`}
                         footnote="Residentes vinculados"
                     />
+                    </>}
                     <StatCard
                         eyebrow="Comunicados"
                         value={isLoading ? '—' : stats.notices}

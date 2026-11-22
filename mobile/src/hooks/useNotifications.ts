@@ -1,3 +1,4 @@
+import { AppState } from 'react-native';
 import { useCallback, useRef, useState } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
 import { useAuth } from '../contexts/AuthContext';
@@ -50,7 +51,9 @@ export function useNotifications() {
     setIsRefreshing(false);
     setFailure(null);
     void load(false);
+    const subscription = AppState.addEventListener('change', state => { if (state === 'active') void load(true); });
     return () => {
+      subscription.remove();
       active.current = false;
       focus.current += 1;
       request.current += 1;

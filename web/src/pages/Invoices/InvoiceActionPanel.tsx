@@ -1,3 +1,5 @@
+import { keyLedgerFor, outcomeIsKnown } from '../../lib/idempotency';
+import { useAuth } from '../../hooks/useAuth';
 import { useState, type FormEvent } from 'react';
 import {
     ACTION_CONFIRM_LABELS, ACTION_EXPLANATIONS, ACTION_LABELS, ACTION_SUCCESS, IRREVERSIBLE, REASON_MAX,
@@ -7,7 +9,7 @@ import { formatMoneyBR } from '../../lib/invoiceFormat';
 import { runInvoiceAction } from '../../lib/runInvoiceAction';
 import type { Invoice } from '../../types/invoice';
 
-const ORDER: ActionKind[] = ['reconcile', 'retry', 'markPaid', 'cancel'];
+const ORDER: ActionKind[] = ['reconcile', 'retry', 'markPaid', 'cancel', 'reissue'];
 
 interface Props {
     invoice: Invoice;
@@ -24,6 +26,7 @@ interface Props {
  * acontecer antes de confirmar. As indisponíveis aparecem desabilitadas com o motivo, em vez de sumirem.
  */
 export default function InvoiceActionPanel({ invoice, onApplied, onFailed, onBusyChange }: Props) {
+    const { user } = useAuth();
     const actions = availableActions(invoice);
     const [selected, setSelected] = useState<ActionKind | null>(null);
     const [reason, setReason] = useState('');
@@ -49,12 +52,16 @@ export default function InvoiceActionPanel({ invoice, onApplied, onFailed, onBus
         setBusy(true);
         onBusyChange(true);
         setError('');
+        const ledger = keyLedgerFor(user?.id ?? 'anonymous');
+        const fingerprint = `reissue:${invoice.id}:${checked.value}`;
         try {
-            const updated = await runInvoiceAction(active, invoice.id, checked.value);
+            const updated = await runInvoiceAction(active, invoice.id, checked.value, active === 'reissue' ? ledger.keyFor(fingerprint) : undefined);
+            if (active === 'reissue') ledger.settle(fingerprint);
             setSelected(null);
             setReason('');
             onApplied(updated, ACTION_SUCCESS[active]);
         } catch (err) {
+            if (active === 'reissue' && outcomeIsKnown(err)) ledger.settle(fingerprint);
             setError(actionErrorMessage(err));
             onFailed();
         } finally {

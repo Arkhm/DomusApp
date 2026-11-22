@@ -7,6 +7,7 @@ import { idParamsSchema } from '../schemas/common';
 
 const router = Router();
 router.use(authMiddleware);
+router.post('/inbox/:id/read', validate(idParamsSchema, 'params'), notificationController.readInbox);
 router.get('/', notificationController.list);
 router.post('/:type/:id/read', validate(idParamsSchema.extend({
   type: z.enum(['NOTICE', 'EVENT', 'INCIDENT'], { error: 'Use NOTICE, EVENT ou INCIDENT.' }),

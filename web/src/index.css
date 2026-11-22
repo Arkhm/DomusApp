@@ -552,3 +552,26 @@
   color: var(--color-bone) !important;
   border: 1px solid var(--color-err) !important;
 }
+
+/* Notification inbox uses wrapping rows rather than compact action buttons. */
+.notification-inbox { position: absolute; right: 0; top: calc(100% + 12px); width: min(480px, calc(100vw - 32px)); z-index: 60; overflow: hidden; box-shadow: 0 16px 48px color-mix(in srgb, var(--color-bone) 18%, transparent); }
+.notification-inbox-header { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 20px 24px; border-bottom: 1px solid var(--color-line-strong); }
+.notification-items { list-style: none; margin: 0; padding: 0; max-height: min(60vh, 520px); overflow-y: auto; overflow-x: hidden; overscroll-behavior: contain; }
+.notification-items li + li { border-top: 1px solid var(--color-line); }
+.notification-item { display: flex; align-items: flex-start; gap: 14px; width: 100%; box-sizing: border-box; padding: 18px 24px; border: 0; background: transparent; color: var(--color-bone); font: inherit; text-align: left; white-space: normal; cursor: pointer; }
+.notification-item:hover, .notification-item:focus-visible { background: var(--color-ink-2); }
+.notification-item:focus-visible { outline: 2px solid var(--color-metal-1); outline-offset: -2px; }
+.notification-item:disabled { opacity: .6; cursor: wait; }
+.notification-item-unread { background: color-mix(in srgb, var(--color-metal-1) 7%, transparent); }
+.notification-item-icon { display: grid; place-items: center; flex-shrink: 0; width: 34px; height: 34px; border: 1px solid var(--color-line-strong); border-radius: 50%; color: var(--color-metal-1); }
+.notification-item-copy { display: grid; gap: 6px; flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.notification-item-title { font-size: 14px; line-height: 1.5; font-weight: 500; }
+.notification-item-description { font-size: 12px; line-height: 1.6; color: var(--color-bone-dim); }
+.notification-item-state { font-size: 10px; color: var(--color-metal-1); }
+.notification-message { padding: 16px 24px; margin: 0; font-size: 13px; overflow-wrap: anywhere; }
+.notification-detail { padding: 20px; border: 1px solid var(--color-line-strong); border-radius: 4px; background: var(--color-ink-0); max-height: 55vh; overflow-y: auto; overflow-x: hidden; }
+.notification-detail p { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.8; font-size: 14px; color: var(--color-bone-soft); }
+@media (max-width: 640px) {
+  .notification-inbox { position: fixed; top: 88px; right: 16px; }
+  .notification-inbox-header, .notification-item { padding: 16px; }
+}

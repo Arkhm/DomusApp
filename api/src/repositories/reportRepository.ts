@@ -1,3 +1,4 @@
+import { dueDayCutoff } from '../lib/invoiceDate';
 import { Prisma, IncidentCategory, IncidentStatus, ReservationStatus } from '@prisma/client';
 import { prisma } from '../lib/prisma';
 import { ReportPeriod, monthStart, nextDay, saoPauloDayStart } from '../schemas/reportSchema';
@@ -30,7 +31,7 @@ export const reportRepository = {
     return prisma.$queryRaw<ChargeRow[]>(Prisma.sql`
       SELECT classified.month, classified.status, COUNT(*) AS count, SUM(classified.amount) AS amount
       FROM (SELECT calendar.month,
-        CASE WHEN i.status = 'OVERDUE' OR (i.status = 'PENDING' AND i.dueDate < ${now})
+        CASE WHEN i.status = 'OVERDUE' OR (i.status = 'PENDING' AND i.dueDate < ${dueDayCutoff(now)})
           THEN 'OVERDUE' ELSE i.status END AS status, i.amount
       FROM Invoice i JOIN (${Prisma.join(months, ' UNION ALL ')}) calendar
         ON i.dueDate >= calendar.startsAt AND i.dueDate < calendar.endsAt

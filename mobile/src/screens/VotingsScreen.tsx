@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, FlatList, Pressable, RefreshControl, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute } from '@react-navigation/native';
 import { isAxiosError } from 'axios';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -62,7 +62,8 @@ function BackButton({ onPress, label }: { onPress: () => void; label: string }) 
 
 export function VotingsScreen() {
   const navigation = useNavigation();
-  const [detailId, setDetailId] = useState<string | null>(null);
+  const notificationSource = (useRoute().params as { sourceId?: string } | undefined)?.sourceId;
+  const [detailId, setDetailId] = useState<string | null>(notificationSource ?? null);
   const { votings, loading, refreshing, failure, reload } = useVotings();
   const { user } = useAuth();
   const canVote = user?.role === 'MORADOR' && Boolean(user.unitId);

@@ -1,3 +1,4 @@
+import { selectorController } from '../controllers/selectorController';
 import { idParamsSchema } from '../schemas/common';
 import { Router } from 'express';
 import { unitController } from '../controllers/unitController';
@@ -9,6 +10,8 @@ import { createUnitSchema, updateUnitSchema } from '../schemas/unitSchema';
 const router = Router();
 
 router.use(authMiddleware);
+
+router.get('/options', authorizeRole(['ADMIN', 'FUNCIONARIO', 'SYNDIC']), selectorController.units);
 
 // ADMIN e FUNCIONÁRIOS podem listar
 router.get('/', authorizeRole(['ADMIN', 'FUNCIONARIO']), unitController.list);

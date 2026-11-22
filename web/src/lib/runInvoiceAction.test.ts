@@ -2,13 +2,13 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Invoice } from '../types/invoice';
 import { runInvoiceAction } from './runInvoiceAction';
 
-const { reconcile, retry, setStatus } = vi.hoisted(() => ({ reconcile: vi.fn(), retry: vi.fn(), setStatus: vi.fn() }));
-vi.mock('../services/invoiceService', () => ({ invoiceService: { reconcile, retry, setStatus } }));
+const { reconcile, retry, setStatus, reissue } = vi.hoisted(() => ({ reconcile: vi.fn(), retry: vi.fn(), setStatus: vi.fn(), reissue: vi.fn() }));
+vi.mock('../services/invoiceService', () => ({ invoiceService: { reconcile, retry, setStatus, reissue } }));
 
 describe('runInvoiceAction', () => {
     const updated = { id: 'inv1' } as Invoice;
     beforeEach(() => {
-        for (const mock of [reconcile, retry, setStatus]) mock.mockReset().mockResolvedValue(updated);
+        for (const mock of [reconcile, retry, setStatus, reissue]) mock.mockReset().mockResolvedValue(updated);
     });
 
     it('conciliar e reenviar chamam o endpoint próprio, com a justificativa', async () => {
@@ -32,4 +32,10 @@ describe('runInvoiceAction', () => {
         setStatus.mockRejectedValueOnce(new Error('falhou'));
         await expect(runInvoiceAction('markPaid', 'inv1', 'motivo')).rejects.toThrow('falhou');
     });
+});
+
+it('reemissão preserva chave e justificativa e rejeita chamada sem chave', async () => {
+    await runInvoiceAction('reissue', 'inv1', 'Pix expirou', 'same-key');
+    expect(reissue).toHaveBeenCalledWith('inv1', 'Pix expirou', 'same-key');
+    expect(() => runInvoiceAction('reissue', 'inv1', 'Pix expirou')).toThrow(/idempotência/);
 });

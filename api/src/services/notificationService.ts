@@ -1,3 +1,4 @@
+import { inboxService } from './inboxService';
 import { HttpError } from '../lib/httpError';
 import { userRepository } from '../repositories/userRepository';
 import { noticeRepository } from '../repositories/noticeRepository';
@@ -38,7 +39,7 @@ export const notificationService = {
       ...events.map(event => ({
         id: `EVENT:${event.id}`, type: 'EVENT' as const, sourceId: event.id,
         title: event.title, description: event.status === 'CANCELLED' ? 'Evento cancelado' : 'Evento publicado',
-        createdAt: event.createdAt, isRead: readAt.has(`EVENT:${event.id}`),
+        createdAt: event.updatedAt ?? event.createdAt, isRead: (readAt.get(`EVENT:${event.id}`)?.getTime() ?? 0) >= (event.updatedAt ?? event.createdAt).getTime(),
       })),
       ...incidents.map(incident => ({
         id: `INCIDENT:${incident.id}`, type: 'INCIDENT' as const, sourceId: incident.id,
@@ -48,7 +49,7 @@ export const notificationService = {
         isRead: (readAt.get(`INCIDENT:${incident.id}`)?.getTime() ?? 0) >= incident.updatedAt.getTime(),
       })),
     ];
-    return items.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime() || a.id.localeCompare(b.id));
+    return [...items, ...await inboxService.list(user)].sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime() || a.id.localeCompare(b.id));
   },
 
   async markRead(userId: string, type: NotificationType, sourceId: string) {

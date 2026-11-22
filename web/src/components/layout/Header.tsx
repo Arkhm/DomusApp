@@ -1,6 +1,7 @@
+import NotificationBell from './NotificationBell';
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Bell, ChevronDown, LogOut, Lock, Moon, Sun, User as UserIcon } from 'lucide-react';
+import { ChevronDown, LogOut, Lock, Moon, Sun, User as UserIcon } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import toast from 'react-hot-toast';
 import { useAuth } from '../../hooks/useAuth';
@@ -123,32 +124,7 @@ export default function Header({ title, eyebrow }: HeaderProps) {
                     {theme === 'dark' ? <Sun size={18} strokeWidth={1.4} aria-hidden="true" /> : <Moon size={18} strokeWidth={1.4} aria-hidden="true" />}
                 </button>
 
-                {/* Bell */}
-                <button
-                    title="Notificações"
-                    style={{
-                        position: 'relative',
-                        background: 'none',
-                        border: 'none',
-                        color: 'var(--color-bone-dim)',
-                        cursor: 'pointer',
-                        padding: 8,
-                    }}
-                >
-                    <Bell size={18} strokeWidth={1.4} />
-                    <span
-                        style={{
-                            position: 'absolute',
-                            top: 6,
-                            right: 6,
-                            width: 6,
-                            height: 6,
-                            borderRadius: '50%',
-                            background: 'var(--color-metal-1)',
-                            boxShadow: '0 0 6px var(--color-metal-1)',
-                        }}
-                    />
-                </button>
+                <NotificationBell key={user?.id} />
 
                 <div style={{ width: 1, height: 32, background: 'var(--color-line-strong)' }} />
 

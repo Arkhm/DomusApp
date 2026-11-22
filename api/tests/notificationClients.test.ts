@@ -85,6 +85,7 @@ test('mobile: carregamento não antecipa leitura, bloqueia duplo toque e ignora 
   let finish!: (value: any) => void;
   let calls = 0;
   const module = loadMobile('hooks/useNotifications.ts', {
+    'react-native': { AppState: { addEventListener: () => ({ remove() {} }) } },
     react: app.react, '@react-navigation/native': app.navigation,
     '../contexts/AuthContext': { useAuth: () => ({ user: { id: 'me', unitId: 'unidade' } }) },
     '../services/api': { toApiFailure: (_error: unknown, message: string) => ({ message }) },
@@ -111,6 +112,7 @@ test('mobile: carregamento não antecipa leitura, bloqueia duplo toque e ignora 
 test('mobile: falha ao carregar mantém notificação não lida e permite nova tentativa', async () => {
   const app = hooks(); let fail = true;
   const module = loadMobile('hooks/useNotifications.ts', {
+    'react-native': { AppState: { addEventListener: () => ({ remove() {} }) } },
     react: app.react, '@react-navigation/native': app.navigation,
     '../contexts/AuthContext': { useAuth: () => ({ user: { id: 'me', unitId: null } }) },
     '../services/api': { toApiFailure: (_error: unknown, message: string) => ({ message }) },
@@ -133,7 +135,8 @@ test('mobile: troca de usuário ou unidade oculta a caixa anterior e invalida ab
     const app = hooks(); let user = { id: 'me', unitId: 'unidade' };
     let finish!: (value: any) => void;
     const module = loadMobile('hooks/useNotifications.ts', {
-      react: app.react, '@react-navigation/native': app.navigation,
+      'react-native': { AppState: { addEventListener: () => ({ remove() {} }) } },
+    react: app.react, '@react-navigation/native': app.navigation,
       '../contexts/AuthContext': { useAuth: () => ({ user }) },
       '../services/api': { toApiFailure: () => ({ message: 'Falha' }) },
       '../services/notificationService': { listNotifications: async () => [item],

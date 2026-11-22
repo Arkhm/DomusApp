@@ -1,3 +1,4 @@
+import { todayBR } from '../lib/invoiceFormat';
 import type { Unit } from './user';
 
 export type InvoiceStatus =
@@ -41,7 +42,7 @@ export interface Invoice {
     createdAt: string;
     userId: string;
     unitId: string;
-    user: { id: string; name: string; email: string } | null;
+    user: { id: string; name: string } | null;
     unit: Unit | null;
 }
 
@@ -131,7 +132,7 @@ export const ISSUANCE_LABELS: Record<string, string> = {
  * que os relatórios e o filtro "Vencida" da API a tratam.
  */
 export function effectiveInvoiceStatus(invoice: Pick<Invoice, 'status' | 'dueDate'>, now: Date = new Date()): InvoiceStatus {
-    if (invoice.status === 'PENDING' && new Date(invoice.dueDate).getTime() < now.getTime()) return 'OVERDUE';
+    if (invoice.status === 'PENDING' && invoice.dueDate.slice(0, 10) < todayBR(now)) return 'OVERDUE';
     return invoice.status;
 }
 

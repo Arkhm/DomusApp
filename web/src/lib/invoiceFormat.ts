@@ -16,8 +16,8 @@ export function formatDueDateBR(value: string): string {
 
 const todayFormatter = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo', year: 'numeric', month: '2-digit', day: '2-digit' });
 /** Hoje em Brasília, como AAAA-MM-DD (o formato que a API aceita nos filtros). */
-export function todayBR(): string {
-    const parts = todayFormatter.formatToParts(new Date());
+export function todayBR(now = new Date()): string {
+    const parts = todayFormatter.formatToParts(now);
     return ['year', 'month', 'day'].map(type => parts.find(part => part.type === type)!.value).join('-');
 }
 

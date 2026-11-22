@@ -5,6 +5,7 @@ export interface VotingOption {
 }
 
 export interface Voting {
+    authorId: string;
     id: string;
     title: string;
     description: string;

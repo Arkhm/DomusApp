@@ -4,7 +4,7 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "tsx --test tests/*.test.ts",
+    "test": "tsx --test --test-concurrency=1 tests/*.test.ts",
     "dev": "tsx watch src/server.ts",
     "check:security": "node scripts/security-check.mjs",
     "typecheck": "tsc --noEmit",
@@ -13,8 +13,10 @@
     "db:deploy": "prisma migrate deploy",
     "payments:verify": "node --env-file=../.env --import tsx scripts/verify-mercado-pago.ts",
     "test:coverage": "c8 --all --src=src --include=src/services/** --include=src/repositories/** --reporter=text-summary --reporter=text --check-coverage --lines=70 npm test",
-    "build": "tsc --rootDir src --outDir dist --sourceMap false src/server.ts src/workers/paymentWorker.ts --target ES2022 --module NodeNext --moduleResolution NodeNext --strict --esModuleInterop --skipLibCheck",
-    "payments:worker:prod": "node dist/workers/paymentWorker.js"
+    "build": "tsc --rootDir src --outDir dist --sourceMap false src/server.ts src/workers/paymentWorker.ts src/workers/notificationWorker.ts --target ES2022 --module NodeNext --moduleResolution NodeNext --strict --esModuleInterop --skipLibCheck",
+    "payments:worker:prod": "node dist/workers/paymentWorker.js",
+    "notifications:worker": "tsx src/workers/notificationWorker.ts",
+    "notifications:worker:prod": "node dist/workers/notificationWorker.js"
   },
   "keywords": [],
   "author": "",

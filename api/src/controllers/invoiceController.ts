@@ -162,6 +162,14 @@ export const invoiceController = {
       respondError(res, error);
     }
   },
+  async reissue(req: AuthRequest, res: Response) {
+    try { res.status(202).json(await invoiceService.reissue(req.params.id as string, req.user!, req.body?.reason, req.get('Idempotency-Key'))); }
+    catch (error) { respondError(res, error); }
+  },
+  async attempts(req: AuthRequest, res: Response) {
+    try { res.json(await invoiceService.attempts(req.params.id as string, req.user!)); }
+    catch (error) { respondError(res, error); }
+  },
   async health(req: AuthRequest, res: Response) {
     try { res.json(await invoiceService.health(req.user!)); }
     catch (error) { respondError(res, error); }

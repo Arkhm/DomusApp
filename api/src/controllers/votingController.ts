@@ -42,10 +42,10 @@ export const votingController = {
   async delete(req: AuthRequest, res: Response) {
     try {
       const { id } = req.params;
-      const result = await votingService.delete(id as string);
+      const result = await votingService.delete(id as string, req.user!);
       res.status(200).json(result);
     } catch (error: any) {
-      res.status(400).json({ error: error.message });
+      res.status(error.statusCode ?? 400).json({ error: error.message });
     }
   }
 };

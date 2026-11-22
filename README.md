@@ -29,7 +29,7 @@ O DomusApp é uma plataforma moderna para gestão de condomínios, facilitando a
 ```
 /api      → Backend da aplicação
 /web      → Frontend web (painel administrativo)
-/mobile   → App mobile (em planejamento — destino dos moradores)
+/mobile   → App Expo dos moradores
 ```
 
 ---
@@ -121,9 +121,7 @@ O painel web é **administrativo** — só estas pessoas conseguem logar:
 
 **Morador comum pode autenticar e usar o mobile**, mas não é autorizado a abrir o painel web. `GET /auth/me` identifica qualquer usuário ativo; o painel verifica `hasPanelAccess` e a API protege cada recurso por suas permissões.
 
-**Quem pode mutar (criar/excluir):** apenas `ADMIN`. Síndica e funcionário acessam em **modo leitura** — veem tudo (inclusive rascunhos e contadores de leitura), mas não têm botões de "Novo X" nem ícones de lixeira.
-
-Exceções dos módulos de atendimento: a síndica também aprova e rejeita reservas, e funcionário e síndica atualizam e respondem ocorrências (veja abaixo).
+**Permissões:** ADMIN gerencia os módulos. FUNCIONARIO opera cobranças e atende ocorrências, mantendo leitura nos cadastros restritos. A síndica administra cobranças, avalia reservas e atende ocorrências; cria comunicados, eventos e votações e edita/exclui os próprios. Votações só podem ser editadas antes do início e sem votos. Usuários, unidades, vagas e gestão geral de veículos/pets mantêm suas restrições específicas. O painel oculta acessos não autorizados, e a API continua validando cada operação.
 
 ---
 
@@ -227,3 +225,23 @@ Web e mobile usam `GET /auth/me` para consultar o próprio perfil atualizado com
 Access tokens (15 minutos) e refresh tokens (7 dias) carregam `tokenVersion`. Cada requisição protegida consulta o cadastro atual: usuário excluído, inativo ou com versão diferente recebe 401. Cargo e flag de síndica usados na autorização vêm do banco. Falha de consulta retorna 503 sem autorizar a operação nem apagar os cookies.
 
 Logout e recuperação de senha revogam as sessões de todos os dispositivos. Edição administrativa de senha, cargo, status ou flag de síndica também incrementa a versão na mesma escrita; campos comuns não encerram sessões. Repetir logout com um token antigo não revoga sessões emitidas posteriormente. Tokens anteriores a esta atualização, sem versão, exigem novo login. Requisições já autorizadas e em execução não são canceladas.
+
+## Operação financeira e notificações internas
+
+O detalhe de cobrança permite baixa manual, cancelamento, conciliação, recuperação de emissão e reemissão de Pix encerrado, com justificativa e auditoria. A reemissão mantém a mesma dívida e preserva as tentativas anteriores. Um Pix ativo não é substituído: o provedor deve confirmar o encerramento anterior. Pagamento tardio de tentativa histórica encerra o Pix substituto quando possível e exige revisão; uma falha de conferência mantém a operação bloqueada. O ambiente TEST nunca quita a dívida por aprovação simulada.
+
+Vencimentos são dias civis: uma dívida só vence após terminar seu dia em Brasília. Os indicadores em aberto incluem pendentes e vencidas. Os seletores financeiros da síndica não concedem gestão de cadastros.
+
+Web e mobile exibem comunicados, eventos, ocorrências e a caixa persistente de cobranças, reservas e votações. A gestão recebe pendências de reservas, atendimento e revisão financeira. A caixa usa chaves de deduplicação, leitura individual e captura transacional de snapshots; é consultada sem escritas e atualizada pelo worker independente `notification-worker` a cada minuto. A listagem mostra até 100 itens persistidos e a retenção é de 180 dias. Ela representa as situações observadas, não um histórico completo de todas as transições intermediárias. A operação de domínio continua sendo a fonte da verdade. Não há push com o aplicativo fechado.
+
+As migrações `20261121190000_multiple_payment_attempts` e `20261121200000_inbox_notifications` preservam dados existentes. Regenerar o Prisma Client e reiniciar API/worker após aplicá-las. Testes de integração devem usar exclusivamente uma base terminada em `_test`.
+
+### Correções da revisão do PR
+
+O seletor de pagadores devolve apenas identificação, unidade e elegibilidade calculada no servidor; CPF/e-mail permanecem internos à emissão. Consultas de faturas também minimizam os dados do morador. As opções de unidades compartilham controller/service/repository, mantendo as URLs antigas por compatibilidade.
+
+A migração `20261122010000_review_integrity` valida a existência e o pertencimento da tentativa corrente à fatura e vincula notificações ao usuário com exclusão em cascata. Notificações órfãs de usuários já removidos são descartadas durante essa migração. Não edite migrações já aplicadas.
+
+O worker financeiro retira da fila automática tentativas de cobranças bloqueadas, registrando revisão e auditoria. O worker de notificações opera separadamente e não depende de credenciais do Mercado Pago. Após atualizar, aplique a migração, gere o Prisma Client e inicie `docker compose up -d notification-worker`, reiniciando API e payment-worker. A justificativa financeira é limitada uniformemente a 191 caracteres.
+
+A suíte da API executa arquivos sequencialmente: as integrações compartilham a mesma base de teste e algumas consultas usam agregações globais, portanto execução simultânea pode causar interferência entre fixtures e deadlocks de limpeza. Os testes de concorrência dentro de cada cenário permanecem ativos.

@@ -23,7 +23,8 @@ const MAX_POLLS = 24;
 
 interface Props {
     /** A linha da lista: aparece de imediato enquanto os dados atuais são buscados. */
-    invoice: Invoice;
+    id: string;
+    initialInvoice?: Invoice;
     onClose: () => void;
     /** Algo mudou (ou pode ter mudado): a lista deve recarregar. */
     onChanged: () => void;
@@ -32,8 +33,10 @@ interface Props {
 const sectionTitle = { fontSize: 11, margin: '0 0 12px', color: 'var(--color-bone-muted)' } as const;
 
 /** Detalhe de uma cobrança: dados, Pix ativo, ações da administração e histórico de alterações. */
-export default function InvoiceDetailModal({ invoice: initial, onClose, onChanged }: Props) {
-    const [invoice, setInvoice] = useState<Invoice>(initial);
+export default function InvoiceDetailModal({ id, initialInvoice, onClose, onChanged }: Props) {
+    const [invoice, setInvoice] = useState<Invoice | null>(initialInvoice ?? null);
+    const [attempts, setAttempts] = useState<Awaited<ReturnType<typeof invoiceService.attempts>>>([]);
+    const [attemptsError, setAttemptsError] = useState('');
     const [audit, setAudit] = useState<InvoiceAudit[] | null>(null);
     const [detailError, setDetailError] = useState('');
     const [auditError, setAuditError] = useState('');
@@ -47,18 +50,20 @@ export default function InvoiceDetailModal({ invoice: initial, onClose, onChange
     useEffect(() => {
         let cancelled = false;
         async function load() {
-            const [detail, history] = await Promise.allSettled([invoiceService.getById(initial.id), invoiceService.audit(initial.id)]);
+            const [detail, history, payments] = await Promise.allSettled([invoiceService.getById(id), invoiceService.audit(id), invoiceService.attempts(id)]);
             if (cancelled) return;
             if (detail.status === 'fulfilled') { setInvoice(detail.value); setDetailError(''); }
             else setDetailError(loadErrorMessage(detail.reason, 'Não foi possível atualizar os dados da cobrança.'));
+            if (payments.status === 'fulfilled') { setAttempts(payments.value); setAttemptsError(''); }
+            else setAttemptsError(loadErrorMessage(payments.reason, 'Não foi possível carregar as tentativas.'));
             if (history.status === 'fulfilled') { setAudit(history.value); setAuditError(''); }
             else setAuditError(loadErrorMessage(history.reason, 'Não foi possível carregar o histórico.'));
         }
         void load();
         return () => { cancelled = true; };
-    }, [initial.id, attempt]);
+    }, [id, attempt]);
 
-    const inFlight = ISSUANCE_IN_FLIGHT.has(invoice.issuanceStatus);
+    const inFlight = invoice !== null && ISSUANCE_IN_FLIGHT.has(invoice.issuanceStatus);
     useEffect(() => {
         if (!inFlight) return;
         let polls = 0;
@@ -83,11 +88,15 @@ export default function InvoiceDetailModal({ invoice: initial, onClose, onChange
         onChanged();
     }
 
+    if (!invoice) return <LuxuryModal open onClose={onClose} icon={<Receipt size={18} />} title="Detalhes da cobrança" size="xl"><div style={{ padding: 28 }}>
+        {detailError ? <div role="alert">{detailError}<button className="btn-ghost" onClick={refresh}>Tentar novamente</button></div> : <p role="status">Carregando cobrança…</p>}
+    </div></LuxuryModal>;
+
     const status = effectiveInvoiceStatus(invoice, new Date());
     const rows: [string, React.ReactNode][] = [
         ['Descrição', <span style={{ overflowWrap: 'anywhere' }}>{invoice.description}</span>],
         ['Tipo', INVOICE_TYPE_LABELS[invoice.type] ?? invoice.type],
-        ['Morador', invoice.user ? `${invoice.user.name} (${invoice.user.email})` : '—'],
+        ['Morador', invoice.user ? invoice.user.name : '—'],
         ['Unidade', formatUnitDisplay(invoice.unit)],
         ['Valor', formatMoneyBR(invoice.amount)],
         ['Vencimento', formatDueDateBR(invoice.dueDate)],
@@ -141,6 +150,12 @@ export default function InvoiceDetailModal({ invoice: initial, onClose, onChange
                     <InvoiceActionPanel invoice={invoice} onApplied={applied} onFailed={failed} onBusyChange={setActing} />
                 </section>
 
+                <section aria-label="Tentativas de pagamento">
+                    <h3 className="tracking-luxe" style={sectionTitle}>TENTATIVAS DE PAGAMENTO</h3>
+                    {attemptsError && <p role="alert">{attemptsError} <button className="btn-ghost" onClick={refresh}>Tentar novamente</button></p>}
+                    {attempts.map(payment => <p key={payment.id}>{formatDateTimeBR(payment.createdAt)} · {payment.state} · {payment.environment} · {formatMoneyBR(payment.amount)}</p>)}
+                    {!attempts.length && !attemptsError && <p>Nenhuma tentativa registrada.</p>}
+                </section>
                 <section aria-label="Histórico">
                     <h3 className="tracking-luxe" style={sectionTitle}>HISTÓRICO</h3>
                     <InvoiceAuditTimeline entries={audit} error={auditError} names={names} onRetry={refresh} />

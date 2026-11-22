@@ -64,7 +64,7 @@ const STATUS_LABELS: Record<InvoiceStatus, string> = {
 };
 
 export function isInvoiceOverdue(invoice: Invoice, now = Date.now()): boolean {
-  return invoice.status === 'OVERDUE' || (invoice.status === 'PENDING' && new Date(invoice.dueDate).getTime() < now);
+  return invoice.status === 'OVERDUE' || (invoice.status === 'PENDING' && invoice.dueDate.slice(0, 10) < new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(now)));
 }
 
 export function invoiceStatusLabel(invoice: Invoice): string {

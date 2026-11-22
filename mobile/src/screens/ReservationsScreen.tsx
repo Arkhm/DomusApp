@@ -4,7 +4,7 @@ import {
   ScrollView, StyleSheet, Text, View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useFocusEffect } from '@react-navigation/native';
+import { useFocusEffect, useRoute } from '@react-navigation/native';
 import { Button, ConfirmSheet, Input, SectionHeader, StatusBanner } from '../components';
 import { useAuth } from '../contexts/AuthContext';
 import { toApiFailure } from '../services/api';
@@ -21,6 +21,7 @@ const STATUS_LABELS: Record<ReservationStatus, string> = {
 
 export function ReservationsScreen(): React.JSX.Element {
   const { user } = useAuth();
+  const notificationSource = (useRoute().params as { sourceId?: string } | undefined)?.sourceId;
   const [reservations, setReservations] = useState<Reservation[]>([]);
   const [areas, setAreas] = useState<CommonArea[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -158,7 +159,7 @@ export function ReservationsScreen(): React.JSX.Element {
           <Button label="Atualizar reservas" variant="ghost" onPress={reload} disabled={isLoading || isSaving} />
           {isLoading ? <ActivityIndicator color={colors.brand} accessibilityLabel="Carregando reservas" /> : null}
           {!isLoading && !loadError && reservations.length === 0 ? <Text style={styles.text}>Você ainda não tem reservas.</Text> : null}
-          {reservations.map((reservation) => (
+          {[...reservations].sort((a, b) => Number(b.id === notificationSource) - Number(a.id === notificationSource)).map((reservation) => (
             <View key={reservation.id} style={styles.card}>
               <Text style={styles.title}>{reservation.commonArea.name}</Text>
               <Text style={styles.text}>{formatReservationDate(reservation.date)} · {reservation.startTime} às {reservation.endTime} (Brasília)</Text>

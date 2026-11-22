@@ -1,3 +1,4 @@
+import { selectorController } from '../controllers/selectorController';
 import { createInvoiceSchema, batchInvoiceSchema, invoiceQuerySchema, unitParamsSchema, invoiceReasonSchema, invoiceStatusSchema, webhookBodySchema, webhookQuerySchema } from '../schemas/invoiceSchema';
 import { idParamsSchema } from '../schemas/common';
 import { validate } from '../middlewares/validate';
@@ -14,6 +15,8 @@ router.post('/webhook', validate(webhookBodySchema), validate(webhookQuerySchema
 // Rotas protegidas
 router.use(authMiddleware);
 
+router.get('/payers', authorizeRole(['ADMIN', 'FUNCIONARIO', 'SYNDIC']), selectorController.payers);
+router.get('/units', authorizeRole(['ADMIN', 'FUNCIONARIO', 'SYNDIC']), selectorController.units);
 router.get('/stats', invoiceController.getUserStats);
 router.get('/payments/health', authorizeRole(['ADMIN', 'FUNCIONARIO', 'SYNDIC']), invoiceController.health);
 
@@ -27,9 +30,11 @@ router.get('/unit/:unitId', authorizeRole(['ADMIN', 'FUNCIONARIO', 'SYNDIC']), v
 
 router.get('/unit/:unitId/stats', authorizeRole(['ADMIN', 'FUNCIONARIO', 'SYNDIC']), validate(unitParamsSchema, 'params'), invoiceController.getUnitStats);
 
-router.get('/all', authorizeRole(['ADMIN', 'FUNCIONARIO']), validate(invoiceQuerySchema, 'query'), invoiceController.listAll);
+router.get('/all', authorizeRole(['ADMIN', 'FUNCIONARIO', 'SYNDIC']), validate(invoiceQuerySchema, 'query'), invoiceController.listAll);
 
 router.get('/:id', validate(idParamsSchema, 'params'), invoiceController.getById);
+router.get('/:id/attempts', authorizeRole(['ADMIN', 'FUNCIONARIO', 'SYNDIC']), validate(idParamsSchema, 'params'), invoiceController.attempts);
+router.post('/:id/reissue', authorizeRole(['ADMIN', 'FUNCIONARIO', 'SYNDIC']), validate(idParamsSchema, 'params'), validate(invoiceReasonSchema), invoiceController.reissue);
 router.get('/:id/audit', authorizeRole(['ADMIN', 'FUNCIONARIO', 'SYNDIC']), validate(idParamsSchema, 'params'), invoiceController.audit);
 router.post('/:id/reconcile', authorizeRole(['ADMIN', 'FUNCIONARIO', 'SYNDIC']), validate(idParamsSchema, 'params'), validate(invoiceReasonSchema), invoiceController.reconcile);
 router.post('/:id/retry', authorizeRole(['ADMIN', 'FUNCIONARIO', 'SYNDIC']), validate(idParamsSchema, 'params'), validate(invoiceReasonSchema), invoiceController.retry);

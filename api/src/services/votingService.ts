@@ -123,13 +123,14 @@ export const votingService = {
     return { message: 'Voto registrado com sucesso.' };
   },
 
-  async delete(id: string) {
+  async delete(id: string, actor: UpdateActor) {
     const voting = await votingRepository.findById(id);
 
     if (!voting) {
       throw new Error('Votação não encontrada.');
     }
 
+    requireEditor(actor, isSyndic(actor) && voting.authorId === actor.id);
     await votingRepository.delete(id);
     return { message: 'Votação removida com sucesso.' };
   }

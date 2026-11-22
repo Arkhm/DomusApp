@@ -93,7 +93,7 @@ test('relatórios: agregações e HTTP com fixtures MySQL isoladas', { skip: pro
     assert.equal(body.total.occupied, body.byBlock.reduce((sum: number, row: any) => sum + row.occupied, 0));
   });
   await t.test('faturas: datas civis UTC, centavos exatos, passado estrito e estados excluídos', async () => {
-    const rows = await reportRepository.charges(period, new Date('2073-02-01T00:00:00Z'));
+    const rows = await reportRepository.charges(period, new Date('2073-02-01T12:00:00Z'));
     const values = rows.map(row => ({ ...row, count: Number(row.count), amount: row.amount.toFixed(2) }));
     assert.deepEqual(values, [
       { month: '2073-01', status: 'OVERDUE', count: 1, amount: '0.10' },
@@ -108,9 +108,9 @@ test('relatórios: agregações e HTTP com fixtures MySQL isoladas', { skip: pro
     assert.equal(body.summary.paid.amount, '0.35');
     assert.equal(body.byMonth.length, 3);
     assert.equal(body.summary.delinquencyRate, 33.2);
-    const later = await reportRepository.charges(period, new Date('2073-02-01T00:00:00.001Z'));
+    const later = await reportRepository.charges(period, new Date('2073-02-02T12:00:00Z'));
     assert.equal(later.find(row => row.month === '2073-02' && row.status === 'OVERDUE')!.amount.toFixed(2), '150.00');
-    const firstDay = await reportRepository.charges({ startDate: '2073-02-01', endDate: '2073-02-01' }, new Date('2073-02-01T00:00:00Z'));
+    const firstDay = await reportRepository.charges({ startDate: '2073-02-01', endDate: '2073-02-01' }, new Date('2073-02-01T12:00:00Z'));
     assert.deepEqual(firstDay.map(row => ({ month: row.month, count: Number(row.count), amount: row.amount.toFixed(2) })),
       [{ month: '2073-02', count: 1, amount: '100.00' }]);
   });
