@@ -70,7 +70,7 @@ O `.env.example` reúne as variáveis de banco, autenticação, pagamentos e fer
 
 **3. Confira o banco e suba os contêineres:**
 
-O fluxo local usa `db push`; o serviço `migrations` é opcional. Confira a estratégia de banco em [report.md](report.md#2-containers-e-inicialização).
+O fluxo local usa `db push`; o serviço `migrations` é opcional.
 
 ```bash
 docker compose up -d --build
@@ -107,7 +107,7 @@ docker compose up -d --build
 docker compose logs --tail=100 api payment-worker
 ```
 
-Ao alterar o schema local, execute `docker compose exec api npx prisma db push`, `docker compose exec api npx prisma generate` e reinicie API e worker. Não repita o seed. O volume `api_node_modules` é compartilhado, e os volumes persistem em `docker compose down` sem `-v`. O perfil opcional `migrations` mantém o caminho de migrações versionadas; consulte o relatório antes de trocar de estratégia.
+Ao alterar o schema local, execute `docker compose exec api npx prisma db push`, `docker compose exec api npx prisma generate` e reinicie API e worker. Não repita o seed. O volume `api_node_modules` é compartilhado, e os volumes persistem em `docker compose down` sem `-v`. O perfil opcional `migrations` mantém o caminho de migrações versionadas; confira as migrações antes de trocar de estratégia.
 
 ---
 
