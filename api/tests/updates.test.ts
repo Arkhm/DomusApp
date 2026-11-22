@@ -116,7 +116,7 @@ test('edições: persistência, leituras e concorrência em MySQL isolado', { sk
     assert.equal(await prisma.noticeRead.count({ where: { noticeId: notice.id } }), 0);
     assert.equal((await prisma.notice.findUniqueOrThrow({ where: { id: notice.id } })).authorId, syndic.id);
     await put(`/notices/${notice.id}`, { ...syndic, id: resident.id }, { title: 'Negado' }).expect(403);
-    await put(`/notices/${notice.id}`, admin, { targetType: 'UNIT', targetUnitId: unit.id }).expect(200);
+    await put(`/notices/${notice.id}`, admin, { targetType: 'UNIT', targetUnitId: unit.id }).expect(r => assert.equal(r.status, 200, JSON.stringify(r.body)));
     await put(`/notices/${notice.id}`, admin, { targetType: 'ALL' }).expect(200).expect(r => assert.equal(r.body.targetUnitId, null));
   });
   await t.test('eventos: cancelamento, limpeza de opcionais e autoria', async () => {

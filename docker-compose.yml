@@ -78,6 +78,21 @@ services:
       api:
         condition: service_started
 
+  notification-worker:
+    build:
+      context: ./api
+      target: development
+    volumes: *api_volumes
+    environment: *api_environment
+    command: npm run notifications:worker
+    restart: unless-stopped
+    stop_grace_period: 60s
+    depends_on:
+      db:
+        condition: service_healthy
+      api:
+        condition: service_started
+
   web:
     build:
       context: ./web

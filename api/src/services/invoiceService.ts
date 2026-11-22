@@ -61,7 +61,7 @@ export const invoiceService = {
       if (existing.requestHash !== requestHash) throw new PaymentError(409, 'Idempotency-Key já usada com outros dados.');
       return existing;
     }
-    const invoices: Prisma.InvoiceCreateWithoutOperationInput[] = [];
+    const invoices: Prisma.InvoiceUncheckedCreateWithoutOperationInput[] = [];
     for (const userId of input.userIds) {
       const user = await userRepository.findById(userId);
       if (!user) throw new PaymentError(400, 'Usuário não encontrado.');
@@ -76,8 +76,7 @@ export const invoiceService = {
       invoices.push({ id: randomUUID(), description: input.description, amount: input.amount,
         dueDate: new Date(input.dueDate), type: input.type,
         referenceMonth: input.referenceMonth ? new Date(input.referenceMonth) : null,
-        user: { connect: { id: userId } }, unit: { connect: { id: unitId } },
-        currentPaymentAttemptId: attemptId,
+        userId, unitId,
         paymentAttempts: { create: { id: attemptId, externalReference: attemptId, idempotencyKey: attemptId,
           amount: payload.total_amount, environment: config.environment, sellerId: config.sellerId,
           requestPayload: payload as unknown as Prisma.InputJsonValue } },
@@ -137,7 +136,7 @@ export const invoiceService = {
   async updateStatus(id: string, status: unknown, actor: PaymentActor, reason: unknown) {
     if (!canManageInvoices(actor)) throw new PaymentError(403, 'Acesso negado.');
     if (status !== 'PAID' && status !== 'CANCELLED') throw new PaymentError(400, 'Alteração manual permite apenas PAID ou CANCELLED.');
-    const justification = requiredText(reason, 'Justificativa', 1000);
+    const justification = requiredText(reason, 'Justificativa', 191);
     const invoice = await invoiceRepository.findById(id);
     if (!invoice) throw new PaymentError(404, 'Fatura não encontrada.');
     if (invoice.paymentAttempt) await paymentService.manualChange(invoice.paymentAttempt.id, status, actor, justification);
@@ -153,7 +152,7 @@ export const invoiceService = {
     if (!canManageInvoices(actor)) throw new PaymentError(403, 'Acesso negado.');
     const invoice = await invoiceRepository.findById(id);
     if (!invoice) throw new PaymentError(404, 'Fatura não encontrada.');
-    const justification = requiredText(reason, 'Justificativa', 1000);
+    const justification = requiredText(reason, 'Justificativa', 191);
     const attempt = invoice.paymentAttempt ?? await paymentService.adoptLegacy(invoice, actor, justification);
     await paymentService.reconcile(attempt.id, actor, justification);
     return this.getById(id, actor);
@@ -164,7 +163,7 @@ export const invoiceService = {
     const invoice = await invoiceRepository.findById(id);
     if (!invoice) throw new PaymentError(404, 'Fatura não encontrada.');
     if (!invoice.paymentAttempt) throw new PaymentError(409, 'Fatura legada exige conferência dos registros no provedor.', 'LEGACY_REVIEW');
-    await paymentService.retry(invoice.paymentAttempt.id, actor, requiredText(reason, 'Justificativa', 1000));
+    await paymentService.retry(invoice.paymentAttempt.id, actor, requiredText(reason, 'Justificativa', 191));
     return this.getById(id, actor);
   },
 
@@ -190,6 +189,7 @@ export const invoiceService = {
       const order = await mercadoPagoService.getOrder(old.orderId);
       const state = mercadoPagoService.mapPaymentStatus(order.status, order.status_detail);
       await paymentService.applyOrder(old, order);
+      if (['PAID', 'PARTIALLY_REFUNDED', 'REFUNDED', 'CHARGED_BACK'].includes(state)) throw new PaymentError(409, 'Pagamento ou estorno identificado no provedor. A cobrança foi atualizada; nenhum novo Pix foi emitido.', 'PAYMENT_ALREADY_PROCESSED');
       if (!['EXPIRED', 'REJECTED', 'CANCELLED'].includes(state)) throw new PaymentError(409, 'Pix anterior não está encerrado.');
       const config = paymentConfig();
       const attemptId = randomUUID();

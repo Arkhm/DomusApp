@@ -42,7 +42,7 @@ export interface Invoice {
     createdAt: string;
     userId: string;
     unitId: string;
-    user: { id: string; name: string; email: string } | null;
+    user: { id: string; name: string } | null;
     unit: Unit | null;
 }
 

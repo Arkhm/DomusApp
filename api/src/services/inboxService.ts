@@ -1,4 +1,4 @@
-import { prisma } from '../lib/prisma';
+import { inboxRepository } from '../repositories/inboxRepository';
 import { hasPanelAccess } from '../lib/access';
 import { dueDayCutoff } from '../lib/invoiceDate';
 import { HttpError } from '../lib/httpError';
@@ -8,13 +8,9 @@ export const inboxService = {
     const panel = hasPanelAccess(actor);
     const financial = actor.role === 'ADMIN' || actor.role === 'FUNCIONARIO' || (actor.role === 'MORADOR' && actor.isSyndic);
     // A transaction gives the materialized inbox a consistent local snapshot.
-    await prisma.$transaction(async tx => {
-      const [invoices, reservations, votings, incidents] = await Promise.all([
-        tx.invoice.findMany({ where: financial ? { OR: [{ userId: actor.id }, { requiresReview: true }] } : { userId: actor.id } }),
-        tx.reservation.findMany({ where: panel ? { OR: [{ userId: actor.id }, { status: 'PENDING' }] } : { userId: actor.id }, include: { commonArea: true } }),
-        tx.voting.findMany(),
-        panel ? tx.incident.findMany({ where: { status: 'OPEN' } }) : Promise.resolve([]),
-      ]);
+    await inboxRepository.snapshot(async tx => {
+      const since = new Date(Date.now() - 180 * 86400000);
+      const [invoices, reservations, votings, incidents] = await inboxRepository.sources(tx, actor.id, panel, !!financial, since);
       const entries: { type: string; sourceId: string; title: string; description: string; revision: string }[] = [];
       for (const i of invoices) {
         if (i.userId === actor.id) {
@@ -22,7 +18,7 @@ export const inboxService = {
           if (i.status === 'PAID') entries.push({ type: 'INVOICE', sourceId: i.id, title: i.description, description: 'Pagamento confirmado', revision: 'paid' });
           if (['PENDING', 'OVERDUE'].includes(i.status) && i.dueDate < dueDayCutoff()) entries.push({ type: 'INVOICE', sourceId: i.id, title: i.description, description: 'Cobrança vencida', revision: 'overdue' });
         }
-        if (financial && i.requiresReview) entries.push({ type: 'INVOICE', sourceId: i.id, title: i.description, description: 'Cobrança exige revisão', revision: `review:${i.version}` });
+        if (financial && i.requiresReview) entries.push({ type: 'INVOICE', sourceId: i.id, title: i.description, description: 'Cobrança exige revisão', revision: `review:${i.audits[0]?.id ?? 'initial'}` });
       }
       for (const r of reservations) {
         if (r.userId === actor.id && ['APPROVED', 'REJECTED'].includes(r.status)) entries.push({ type: 'RESERVATION', sourceId: r.id, title: r.commonArea.name, description: r.status === 'APPROVED' ? 'Reserva aprovada' : 'Reserva rejeitada', revision: r.status });
@@ -30,25 +26,29 @@ export const inboxService = {
       }
       for (const v of votings) entries.push({ type: 'VOTING', sourceId: v.id, title: v.title, description: 'Votação publicada', revision: 'published' });
       for (const i of incidents) entries.push({ type: 'INCIDENT', sourceId: i.id, title: i.title, description: 'Nova ocorrência para atendimento', revision: 'open' });
-      for (const e of entries) {
-        const { revision, ...data } = e;
-        await tx.inboxNotification.upsert({ where: { key: `${actor.id}:${e.type}:${e.sourceId}:${revision}` },
-          create: { ...data, userId: actor.id, key: `${actor.id}:${e.type}:${e.sourceId}:${revision}` }, update: {} });
-      }
+      const sourceDates = new Map<string, Date>();
+      for (const i of invoices) sourceDates.set(i.id, i.createdAt);
+      for (const r of reservations) sourceDates.set(r.id, r.updatedAt);
+      for (const v of votings) sourceDates.set(v.id, v.createdAt);
+      for (const i of incidents) sourceDates.set(i.id, i.createdAt);
+      const data = entries.map(({ revision, ...e }) => ({ ...e, userId: actor.id, key: `${actor.id}:${e.type}:${e.sourceId}:${revision}`,
+        createdAt: e.type === 'INVOICE' && e.description === 'Pagamento confirmado' ? invoices.find(i => i.id === e.sourceId)?.paidAt ?? sourceDates.get(e.sourceId) ?? new Date() : e.type === 'INVOICE' && e.description === 'Cobrança exige revisão' ? invoices.find(i => i.id === e.sourceId)!.audits[0]?.createdAt ?? invoices.find(i => i.id === e.sourceId)!.updatedAt : sourceDates.get(e.sourceId) ?? new Date() })).filter(e => e.createdAt >= since);
+      await inboxRepository.insertMissing(tx, data);
+
     });
   },
   async list(actor: Actor) {
-    await this.capture(actor);
-    const items = await prisma.inboxNotification.findMany({ where: { userId: actor.id }, orderBy: { createdAt: 'desc' } });
+    const items = await inboxRepository.list(actor.id);
     return items.map(({ id, type, sourceId, title, description, createdAt, readAt }) => ({ id: `INBOX:${id}`, eventId: id, type, sourceId, title, description, createdAt, isRead: readAt !== null }));
   },
   async read(actor: Actor, id: string) {
-    const item = await prisma.inboxNotification.findFirst({ where: { id, userId: actor.id } });
+    const item = await inboxRepository.findOwned(id, actor.id);
     if (!item) throw new HttpError(404, 'Notificação não encontrada.');
-    await prisma.inboxNotification.update({ where: { id: item.id }, data: { readAt: new Date() } });
+    await inboxRepository.read(item.id);
   },
   async captureAll() {
-    const users = await prisma.user.findMany({ where: { status: 'ACTIVE' }, select: { id: true, role: true, isSyndic: true } });
+    const users = await inboxRepository.users();
     for (const user of users) await this.capture(user);
+    await inboxRepository.prune();
   },
 };

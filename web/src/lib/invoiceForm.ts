@@ -82,7 +82,9 @@ const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
  * lote, a API recusa a emissão inteira com uma mensagem genérica; por isso a
  * tela separa antes quem não pode receber cobrança.
  */
-export function payerIssue(user: User): string | null {
+export type Payer = Pick<User, 'id' | 'name' | 'unitId' | 'unit'> & { eligible: boolean; issue: string | null };
+export function payerIssue(user: User | Payer): string | null {
+    if ('eligible' in user) return user.eligible ? null : user.issue ?? 'cadastro do pagador incompleto';
     if (user.status !== 'ACTIVE') return 'cadastro inativo';
     if (!user.unitId || !user.unit) return 'sem unidade vinculada';
     if (!user.name.trim()) return 'sem nome';
@@ -91,12 +93,12 @@ export function payerIssue(user: User): string | null {
     return null;
 }
 
-export interface BlockedResident { user: User; reason: string }
+export interface BlockedResident { user: User | Payer; reason: string }
 
 /** Separa os moradores que podem receber cobrança dos que precisam de correção cadastral. */
-export function splitResidents(users: User[]): { eligible: User[]; blocked: BlockedResident[] } {
-    const residents = users.filter(user => user.role === 'MORADOR').sort(compareResidents);
-    const eligible: User[] = [];
+export function splitResidents(users: (User | Payer)[]): { eligible: (User | Payer)[]; blocked: BlockedResident[] } {
+    const residents = users.filter(user => 'eligible' in user || user.role === 'MORADOR').sort(compareResidents);
+    const eligible: (User | Payer)[] = [];
     const blocked: BlockedResident[] = [];
     for (const user of residents) {
         const reason = payerIssue(user);
@@ -106,13 +108,13 @@ export function splitResidents(users: User[]): { eligible: User[]; blocked: Bloc
     return { eligible, blocked };
 }
 
-function compareResidents(a: User, b: User) {
+function compareResidents(a: User | Payer, b: User | Payer) {
     return formatUnitDisplay(a.unit).localeCompare(formatUnitDisplay(b.unit), 'pt-BR', { numeric: true })
         || a.name.localeCompare(b.name, 'pt-BR');
 }
 
 /** Rótulo "Nome · Unidade" usado nas listas de moradores. */
-export function residentLabel(user: User): string {
+export function residentLabel(user: User | Payer): string {
     return `${user.name} · ${formatUnitDisplay(user.unit)}`;
 }
 

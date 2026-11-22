@@ -1,4 +1,4 @@
-import { prisma } from '../lib/prisma';
+import { selectorController } from '../controllers/selectorController';
 import { createInvoiceSchema, batchInvoiceSchema, invoiceQuerySchema, unitParamsSchema, invoiceReasonSchema, invoiceStatusSchema, webhookBodySchema, webhookQuerySchema } from '../schemas/invoiceSchema';
 import { idParamsSchema } from '../schemas/common';
 import { validate } from '../middlewares/validate';
@@ -15,14 +15,8 @@ router.post('/webhook', validate(webhookBodySchema), validate(webhookQuerySchema
 // Rotas protegidas
 router.use(authMiddleware);
 
-router.get('/payers', authorizeRole(['ADMIN', 'FUNCIONARIO', 'SYNDIC']), async (_req, res) => {
-  try { res.json(await prisma.user.findMany({ where: { role: 'MORADOR' }, select: { id: true, name: true, email: true, cpf: true, status: true, role: true, unitId: true, unit: true } })); }
-  catch { res.status(503).json({ error: 'Não foi possível consultar os pagadores.' }); }
-});
-router.get('/units', authorizeRole(['ADMIN', 'FUNCIONARIO', 'SYNDIC']), async (_req, res) => {
-  try { res.json(await prisma.unit.findMany({ orderBy: { number: 'asc' } })); }
-  catch { res.status(503).json({ error: 'Não foi possível consultar as unidades.' }); }
-});
+router.get('/payers', authorizeRole(['ADMIN', 'FUNCIONARIO', 'SYNDIC']), selectorController.payers);
+router.get('/units', authorizeRole(['ADMIN', 'FUNCIONARIO', 'SYNDIC']), selectorController.units);
 router.get('/stats', invoiceController.getUserStats);
 router.get('/payments/health', authorizeRole(['ADMIN', 'FUNCIONARIO', 'SYNDIC']), invoiceController.health);
 

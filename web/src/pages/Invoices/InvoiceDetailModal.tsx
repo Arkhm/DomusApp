@@ -96,7 +96,7 @@ export default function InvoiceDetailModal({ id, initialInvoice, onClose, onChan
     const rows: [string, React.ReactNode][] = [
         ['Descrição', <span style={{ overflowWrap: 'anywhere' }}>{invoice.description}</span>],
         ['Tipo', INVOICE_TYPE_LABELS[invoice.type] ?? invoice.type],
-        ['Morador', invoice.user ? `${invoice.user.name} (${invoice.user.email})` : '—'],
+        ['Morador', invoice.user ? invoice.user.name : '—'],
         ['Unidade', formatUnitDisplay(invoice.unit)],
         ['Valor', formatMoneyBR(invoice.amount)],
         ['Vencimento', formatDueDateBR(invoice.dueDate)],

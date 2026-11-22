@@ -59,6 +59,7 @@ test('pagamentos com MySQL isolado', { skip: !enabled }, async t => {
     const ids = invoices.map(i => i.id);
     await prisma.paymentWebhook.deleteMany({ where: { sellerId } });
     await prisma.invoiceAudit.deleteMany({ where: { invoiceId: { in: ids } } });
+    await prisma.invoice.updateMany({ where: { id: { in: ids } }, data: { currentPaymentAttemptId: null } });
     await prisma.paymentAttempt.deleteMany({ where: { invoiceId: { in: ids } } });
     await prisma.invoice.deleteMany({ where: { id: { in: ids } } });
     await prisma.paymentOperation.deleteMany({ where: { id: { in: invoices.flatMap(i => i.operationId ? [i.operationId] : []) } } });
@@ -328,10 +329,13 @@ test('pagamentos com MySQL isolado', { skip: !enabled }, async t => {
 
   await t.test('caixa persistente deduplica cobranças, mantém leitura e rejeita outro usuário', async () => {
     const resident = { id: user.id, role: 'MORADOR' };
+    await inboxService.capture(resident);
     const first = await inboxService.list(resident);
     assert.ok(first.some(item => item.type === 'INVOICE'));
     const item = first.find(item => item.type === 'INVOICE')!;
     await inboxService.read(resident, item.eventId);
+    await prisma.invoice.updateMany({ where: { userId: user.id, requiresReview: true }, data: { version: { increment: 1 } } });
+    await inboxService.capture(resident);
     const second = await inboxService.list(resident);
     assert.equal(second.length, first.length);
     assert.equal(second.find(i => i.eventId === item.eventId)?.isRead, true);
@@ -345,6 +349,39 @@ test('pagamentos com MySQL isolado', { skip: !enabled }, async t => {
     const perUnit = await invoiceService.getUnitStats(unit.id);
     assert.equal(personal.pending, open); assert.equal(perUnit.pending, open);
     assert.equal(personal.overdue, perUnit.overdue);
+  });
+
+  await t.test('dez emissões bloqueadas não impedem uma emissão nova', async () => {
+    const ids: string[] = [];
+    for (let n = 0; n < 10; n++) {
+      const batch = await invoiceService.createBatch({ ...input, userIds: [user.id] }, randomUUID(), actor);
+      ids.push(batch.created[0]!.id);
+    }
+    await prisma.invoice.updateMany({ where: { id: { in: ids } }, data: { requiresReview: true } });
+    await prisma.paymentAttempt.updateMany({ where: { invoiceId: { in: ids } }, data: { retryAt: new Date('2000-01-01') } });
+    const healthy = await invoiceService.createBatch({ ...input, userIds: [user.id] }, randomUUID(), actor);
+    await prisma.paymentAttempt.updateMany({ where: { invoiceId: healthy.created[0]!.id }, data: { retryAt: new Date('2001-01-01') } });
+    for (let round = 0; round < 3; round++) for (const attempt of await paymentRepository.dueAttempts()) await paymentService.issue(attempt.id);
+    assert.equal(await prisma.paymentAttempt.count({ where: { invoiceId: { in: ids }, state: 'REVIEW' } }), 10);
+    assert.equal((await invoiceService.getById(healthy.created[0]!.id, actor)).issuanceStatus, 'ACTIVE');
+  });
+  await t.test('FK impede tentativa inexistente ou pertencente a outra fatura', async () => {
+    const first = await invoiceService.create(input, randomUUID(), actor);
+    const second = await invoiceService.create(input, randomUUID(), actor);
+    const attempt = await prisma.paymentAttempt.findFirstOrThrow({ where: { invoiceId: second.id } });
+    await assert.rejects(prisma.invoice.update({ where: { id: first.id }, data: { currentPaymentAttemptId: randomUUID() } }));
+    await assert.rejects(prisma.invoice.update({ where: { id: first.id }, data: { currentPaymentAttemptId: attempt.id } }));
+    assert.equal('cpf' in (await invoiceService.getById(first.id, actor)).user, false);
+    assert.equal('email' in (await invoiceService.getById(first.id, actor)).user, false);
+  });
+
+  await t.test('reemissão informa pagamento descoberto sem emitir outro Pix', async () => {
+    const invoice = await invoiceService.create(input, randomUUID(), actor);
+    state(orders.get(invoice.mpOrderId!)!, 'processed', 'accredited');
+    const before = creates;
+    await assert.rejects(invoiceService.reissue(invoice.id, actor, 'Pix expirou', randomUUID()), (error: any) => error.code === 'PAYMENT_ALREADY_PROCESSED');
+    assert.equal(creates, before);
+    assert.equal((await invoiceService.getById(invoice.id, actor)).status, 'PAID');
   });
 
   await t.test('HTTP retorna erros seguros e valida autenticação, filtros e webhook', async () => {

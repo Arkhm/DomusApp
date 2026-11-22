@@ -1,12 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
 import { apiErrorMessage } from '../../lib/apiError';
-import { splitResidents } from '../../lib/invoiceForm';
+import { splitResidents, type Payer } from '../../lib/invoiceForm';
 import api from '../../services/api';
-import type { User } from '../../types/user';
 
 /** Carrega os moradores e separa quem pode receber cobrança de quem precisa de correção cadastral. */
 export function useResidents() {
-    const [users, setUsers] = useState<User[] | null>(null);
+    const [users, setUsers] = useState<Payer[] | null>(null);
     const [error, setError] = useState('');
     const [attempt, setAttempt] = useState(0);
 
@@ -15,7 +14,7 @@ export function useResidents() {
         async function load() {
             setError('');
             try {
-                const data = (await api.get<User[]>('/invoices/payers')).data;
+                const data = (await api.get<Payer[]>('/invoices/payers')).data;
                 if (!cancelled) setUsers(data);
             } catch (err) {
                 if (!cancelled) setError(apiErrorMessage(err, 'Erro ao carregar os moradores.'));

@@ -9,8 +9,16 @@ export const paymentRepository = {
   findOperation(keyHash: string) {
     return prisma.paymentOperation.findUnique({ where: { keyHash }, include: operationInclude }).then(operation => operation ? ({ ...operation, invoices: operation.invoices.map(currentAttempt) }) : null);
   },
-  createOperation(data: Prisma.PaymentOperationCreateInput) {
-    return prisma.paymentOperation.create({ data, include: operationInclude }).then(operation => ({ ...operation, invoices: operation.invoices.map(currentAttempt) }));
+  async createOperation(data: Prisma.PaymentOperationCreateInput) {
+    return prisma.$transaction(async tx => {
+      const operation = await tx.paymentOperation.create({ data, include: operationInclude });
+      for (const invoice of operation.invoices) {
+        const attempt = invoice.paymentAttempts[0];
+        if (attempt) await tx.invoice.update({ where: { id: invoice.id }, data: { currentPaymentAttemptId: attempt.id } });
+      }
+      const result = await tx.paymentOperation.findUniqueOrThrow({ where: { id: operation.id }, include: operationInclude });
+      return { ...result, invoices: result.invoices.map(currentAttempt) };
+    });
   },
   async adoptLegacy(input: { invoiceId: string; invoiceVersion: number; actorId: string; reason: string;
     attempt: Prisma.PaymentAttemptCreateWithoutInvoiceInput }) {
@@ -19,6 +27,7 @@ export const paymentRepository = {
         data: { version: { increment: 1 }, requiresReview: true } });
       if (!updated.count) throw new PaymentError(409, 'Fatura alterada por outra operação.', 'PAYMENT_BUSY');
       const attempt = await tx.paymentAttempt.create({ data: { ...input.attempt, invoice: { connect: { id: input.invoiceId } } } });
+      await tx.invoice.update({ where: { id: input.invoiceId }, data: { currentPaymentAttemptId: attempt.id } });
       const invoice = await tx.invoice.findUniqueOrThrow({ where: { id: input.invoiceId } });
       await tx.invoiceAudit.create({ data: { invoiceId: invoice.id, actorId: input.actorId, source: 'MANUAL',
         action: 'LEGACY_IMPORT', reason: input.reason, fromStatus: invoice.status, toStatus: invoice.status, amount: attempt.amount } });

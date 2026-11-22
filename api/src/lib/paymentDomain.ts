@@ -126,7 +126,8 @@ export function currentAttempt<T extends { paymentAttempts?: any[]; currentPayme
 export function publicInvoice<T extends Record<string, any>>(invoice: T) {
   const { mpResponse, paymentAttempt, paymentAttempts, currentPaymentAttemptId, operationId, ...result } = currentAttempt(invoice);
   const active = paymentAttempt?.state === 'ACTIVE' && (!paymentAttempt.expiresAt || new Date(paymentAttempt.expiresAt).getTime() > Date.now()) && !invoice.requiresReview && ['PENDING', 'OVERDUE'].includes(invoice.status);
-  return { ...result, mpQrCode: active ? invoice.mpQrCode : null, mpQrCodeBase64: active ? invoice.mpQrCodeBase64 : null,
+  const user = result.user ? { id: result.user.id, name: result.user.name } : result.user;
+  return { ...result, ...(result.user ? { user } : {}), mpQrCode: active ? invoice.mpQrCode : null, mpQrCodeBase64: active ? invoice.mpQrCodeBase64 : null,
     issuanceStatus: paymentAttempt?.state ?? (invoice.mpOrderId ? 'LEGACY' : 'NOT_ISSUED'),
     paymentEnvironment: paymentAttempt?.environment ?? null,
     paymentAmount: paymentAttempt?.amount?.toString() ?? null,

@@ -35,6 +35,7 @@ model User {
   votings         Voting[] @relation("VotingAuthor")
   noticeReads     NoticeRead[]
   notificationReads NotificationRead[]
+  inboxNotifications InboxNotification[]
   votingVotes     VotingVote[]
   reservations    Reservation[]
   incidents       Incident[]   @relation("IncidentAuthor")
@@ -218,6 +219,8 @@ model Invoice {
   operationId   String?
   operation     PaymentOperation? @relation(fields: [operationId], references: [id])
   currentPaymentAttemptId String?
+  currentPaymentAttempt PaymentAttempt? @relation("CurrentAttempt", fields: [id, currentPaymentAttemptId], references: [invoiceId, id], onDelete: Restrict, onUpdate: Restrict)
+  @@index([id, currentPaymentAttemptId])
   paymentAttempts PaymentAttempt[]
   audits        InvoiceAudit[]
 
@@ -274,6 +277,8 @@ model PaymentAttempt {
 
   @@index([state, retryAt])
   @@index([invoiceId])
+  @@unique([invoiceId, id])
+  currentFor Invoice[] @relation("CurrentAttempt")
 }
 
 model PaymentWebhook {
@@ -407,6 +412,7 @@ model InboxNotification {
   id String @id @default(uuid())
   key String @unique @db.VarChar(191)
   userId String
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
   type String @db.VarChar(16)
   sourceId String
   title String

@@ -232,6 +232,16 @@ O detalhe de cobrança permite baixa manual, cancelamento, conciliação, recupe
 
 Vencimentos são dias civis: uma dívida só vence após terminar seu dia em Brasília. Os indicadores em aberto incluem pendentes e vencidas. Os seletores financeiros da síndica não concedem gestão de cadastros.
 
-Web e mobile exibem comunicados, eventos, ocorrências e a caixa persistente de cobranças, reservas e votações. A gestão recebe pendências de reservas, atendimento e revisão financeira. A caixa usa chaves de deduplicação, leitura individual e captura transacional de snapshots; é atualizada nas consultas e pelo worker a cada minuto. Ela representa as situações observadas, não um histórico completo de todas as transições intermediárias. A operação de domínio continua sendo a fonte da verdade. Não há push com o aplicativo fechado.
+Web e mobile exibem comunicados, eventos, ocorrências e a caixa persistente de cobranças, reservas e votações. A gestão recebe pendências de reservas, atendimento e revisão financeira. A caixa usa chaves de deduplicação, leitura individual e captura transacional de snapshots; é consultada sem escritas e atualizada pelo worker independente `notification-worker` a cada minuto. A listagem mostra até 100 itens persistidos e a retenção é de 180 dias. Ela representa as situações observadas, não um histórico completo de todas as transições intermediárias. A operação de domínio continua sendo a fonte da verdade. Não há push com o aplicativo fechado.
 
 As migrações `20261121190000_multiple_payment_attempts` e `20261121200000_inbox_notifications` preservam dados existentes. Regenerar o Prisma Client e reiniciar API/worker após aplicá-las. Testes de integração devem usar exclusivamente uma base terminada em `_test`.
+
+### Correções da revisão do PR
+
+O seletor de pagadores devolve apenas identificação, unidade e elegibilidade calculada no servidor; CPF/e-mail permanecem internos à emissão. Consultas de faturas também minimizam os dados do morador. As opções de unidades compartilham controller/service/repository, mantendo as URLs antigas por compatibilidade.
+
+A migração `20261122010000_review_integrity` valida a existência e o pertencimento da tentativa corrente à fatura e vincula notificações ao usuário com exclusão em cascata. Notificações órfãs de usuários já removidos são descartadas durante essa migração. Não edite migrações já aplicadas.
+
+O worker financeiro retira da fila automática tentativas de cobranças bloqueadas, registrando revisão e auditoria. O worker de notificações opera separadamente e não depende de credenciais do Mercado Pago. Após atualizar, aplique a migração, gere o Prisma Client e inicie `docker compose up -d notification-worker`, reiniciando API e payment-worker. A justificativa financeira é limitada uniformemente a 191 caracteres.
+
+A suíte da API executa arquivos sequencialmente: as integrações compartilham a mesma base de teste e algumas consultas usam agregações globais, portanto execução simultânea pode causar interferência entre fixtures e deadlocks de limpeza. Os testes de concorrência dentro de cada cenário permanecem ativos.

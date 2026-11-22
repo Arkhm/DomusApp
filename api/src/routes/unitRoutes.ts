@@ -1,4 +1,4 @@
-import { prisma } from '../lib/prisma';
+import { selectorController } from '../controllers/selectorController';
 import { idParamsSchema } from '../schemas/common';
 import { Router } from 'express';
 import { unitController } from '../controllers/unitController';
@@ -11,10 +11,7 @@ const router = Router();
 
 router.use(authMiddleware);
 
-router.get('/options', authorizeRole(['ADMIN', 'FUNCIONARIO', 'SYNDIC']), async (_req, res) => {
-  try { res.json(await prisma.unit.findMany({ select: { id: true, type: true, number: true, block: true }, orderBy: { number: 'asc' } })); }
-  catch { res.status(503).json({ error: 'Não foi possível consultar as unidades.' }); }
-});
+router.get('/options', authorizeRole(['ADMIN', 'FUNCIONARIO', 'SYNDIC']), selectorController.units);
 
 // ADMIN e FUNCIONÁRIOS podem listar
 router.get('/', authorizeRole(['ADMIN', 'FUNCIONARIO']), unitController.list);

@@ -132,7 +132,10 @@ export const paymentService = {
     try {
       assertEnvironment(attempt);
       if (attempt.state === 'REVIEW' || closedStates.has(attempt.state)) return;
-      if (!['PENDING', 'OVERDUE'].includes(attempt.invoice.status) || attempt.invoice.requiresReview) return;
+      if (!['PENDING', 'OVERDUE'].includes(attempt.invoice.status) || attempt.invoice.requiresReview) {
+        await this.failAttempt(attempt, new PaymentError(409, 'Cobrança bloqueada para emissão; conciliação necessária.', 'INVOICE_NOT_ISSUABLE'));
+        return;
+      }
       let order: MercadoPagoOrder | null = null;
       if (attempt.orderId) order = await mercadoPagoService.getOrder(attempt.orderId);
       else if (attempt.state === 'ISSUING' || attempt.retryCount > 0 || Date.now() - attempt.createdAt.getTime() > 60_000) {
@@ -175,7 +178,7 @@ export const paymentService = {
 
   async manualChange(attemptId: string, status: 'PAID' | 'CANCELLED', actor: PaymentActor, reason: string) {
     if (!canManageInvoices(actor)) throw new PaymentError(403, 'Acesso negado.');
-    requiredText(reason, 'Justificativa', 1000);
+    requiredText(reason, 'Justificativa', 191);
     const attempt = await paymentRepository.claimAttempt(attemptId);
     try {
       assertEnvironment(attempt);
@@ -242,7 +245,7 @@ export const paymentService = {
 
   async reconcile(attemptId: string, actor: PaymentActor, reason: string) {
     if (!canManageInvoices(actor)) throw new PaymentError(403, 'Acesso negado.');
-    requiredText(reason, 'Justificativa', 1000);
+    requiredText(reason, 'Justificativa', 191);
     let attempt = await paymentRepository.claimAttempt(attemptId);
     const token = attempt.lockToken!;
     try {
@@ -281,7 +284,7 @@ export const paymentService = {
 
   async retry(attemptId: string, actor: PaymentActor, reason: string) {
     if (!canManageInvoices(actor)) throw new PaymentError(403, 'Acesso negado.');
-    requiredText(reason, 'Justificativa', 1000);
+    requiredText(reason, 'Justificativa', 191);
     const attempt = await paymentRepository.claimAttempt(attemptId);
     try {
       assertEnvironment(attempt);
