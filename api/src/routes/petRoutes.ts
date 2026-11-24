@@ -1,3 +1,7 @@
+import { updatePetSchema } from '../schemas/updateSchemas';
+import { createManagedPetSchema, petQuerySchema } from '../schemas/petSchema';
+import { idParamsSchema } from '../schemas/common';
+import { validate } from '../middlewares/validate';
 import { Router } from 'express';
 import { petController } from '../controllers/petController';
 import { authMiddleware } from '../middlewares/authMiddleware';
@@ -7,9 +11,10 @@ const router = Router();
 
 router.use(authMiddleware);
 
-router.get('/', authorizeRole(['ADMIN', 'FUNCIONARIO']), petController.list);
+router.get('/', authorizeRole(['ADMIN', 'FUNCIONARIO']), validate(petQuerySchema, 'query'), petController.list);
 router.get('/me', authorizeRole(['MORADOR']), petController.listMine);
-router.post('/', authorizeRole(['MORADOR']), petController.create);
-router.delete('/:id', authorizeRole(['ADMIN', 'MORADOR']), petController.delete);
+router.post('/', authorizeRole(['ADMIN', 'MORADOR']), validate(createManagedPetSchema), petController.create);
+router.put('/:id', authorizeRole(['ADMIN', 'MORADOR']), validate(idParamsSchema, 'params'), validate(updatePetSchema), petController.update);
+router.delete('/:id', authorizeRole(['ADMIN', 'MORADOR']), validate(idParamsSchema, 'params'), petController.delete);
 
 export default router;

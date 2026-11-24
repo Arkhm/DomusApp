@@ -83,7 +83,7 @@ As respostas distinguem 400 (entrada), 401 (autenticação/assinatura), 403 (per
 - `CANCELLED`, `EXPIRED` e `REJECTED`: tentativa encerrada; a expiração ou falha do Pix não extingue a dívida.
 - `REVIEW`: automação suspensa por divergência ou esgotamento das tentativas.
 
-O Pix vale 24 horas, independentemente do vencimento da fatura. A dívida não é automaticamente perdoada nem uma nova cobrança emitida quando o código expira. A reemissão de um novo Pix para uma tentativa já encerrada não faz parte desta versão.
+O Pix vale 24 horas, independentemente do vencimento da fatura. A dívida não é automaticamente perdoada nem uma nova cobrança emitida quando o código expira. A administração pode reemitir um Pix encerrado na mesma fatura por `POST /invoices/:id/reissue`, com `reason` e `Idempotency-Key`. O provedor precisa confirmar EXPIRED, CANCELLED ou REJECTED; situações incertas bloqueiam a operação. O histórico permanece consultável em `GET /invoices/:id/attempts`. Webhooks históricos não substituem o Pix corrente. Pagamento tardio exige encerramento do substituto e revisão financeira.
 
 Em teste, o payload oficial envia R$ 50, `test_payer@example.com` e `APRO`. `paymentAmount` expõe o valor efetivamente enviado, mesmo se a fatura tiver outro valor. A aprovação simulada atualiza a tentativa e o histórico com origem `MERCADO_PAGO_TEST`, mas **não quita a obrigação financeira nem altera `paidAt`**. Em produção, a baixa exige que valor da fatura, valor enviado e valor consultado coincidam.
 

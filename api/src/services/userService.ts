@@ -1,5 +1,8 @@
 import bcrypt from 'bcryptjs';
+import { HttpError } from '../lib/httpError';
 import { userRepository } from '../repositories/userRepository';
+import { isValidCpf } from '../lib/cpf';
+import { sanitizeUser } from '../lib/sanitizeUser';
 
 export const userService = {
   async listAll() {
@@ -9,9 +12,8 @@ export const userService = {
   async getById(id: string) {
     const user = await userRepository.findById(id);
     if (!user) throw new Error('Usuário não encontrado.');
-    
-    const { password, ...userWithoutPassword } = user;
-    return userWithoutPassword;
+
+    return sanitizeUser(user);
   },
 
   async search(query: string) {
@@ -51,8 +53,7 @@ export const userService = {
     data.password = await bcrypt.hash(data.password, 10);
 
     const newUser = await userRepository.create(data);
-    const { password, ...userWithoutPassword } = newUser;
-    return userWithoutPassword;
+    return sanitizeUser(newUser);
   },
 
   async update(id: string, data: any) {
@@ -64,6 +65,12 @@ export const userService = {
     }
 
     if (data.cpf && data.cpf !== user.cpf) {
+      // O dígito verificador só é conferido quando o CPF muda de fato. O
+      // schema Zod da edição valida só o formato (11 dígitos) — registros
+      // antigos/seed podem ter CPF sem dígito verificador válido, e reenviar
+      // o mesmo CPF em uma edição de outro campo não pode travar. Mesma regra
+      // já aplicada no front (ver UserFormModal `cpfUnchanged`).
+      if (!isValidCpf(data.cpf)) throw new Error('CPF inválido.');
       if (await userRepository.findByCpf(data.cpf)) throw new Error('CPF já cadastrado por outro.');
     }
 
@@ -77,8 +84,12 @@ export const userService = {
       }
     }
 
-    if (data.role === 'MORADOR' && data.unitId === null) {
-        throw new Error('Um morador não pode ficar sem unidade.');
+    // RNE-003 vale para o estado final do usuário, não só para o body: um PUT
+    // com apenas `{ unitId: null }` também tiraria o morador da unidade.
+    const finalRole = data.role ?? user.role;
+    const finalUnitId = data.unitId !== undefined ? data.unitId : user.unitId;
+    if ((data.role !== undefined || data.unitId !== undefined) && finalRole === 'MORADOR' && !finalUnitId) {
+      throw new Error('Um morador não pode ficar sem unidade.');
     }
 
     if (data.role && data.role !== 'MORADOR') {
@@ -93,9 +104,18 @@ export const userService = {
       delete data.password;
     }
 
-    const updatedUser = await userRepository.update(id, data);
-    const { password, ...userWithoutPassword } = updatedUser;
-    return userWithoutPassword;
+    const sensitiveChange = !!data.password || ['role', 'status', 'isSyndic'].some(
+      field => data[field] !== undefined && data[field] !== user[field as keyof typeof user],
+    );
+    if (sensitiveChange) data.tokenVersion = { increment: 1 };
+
+    // Grava só se o tokenVersion ainda for o lido acima: uma alteração sensível
+    // concorrente já o incrementou, e esta edição comparou contra dados velhos.
+    const updatedUser = await userRepository.updateIfVersion(id, user.tokenVersion, data);
+    if (!updatedUser) {
+      throw new HttpError(409, 'O cadastro foi alterado por outra pessoa. Recarregue e tente novamente.');
+    }
+    return sanitizeUser(updatedUser);
   },
 
   async delete(id: string) {

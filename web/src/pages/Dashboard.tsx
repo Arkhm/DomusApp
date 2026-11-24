@@ -10,6 +10,7 @@ import { useAuth } from '../hooks/useAuth';
 import { userService } from '../services/userService';
 import { noticeService } from '../services/noticeService';
 import { unitService } from '../services/unitService';
+import { reportService } from '../services/reportService';
 import { eventService } from '../services/eventService';
 import type { Notice } from '../types/notice';
 import type { Event as EventItem } from '../types/event';
@@ -39,6 +40,7 @@ const initialStats: DashboardStats = {
 export default function Dashboard() {
     const { user } = useAuth();
     const [isLoading, setIsLoading] = useState(true);
+    const [occupancy, setOccupancy] = useState<number | null>(null);
     const [stats, setStats] = useState<DashboardStats>(initialStats);
     const [recentNotices, setRecentNotices] = useState<Notice[]>([]);
     const [upcomingEvents, setUpcomingEvents] = useState<EventItem[]>([]);
@@ -46,11 +48,13 @@ export default function Dashboard() {
     useEffect(() => {
         const load = async () => {
             setIsLoading(true);
-            const [usersR, noticesR, unitsR, eventsR] = await Promise.allSettled([
-                userService.getAll(),
+            setOccupancy(null);
+            const [usersR, noticesR, unitsR, eventsR, occupancyR] = await Promise.allSettled([
+                user?.role === 'MORADOR' ? Promise.resolve([]) : userService.getAll(),
                 noticeService.getAll(),
-                unitService.getAll(),
+                user?.role === 'MORADOR' ? Promise.resolve([]) : unitService.getAll(),
                 eventService.getAll(),
+                user?.role === 'MORADOR' ? Promise.resolve(null) : reportService.occupancy(),
             ]);
 
             const users: User[] = usersR.status === 'fulfilled' ? usersR.value : [];
@@ -58,6 +62,7 @@ export default function Dashboard() {
             const unitsCount = unitsR.status === 'fulfilled' ? unitsR.value.length : 0;
             const events: EventItem[] = eventsR.status === 'fulfilled' ? eventsR.value : [];
 
+            setOccupancy(occupancyR.status === 'fulfilled' ? occupancyR.value?.total.occupancyRate ?? null : null);
             setStats({
                 totalUsers: users.length,
                 activeUsers: users.filter((u) => u.status === 'ACTIVE').length,
@@ -84,7 +89,7 @@ export default function Dashboard() {
             );
             setIsLoading(false);
 
-            const failedCalls = [usersR, noticesR, unitsR, eventsR].filter((r) => r.status === 'rejected').length;
+            const failedCalls = [usersR, noticesR, unitsR, eventsR, occupancyR].filter((r) => r.status === 'rejected').length;
             if (failedCalls > 0) {
                 toast('Alguns indicadores não puderam ser carregados com o seu perfil atual.', {
                     icon: 'ℹ️',
@@ -93,12 +98,7 @@ export default function Dashboard() {
             }
         };
         load();
-    }, []);
-
-    const occupancy = useMemo(() => {
-        if (!stats.units) return 0;
-        return Math.min(100, Math.round((stats.residents / stats.units) * 100));
-    }, [stats.residents, stats.units]);
+    }, [user?.role]);
 
     const firstName = user?.name?.split(' ')[0] || 'Administração';
     const greeting = useMemo(() => {
@@ -206,7 +206,7 @@ export default function Dashboard() {
                                     maxWidth: 540,
                                 }}
                             >
-                                {stats.residents} residentes ativos em {stats.units} unidades.{' '}
+                                {user?.role !== 'MORADOR' && <>{stats.residents} moradores cadastrados em {stats.units} unidades. </>}
                                 {upcomingEvents.length} eventos próximos na programação e {stats.notices} comunicados
                                 publicados.
                             </p>
@@ -224,7 +224,7 @@ export default function Dashboard() {
                         </div>
 
                         {/* Health card */}
-                        <HealthCard occupancy={occupancy} stats={stats} />
+                        {user?.role !== 'MORADOR' && <HealthCard occupancy={isLoading ? null : occupancy} stats={stats} />}
                     </div>
                 </section>
 
@@ -243,6 +243,7 @@ export default function Dashboard() {
                         marginBottom: 64,
                     }}
                 >
+                    {user?.role !== 'MORADOR' && <>
                     <StatCard
                         eyebrow="Residentes"
                         value={isLoading ? '—' : stats.residents}
@@ -255,9 +256,10 @@ export default function Dashboard() {
                     />
                     <StatCard
                         eyebrow="Ocupação"
-                        value={isLoading ? '—' : `${occupancy}%`}
-                        footnote="Residentes vinculados"
+                        value={isLoading || occupancy === null ? '—' : `${occupancy}%`}
+                        footnote={isLoading ? 'Carregando ocupação' : occupancy === null ? 'Ocupação indisponível' : 'Unidades com morador ativo'}
                     />
+                    </>}
                     <StatCard
                         eyebrow="Comunicados"
                         value={isLoading ? '—' : stats.notices}
@@ -362,7 +364,7 @@ export default function Dashboard() {
 // Sub-components
 // ============================================================
 
-function HealthCard({ occupancy, stats }: { occupancy: number; stats: DashboardStats }) {
+function HealthCard({ occupancy, stats }: { occupancy: number | null; stats: DashboardStats }) {
     return (
         <div
             style={{
@@ -398,7 +400,7 @@ function HealthCard({ occupancy, stats }: { occupancy: number; stats: DashboardS
                         letterSpacing: '-0.02em',
                     }}
                 >
-                    {occupancy}
+                    {occupancy ?? '—'}
                 </div>
                 <div className="serif" style={{ fontSize: 28, color: 'var(--color-metal-1)', fontWeight: 300 }}>
                     %
@@ -424,7 +426,7 @@ function HealthCard({ occupancy, stats }: { occupancy: number; stats: DashboardS
                     <div
                         style={{
                             height: '100%',
-                            width: `${occupancy}%`,
+                            width: `${occupancy ?? 0}%`,
                             background:
                                 'linear-gradient(90deg, var(--color-purple) 0%, var(--color-metal-1) 100%)',
                             boxShadow: '0 0 12px color-mix(in srgb, var(--color-metal-1) 40%, transparent)',

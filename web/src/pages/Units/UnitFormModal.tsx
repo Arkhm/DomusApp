@@ -131,6 +131,9 @@ export default function UnitFormModal({ isOpen, unit, onClose, onSuccess }: Unit
                     />
                 </Field>
 
+                <p>As vagas são gerenciadas na página Vagas e vinculadas à unidade por número.</p>
+                {unit && <p>Vagas: {unit.parkingSpotRecords?.map(spot => spot.number).join(', ') || 'Nenhuma vaga atribuída'}</p>}
+
                 <LuxuryModalFooter
                     onCancel={onClose}
                     submitLabel={isEditing ? 'Salvar alterações' : 'Cadastrar'}

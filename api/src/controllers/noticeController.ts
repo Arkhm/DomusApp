@@ -3,6 +3,14 @@ import { noticeService } from '../services/noticeService';
 import { AuthRequest } from '../middlewares/authMiddleware';
 
 export const noticeController = {
+  async update(req: AuthRequest, res: Response) {
+    try {
+      res.status(200).json(await noticeService.update(req.params.id as string, req.body, req.user!));
+    } catch (error: any) {
+      res.status(error.statusCode ?? 400).json({ error: error.message });
+    }
+  },
+
   async create(req: AuthRequest, res: Response) {
     try {
       // ID de quem está logado direto do Token JWT
@@ -53,7 +61,7 @@ export const noticeController = {
       const result = await noticeService.markAsRead(id, userId);
       res.status(200).json(result);
     } catch (error: any) {
-      res.status(400).json({ error: error.message });
+      res.status(error.statusCode ?? 400).json({ error: error.message });
     }
   }
 };

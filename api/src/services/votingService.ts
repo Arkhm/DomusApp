@@ -1,6 +1,21 @@
+import { updateVotingSchema } from '../schemas/updateSchemas';
+import { UpdateActor, requireEditor, isSyndic, hasPanelAccess } from '../lib/access';
+import { Prisma } from '@prisma/client';
 import { votingRepository } from '../repositories/votingRepository';
+import { userRepository } from '../repositories/userRepository';
+import { HttpError } from '../lib/httpError';
 
 export const votingService = {
+  async update(id: string, input: unknown, actor: UpdateActor) {
+    requireEditor(actor, isSyndic(actor));
+    const data = updateVotingSchema.parse(input);
+    // Mesma regra de avisos e eventos: a síndica só edita o que ela criou.
+    const record = await votingRepository.findById(id);
+    if (!record) throw new HttpError(404, 'Votação não encontrada.');
+    requireEditor(actor, isSyndic(actor) && record.authorId === actor.id);
+    return votingRepository.update(id, data);
+  },
+
   async create(data: {
     title: string;
     description: string;
@@ -31,6 +46,9 @@ export const votingService = {
     if (startDate >= endDate) {
       throw new Error('A data de início deve ser anterior à data de término.');
     }
+    if (endDate <= new Date()) {
+      throw new Error('A data de término deve estar no futuro.');
+    }
 
     if (!Array.isArray(data.options) || data.options.length < 2) {
       throw new Error('A votação deve conter pelo menos duas opções.');
@@ -52,17 +70,67 @@ export const votingService = {
     });
   },
 
-  async list() {
-    return await votingRepository.findAll();
+  async list(actor: UpdateActor) {
+    const user = await userRepository.findById(actor.id);
+    if (!user) throw new HttpError(403, 'Usuário não encontrado.');
+    const votings = await votingRepository.findAll(user.unitId);
+    const panel = hasPanelAccess(actor);
+    const now = new Date();
+    return votings.map(({ ballots, ...voting }) => {
+      const ballot = ballots[0];
+      return {
+        ...voting,
+        // Resultados parciais podem influenciar o voto dos moradores.
+        options: panel || now > voting.endDate ? voting.options : voting.options.map(({ votes, ...option }) => option),
+        myVote: ballot ? {
+          optionId: ballot.optionId, votedAt: ballot.createdAt, votedBy: ballot.user?.name ?? null,
+        } : null,
+      };
+    });
   },
 
-  async delete(id: string) {
+  async vote(votingId: string, optionId: string, userId: string) {
+    const user = await userRepository.findById(userId);
+    if (!user || user.role !== 'MORADOR' || !user.unitId) {
+      throw new HttpError(403, 'Apenas moradores com unidade podem votar.');
+    }
+
+    const voting = await votingRepository.findById(votingId);
+    if (!voting) {
+      throw new HttpError(404, 'Votação não encontrada.');
+    }
+
+    // Limites inclusivos, como o getVotingStatus do web.
+    const now = new Date();
+    if (now < voting.startDate) {
+      throw new HttpError(409, 'A votação ainda não começou.');
+    }
+    if (now > voting.endDate) {
+      throw new HttpError(409, 'A votação já foi encerrada.');
+    }
+    if (!voting.options.some((option) => option.id === optionId)) {
+      throw new Error('Opção inválida para esta votação.');
+    }
+
+    try {
+      await votingRepository.castVote({ votingId, optionId, unitId: user.unitId, userId });
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+        throw new HttpError(409, 'Sua unidade já votou nesta votação.');
+      }
+      throw error;
+    }
+    return { message: 'Voto registrado com sucesso.' };
+  },
+
+  async delete(id: string, actor: UpdateActor) {
     const voting = await votingRepository.findById(id);
 
     if (!voting) {
       throw new Error('Votação não encontrada.');
     }
 
+    requireEditor(actor, isSyndic(actor) && voting.authorId === actor.id);
     await votingRepository.delete(id);
     return { message: 'Votação removida com sucesso.' };
   }

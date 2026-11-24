@@ -2,16 +2,27 @@ import type { NavigatorScreenParams } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
 
+import type { CondoEvent, Notice } from './domain';
+
 export type MainTabParamList = {
   Inicio: undefined;
-  Reservas: undefined;
-  Acessos: undefined;
-  Encomendas: undefined;
+  Reservas: { sourceId?: string } | undefined;
+  Cobrancas: undefined;
   Perfil: undefined;
 };
 
 export type RootStackParamList = {
   Login: undefined;
+  ForgotPassword: { email?: string } | undefined;
+  Ocorrencias: undefined;
+  Comunicados: undefined;
+  Comunicado: { notice: Notice };
+  Eventos: undefined;
+  Evento: { event: CondoEvent };
+  Votacoes: { sourceId?: string } | undefined;
+  FaturaDetalhe: { invoiceId: string };
+  VeiculosPets: undefined;
+  Notificacoes: undefined;
   Main: NavigatorScreenParams<MainTabParamList> | undefined;
   /** Tela "Em breve" para módulos que ainda não têm implementação. */
   EmBreve: { title: string; description?: string };

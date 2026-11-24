@@ -97,3 +97,10 @@ export function isValidCpf(input: string | null | undefined): boolean {
     const d2 = rest < 2 ? 0 : 11 - rest;
     return d2 === parseInt(cpf[10], 10);
 }
+
+/** A reserva representa um dia em UTC, sem conversão para o fuso do navegador. */
+export function formatReservationDateBR(value: string): string {
+    return new Intl.DateTimeFormat('pt-BR', {
+        day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'UTC',
+    }).format(new Date(value));
+}

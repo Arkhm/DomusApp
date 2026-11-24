@@ -1,21 +1,22 @@
-import { Navigate, Outlet } from 'react-router-dom';
+import { Navigate, Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import { hasPanelAccess } from '../../lib/access';
 import Sidebar from './Sidebar';
 
 export default function ProtectedLayout() {
+    const location = useLocation();
     const { isAuthenticated, user } = useAuth();
 
     if (!isAuthenticated) {
         return <Navigate to="/login" replace />;
     }
 
-    // Defesa em profundidade: backend já recusa o login e o /auth/me de quem não
-    // tem acesso, mas se um perfil antigo (pré-gate) ainda estiver no cache do
-    // browser, redireciona antes de montar o painel.
+    // A sessão identifica o usuário; este gate autoriza o acesso ao painel.
     if (!hasPanelAccess(user)) {
         return <Navigate to="/login" replace />;
     }
+
+    if (user?.role === 'MORADOR' && ['/usuarios', '/unidades', '/vagas', '/veiculos', '/pets'].includes(location.pathname)) return <Navigate to="/dashboard" replace />;
 
     return (
         // `app-shell` class ativa o swap automático de .serif/.serif-it → Inter

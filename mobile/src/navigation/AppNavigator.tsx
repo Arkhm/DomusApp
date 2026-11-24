@@ -1,3 +1,4 @@
+import { ForgotPasswordScreen } from '../screens/ForgotPasswordScreen';
 import React from 'react';
 import { ActivityIndicator, StyleSheet, View } from 'react-native';
 import { NavigationContainer, type Theme } from '@react-navigation/native';
@@ -7,7 +8,16 @@ import { Ionicons } from '@expo/vector-icons';
 import { LoginScreen } from '../screens/LoginScreen';
 import { HomeScreen } from '../screens/HomeScreen';
 import { ProfileScreen } from '../screens/ProfileScreen';
-import { ComingSoonScreen, TabPlaceholder } from '../screens/ComingSoonScreen';
+import { ReservationsScreen } from '../screens/ReservationsScreen';
+import { IncidentsScreen } from '../screens/IncidentsScreen';
+import { ComingSoonScreen } from '../screens/ComingSoonScreen';
+import { NoticeDetailScreen, NoticesScreen } from '../screens/NoticesScreen';
+import { EventDetailScreen, EventsScreen } from '../screens/EventsScreen';
+import { VotingsScreen } from '../screens/VotingsScreen';
+import { InvoicesScreen } from '../screens/InvoicesScreen';
+import { InvoiceDetailScreen } from '../screens/InvoiceDetailScreen';
+import { VehiclesPetsScreen } from '../screens/VehiclesPetsScreen';
+import { NotificationsScreen } from '../screens/NotificationsScreen';
 import { useAuth } from '../contexts/AuthContext';
 import { colors, fontFamily, layout, spacing, typography } from '../theme';
 import type { MainTabParamList, RootStackParamList } from '../types';
@@ -33,38 +43,10 @@ const navigationTheme: Theme = {
   },
 };
 
-function ReservationsScreen(): React.JSX.Element {
-  return (
-    <TabPlaceholder
-      title="Reservas"
-      description="A API ainda não expõe /reservations nem um modelo de área comum. A aba fica reservada para a próxima entrega."
-    />
-  );
-}
-
-function AccessScreen(): React.JSX.Element {
-  return (
-    <TabPlaceholder
-      title="Acessos"
-      description="Controle de portaria e liberação de visitantes ainda não existe na API."
-    />
-  );
-}
-
-function PackagesScreen(): React.JSX.Element {
-  return (
-    <TabPlaceholder
-      title="Encomendas"
-      description="A API ainda não expõe /packages para consultar entregas na portaria."
-    />
-  );
-}
-
 const TAB_ICONS: Record<keyof MainTabParamList, [active: string, inactive: string]> = {
   Inicio: ['home', 'home-outline'],
   Reservas: ['calendar', 'calendar-outline'],
-  Acessos: ['key', 'key-outline'],
-  Encomendas: ['cube', 'cube-outline'],
+  Cobrancas: ['receipt', 'receipt-outline'],
   Perfil: ['person', 'person-outline'],
 };
 
@@ -89,8 +71,18 @@ function MainTabs(): React.JSX.Element {
     >
       <Tab.Screen name="Inicio" component={HomeScreen} options={{ title: 'Início' }} />
       <Tab.Screen name="Reservas" component={ReservationsScreen} />
-      <Tab.Screen name="Acessos" component={AccessScreen} />
-      <Tab.Screen name="Encomendas" component={PackagesScreen} />
+      <Tab.Screen
+        name="Cobrancas"
+        component={InvoicesScreen}
+        options={{
+          title: 'Cobranças',
+          headerShown: true,
+          headerStyle: styles.header,
+          headerTitleStyle: styles.headerTitle,
+          headerTintColor: colors.textOnBrand,
+          headerShadowVisible: false,
+        }}
+      />
       <Tab.Screen name="Perfil" component={ProfileScreen} />
     </Tab.Navigator>
   );
@@ -111,25 +103,39 @@ export function AppNavigator(): React.JSX.Element {
 
   return (
     <NavigationContainer theme={navigationTheme}>
-      <Stack.Navigator>
+      <Stack.Navigator screenOptions={{
+        headerBackTitle: 'Voltar',
+        headerTintColor: colors.textOnBrand,
+        headerTitleStyle: styles.headerTitle,
+        headerStyle: styles.header,
+        headerShadowVisible: false,
+      }}>
         {user ? (
           <>
             <Stack.Screen name="Main" component={MainTabs} options={{ headerShown: false }} />
+            <Stack.Screen name="Ocorrencias" component={IncidentsScreen} options={{ title: 'Ocorrências' }} />
+            {/* Comunicados, eventos e votações desenham o próprio cabeçalho com botão de voltar. */}
+            <Stack.Screen name="Comunicados" component={NoticesScreen} options={{ headerShown: false, title: 'Comunicados' }} />
+            <Stack.Screen name="Comunicado" component={NoticeDetailScreen} options={{ headerShown: false, title: 'Comunicado' }} />
+            <Stack.Screen name="Eventos" component={EventsScreen} options={{ headerShown: false }} />
+            <Stack.Screen name="Evento" component={EventDetailScreen} options={{ headerShown: false, title: 'Evento' }} />
+            <Stack.Screen name="Votacoes" component={VotingsScreen} options={{ headerShown: false, title: 'Votações' }} />
+            <Stack.Screen name="FaturaDetalhe" component={InvoiceDetailScreen} options={{ title: 'Fatura' }} />
+            <Stack.Screen name="VeiculosPets" component={VehiclesPetsScreen} options={{ title: 'Veículos e pets' }} />
+            <Stack.Screen name="Notificacoes" component={NotificationsScreen} options={{ title: 'Notificações' }} />
             <Stack.Screen
               name="EmBreve"
               component={ComingSoonScreen}
               options={({ route }) => ({
                 title: route.params.title,
-                headerBackTitle: 'Voltar',
-                headerTintColor: colors.textOnBrand,
-                headerTitleStyle: styles.headerTitle,
-                headerStyle: styles.header,
-                headerShadowVisible: false,
               })}
             />
           </>
         ) : (
-          <Stack.Screen name="Login" component={LoginScreen} options={{ headerShown: false }} />
+          <>
+            <Stack.Screen name="Login" component={LoginScreen} options={{ headerShown: false }} />
+            <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} options={{ title: 'Recuperar senha' }} />
+          </>
         )}
       </Stack.Navigator>
     </NavigationContainer>

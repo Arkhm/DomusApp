@@ -1,3 +1,5 @@
+import type { ParkingType } from './parkingSpot';
+
 export type UserRole = 'MORADOR' | 'ADMIN' | 'FUNCIONARIO';
 export type UserStatus = 'ACTIVE' | 'INACTIVE';
 
@@ -5,6 +7,8 @@ export type UserStatus = 'ACTIVE' | 'INACTIVE';
 export type UnitType = 'APARTMENT' | 'HOUSE';
 
 export interface Unit {
+    parkingSpots?: number;
+    parkingSpotRecords?: { id: string; number: string; type: ParkingType }[];
     id: string;
     /** Default 'APARTMENT' no backend para compat com registros antigos */
     type: UnitType;

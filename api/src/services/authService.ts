@@ -1,53 +1,31 @@
+import { mailConfig } from '../lib/mailConfig';
+import { HttpError } from '../lib/httpError';
 import bcrypt from 'bcryptjs';
-import jwt from 'jsonwebtoken';
+import { createAuthTokens, verifyLogoutToken, verifyRefreshToken } from '../lib/authTokens';
 import { userRepository } from '../repositories/userRepository';
-import { hasPanelAccess } from '../lib/access';
-
-const JWT_SECRET = process.env.JWT_SECRET;
-if (!JWT_SECRET) {
-  throw new Error("ERRO: JWT_SECRET não está definido no arquivo .env");
-}
-
-// Tipagem
-interface RegisterDTO {
-  name?: string;
-  email?: string;
-  password?: string;
-}
-
-const createUserLogic = async (data: RegisterDTO, assignedRole: string) => {
-  if (!data.name || !data.email || !data.password) {
-    throw new Error("Nome, email e senha são obrigatórios.");
-  }
-
-  const userExists = await userRepository.findByEmail(data.email);
-  if (userExists) {
-    throw new Error('E-mail já cadastrado.');
-  }
-
-  const hashedPassword = await bcrypt.hash(data.password, 10);
-
-  const newUser = await userRepository.create({
-    name: data.name,
-    email: data.email,
-    password: hashedPassword,
-    role: assignedRole,
-  });
-
-  const { password: _, ...userWithoutPassword } = newUser;
-  return userWithoutPassword;
-};
+import { generateResetToken, hashResetToken, RESET_TOKEN_TTL_MS } from '../lib/resetToken';
+import { sendPasswordResetEmail } from '../lib/mailer';
+import { sanitizeUser } from '../lib/sanitizeUser';
 
 export const authService = {
-  
-  async register(data: RegisterDTO) {
-    // Registro público sempre será MORADOR
-    return await createUserLogic(data, "MORADOR");
+  async refresh(refreshToken: string) {
+    let payload: ReturnType<typeof verifyRefreshToken>;
+    try { payload = verifyRefreshToken(refreshToken); }
+    catch { throw new HttpError(401, 'Refresh token inválido.'); }
+    const user = await userRepository.findById(payload.sub);
+    if (!user || user.status !== 'ACTIVE' || user.tokenVersion !== payload.tokenVersion) {
+      throw new HttpError(401, 'Refresh token inválido ou revogado.');
+    }
+    // shortcut: refresh reutilizavel ate expirar ou ate tokenVersion mudar, trocar por tabela de sessoes com deteccao de reuso se precisar revogar sessao individual.
+    return createAuthTokens(user);
   },
 
-  async createAdmin(data: RegisterDTO) {
-    // Rota específica para criar administrador
-    return await createUserLogic(data, "ADMIN");
+  async logout(token?: string) {
+    if (!token) return;
+    let payload: ReturnType<typeof verifyLogoutToken>;
+    try { payload = verifyLogoutToken(token); }
+    catch { return; } // Invalid signatures or claims cannot identify a session to revoke.
+    await userRepository.revokeTokens(payload.id, payload.tokenVersion);
   },
 
   async login(email: string, password: string) {
@@ -56,7 +34,7 @@ export const authService = {
     }
 
     const user = await userRepository.findByEmail(email);
-    if (!user) {
+    if (!user || user.status !== 'ACTIVE') {
       throw new Error('Credenciais inválidas.');
     }
 
@@ -65,39 +43,66 @@ export const authService = {
       throw new Error('Credenciais inválidas.');
     }
 
-    // Essa condição bloqueia o login com usuário MORADOR sem ter isSyndic, vou deixar o lib/access ocioso pelo menos por agora, não precisamos dele.
-    // if (!hasPanelAccess(user)) {
-    //   throw new Error('Sua conta não tem acesso ao painel administrativo.');
-    // }
+    const tokens = createAuthTokens(user);
 
-    const token = jwt.sign(
-      {
-        id: user.id,
-        role: user.role,
-        isSyndic: user.isSyndic
-      },
-      JWT_SECRET,
-      { expiresIn: '1d' }
-    );
-
-    const { password: _, ...userWithoutPassword } = user;
-    return { user: userWithoutPassword, token };
+    return { user: sanitizeUser(user), ...tokens };
   },
 
-  // Reidrata a sessão a partir do id que veio no token do cookie. Revalida o
-  // acesso no banco: um usuário revogado ou rebaixado depois da emissão do
-  // token deixa de ser aceito antes de o cookie expirar.
+  // Consulta o cadastro atual da sessão; permissões são verificadas pelos recursos.
   async getAuthenticatedUser(userId: string) {
     const user = await userRepository.findById(userId);
-    if (!user) {
-      throw new Error('Sessão inválida.');
+    if (!user || user.status !== 'ACTIVE') {
+      throw new HttpError(401, 'Sessão inválida.');
     }
 
-    if (!hasPanelAccess(user)) {
-      throw new Error('Sua conta não tem acesso ao painel administrativo.');
+    return sanitizeUser(user);
+  },
+
+  // RF-007. Silenciosa de propósito quando o e-mail não existe: o controller
+  // sempre responde com a mesma mensagem genérica, então quem chama esta
+  // função não vê diferença entre "e-mail não cadastrado" e "e-mail enviado"
+  // — isso é o que impede alguém de usar o formulário pra descobrir quais
+  // e-mails estão cadastrados no condomínio.
+  async forgotPassword(email: string) {
+    if (!email) {
+      throw new Error('E-mail é obrigatório.');
     }
 
-    const { password: _, ...userWithoutPassword } = user;
-    return userWithoutPassword;
+    const user = await userRepository.findByEmail(email);
+    if (!user) return;
+
+    const { token, tokenHash } = generateResetToken();
+    await userRepository.update(user.id, {
+      resetToken: tokenHash,
+      resetTokenExpiry: new Date(Date.now() + RESET_TOKEN_TTL_MS),
+    });
+
+    const resetUrl = new URL('/redefinir-senha', mailConfig().frontendUrl);
+    resetUrl.searchParams.set('token', token);
+
+    await sendPasswordResetEmail(user.email, resetUrl.toString());
+  },
+
+  // RF-007. `userRepository.update` é chamado direto (não `userService.update`)
+  // de propósito: aquele método tem regras de negócio de cargo/CPF que não se
+  // aplicam aqui, e re-hashearia uma senha que já chega hasheada.
+  async resetPassword(token: string, newPassword: string) {
+    if (!token || !newPassword) {
+      throw new Error('Token e nova senha são obrigatórios.');
+    }
+    if (newPassword.length < 8) {
+      throw new Error('Senha deve ter pelo menos 8 caracteres.');
+    }
+
+    const user = await userRepository.findByResetTokenHash(hashResetToken(token));
+
+    if (!user || !user.resetTokenExpiry || user.resetTokenExpiry.getTime() <= Date.now()) {
+      throw new Error('Token inválido ou expirado.');
+    }
+
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+    // Conditional update prevents two concurrent requests from consuming the same token.
+    const consumed = await userRepository.consumeResetToken(user.id, hashResetToken(token), hashedPassword);
+    if (!consumed) throw new Error('Token inválido ou expirado.');
   }
 };

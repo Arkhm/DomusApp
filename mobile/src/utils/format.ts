@@ -17,8 +17,8 @@ export function firstName(fullName: string): string {
 /**
  * Rótulo da unidade do morador — "Bloco A · 101", "Quadra 1 · Casa 02".
  *
- * Devolve `null` quando a API não expôs a relação `unit` (o login só traz
- * `unitId`, e `GET /users/:id` é restrito a ADMIN/FUNCIONARIO).
+ * Devolve `null` quando não há unidade no perfil disponível. A sessão
+ * atualizada por GET /auth/me inclui essa relação.
  */
 export function unitLabel(user: User | null): string | null {
   const unit = user?.unit;

@@ -13,7 +13,7 @@ import { secureStorage, STORAGE_KEYS } from '../services/secureStorage';
 import {
   fetchSessionProfile,
   login as loginRequest,
-  withResolvedUnit,
+  logout as logoutRequest,
 } from '../services/authService';
 import type { User } from '../types';
 
@@ -54,6 +54,7 @@ export function AuthProvider({ children }: { children: ReactNode }): React.JSX.E
   const clearSession = useCallback(async () => {
     await Promise.all([
       secureStorage.remove(STORAGE_KEYS.token),
+      secureStorage.remove(STORAGE_KEYS.refreshToken),
       secureStorage.remove(STORAGE_KEYS.user),
     ]);
     if (isMounted.current) setUser(null);
@@ -77,14 +78,16 @@ export function AuthProvider({ children }: { children: ReactNode }): React.JSX.E
       }
 
       try {
-        await fetchSessionProfile();
-        const enriched = await withResolvedUnit(cached);
-        if (!cancelled) setUser(enriched);
+        const freshUser = await fetchSessionProfile();
+        if (!cancelled) {
+          await secureStorage.set(STORAGE_KEYS.user, JSON.stringify(freshUser));
+          setUser(freshUser);
+        }
       } catch (error) {
         const failure = toApiFailure(error, 'Falha ao restaurar a sessão.');
         if (failure.kind === 'credentials') {
           await clearSession();
-        } else if (!cancelled) {
+        } else if (!cancelled && (failure.kind === 'network' || failure.kind === 'server')) {
           setUser(cached);
         }
       } finally {
@@ -98,31 +101,43 @@ export function AuthProvider({ children }: { children: ReactNode }): React.JSX.E
     };
   }, [clearSession]);
 
-  // Um 401 em qualquer requisição encerra a sessão.
+  // Falha na renovação de sessão limpa o estado autenticado.
   useEffect(() => onUnauthorized(() => void clearSession()), [clearSession]);
 
   const signIn = useCallback<AuthContextValue['signIn']>(async (email, password) => {
     setIsAuthenticating(true);
     try {
-      const { user: loggedUser, token } = await loginRequest(email, password);
+      const { user: loggedUser, token, refreshToken } = await loginRequest(email, password);
 
       await Promise.all([
         secureStorage.set(STORAGE_KEYS.token, token),
+        secureStorage.set(STORAGE_KEYS.refreshToken, refreshToken),
         secureStorage.set(STORAGE_KEYS.user, JSON.stringify(loggedUser)),
       ]);
 
-      const enriched = await withResolvedUnit(loggedUser);
-      if (isMounted.current) setUser(enriched);
+      let profile = loggedUser;
+      try {
+        profile = await fetchSessionProfile();
+      } catch (error) {
+        const failure = toApiFailure(error, 'Falha ao consultar perfil.');
+        if (failure.kind !== 'network' && failure.kind !== 'server') {
+          await clearSession();
+          throw error;
+        }
+      }
+      await secureStorage.set(STORAGE_KEYS.user, JSON.stringify(profile));
+      if (isMounted.current) setUser(profile);
       return null;
     } catch (error) {
       return toApiFailure(error, 'Não foi possível entrar. Tente novamente.');
     } finally {
       if (isMounted.current) setIsAuthenticating(false);
     }
-  }, []);
+  }, [clearSession]);
 
   const signOut = useCallback(async () => {
-    await clearSession();
+    try { await logoutRequest(); }
+    finally { await clearSession(); }
   }, [clearSession]);
 
   const value = useMemo<AuthContextValue>(

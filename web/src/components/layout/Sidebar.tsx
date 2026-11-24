@@ -1,6 +1,9 @@
 import { useState } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import {
+    Car,
+    CarFront,
+    PawPrint,
     LayoutDashboard,
     Users,
     Building2,
@@ -8,25 +11,39 @@ import {
     CalendarDays,
     Vote,
     TreePalm,
+    CalendarCheck,
+    MessageSquare,
+    ChartColumn,
+    Receipt,
     ChevronLeft,
     ChevronRight,
 } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import Monogram from '../luxury/Monogram';
 import { getInitials, roleLabel } from '../luxury/formatters';
+import { hasPanelAccess } from '../../lib/access';
+
+// Gestão operacional: só ADMIN e FUNCIONARIO (a síndica não administra vagas, veículos e pets).
+const STAFF_ONLY = new Set(['/vagas', '/veiculos', '/pets']);
 
 const navItems = [
+    { to: '/relatorios', label: 'Relatórios', icon: ChartColumn },
     { to: '/dashboard', label: 'Painel', icon: LayoutDashboard },
     { to: '/usuarios', label: 'Residentes', icon: Users },
+    { to: '/vagas', label: 'Vagas', icon: Car },
+    { to: '/veiculos', label: 'Veículos', icon: CarFront },
+    { to: '/pets', label: 'Pets', icon: PawPrint },
     { to: '/unidades', label: 'Unidades', icon: Building2 },
     { to: '/comunicados', label: 'Comunicados', icon: Megaphone },
     { to: '/eventos', label: 'Programação', icon: CalendarDays },
     { to: '/votacoes', label: 'Votações', icon: Vote },
+    { to: '/areas-comuns', label: 'Áreas comuns', icon: TreePalm },
+    { to: '/reservas', label: 'Reservas', icon: CalendarCheck },
+    { to: '/ocorrencias', label: 'Ocorrências', icon: MessageSquare },
+    { to: '/cobrancas', label: 'Cobranças', icon: Receipt },
 ];
 
-const plannedItems = [
-    { label: 'Áreas Comuns', icon: TreePalm },
-];
+
 
 export default function Sidebar() {
     const [collapsed, setCollapsed] = useState(true);
@@ -106,7 +123,9 @@ export default function Sidebar() {
                     gap: 2,
                 }}
             >
-                {navItems.map((item) => {
+                {navItems.filter(item => !STAFF_ONLY.has(item.to) || user?.role === 'ADMIN' || user?.role === 'FUNCIONARIO').map((item) => {
+                    if (item.to === '/relatorios' && !hasPanelAccess(user)) return null;
+                    if (['/usuarios', '/unidades'].includes(item.to) && user?.role !== 'ADMIN' && user?.role !== 'FUNCIONARIO') return null;
                     const Icon = item.icon;
                     return (
                         <NavLink
@@ -125,32 +144,6 @@ export default function Sidebar() {
                     );
                 })}
 
-                {/* Subtle separator before planned items */}
-                <div
-                    style={{
-                        height: 1,
-                        background: 'var(--color-line)',
-                        margin: collapsed ? '12px 22px' : '16px 24px',
-                    }}
-                />
-
-                {plannedItems.map((item) => {
-                    const Icon = item.icon;
-                    return (
-                        <div
-                            key={item.label}
-                            className="nav-item disabled"
-                            title={`${item.label} · em breve`}
-                            style={{
-                                padding: collapsed ? '14px 0' : '12px 24px',
-                                justifyContent: collapsed ? 'center' : 'flex-start',
-                            }}
-                        >
-                            <Icon size={18} strokeWidth={1.4} />
-                            {!collapsed && <span>{item.label}</span>}
-                        </div>
-                    );
-                })}
             </nav>
 
             {/* Footer — avatar + collapse toggle */}

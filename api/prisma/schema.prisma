@@ -12,13 +12,20 @@ model User {
   email           String   @unique
   cpf             String   @unique
   phone           String? 
+  tokenVersion    Int      @default(0)
   password        String
   role            String   @default("MORADOR")
   status          String   @default("ACTIVE") 
-  isSyndic        Boolean  @default(false)   
-  isCouncilMember Boolean  @default(false)   
+  isSyndic        Boolean  @default(false)
+  isCouncilMember Boolean  @default(false)
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
+
+  // RF-007 — recuperação de senha. Guarda o hash SHA-256 do token (nunca o
+  // token em si, mesmo princípio do bcrypt nas senhas): se o banco vazar,
+  // ninguém consegue redefinir a senha de ninguém com o que está aqui.
+  resetToken       String?   @unique
+  resetTokenExpiry DateTime?
 
   unitId          String?  
   unit            Unit?    @relation(fields: [unitId], references: [id])
@@ -27,8 +34,24 @@ model User {
   events          Event[]  @relation("EventAuthor")
   votings         Voting[] @relation("VotingAuthor")
   noticeReads     NoticeRead[]
+  notificationReads NotificationRead[]
+  inboxNotifications InboxNotification[]
+  votingVotes     VotingVote[]
+  reservations    Reservation[]
+  incidents       Incident[]   @relation("IncidentAuthor")
   pets            Pet[]
   invoices        Invoice[]
+}
+
+model NotificationRead {
+  id       String   @id @default(uuid())
+  userId   String
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type     String   @db.VarChar(10)
+  sourceId String
+  readAt   DateTime @default(now())
+
+  @@unique([userId, type, sourceId])
 }
 
 model Unit {
@@ -36,7 +59,8 @@ model Unit {
   type        String   @default("APARTMENT") // "APARTMENT" | "HOUSE"
   block       String? 
   number      String  
-  parkingSpots Int     @default(0)
+  parkingSpots Int     @default(0) // Contador derivado de parkingSpotRecords.
+  parkingSpotRecords ParkingSpot[]
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
@@ -45,6 +69,8 @@ model Unit {
   vehicles    Vehicle[]
   events      Event[]  @relation("EventTargetUnit")
   invoices    Invoice[]
+  votingVotes VotingVote[]
+  incidents   Incident[]
 }
 
 model Notice {
@@ -110,6 +136,7 @@ model Voting {
   authorId    String
   author      User           @relation("VotingAuthor", fields: [authorId], references: [id])
   options     VotingOption[]
+  ballots     VotingVote[]
   createdAt   DateTime       @default(now())
   updatedAt   DateTime       @updatedAt
 }
@@ -120,7 +147,28 @@ model VotingOption {
   votingId  String
   voting    Voting   @relation(fields: [votingId], references: [id], onDelete: Cascade)
   votes     Int      @default(0)
+  ballots   VotingVote[]
   createdAt DateTime @default(now())
+}
+
+// Um voto por unidade em cada votação (@@unique), como numa assembleia de
+// condomínio. `VotingOption.votes` continua sendo o total exibido e é
+// incrementado na mesma transação que cria este registro. `userId` guarda
+// quem votou pela unidade e vira null se o usuário for removido, sem apagar
+// o voto.
+model VotingVote {
+  id        String       @id @default(uuid())
+  votingId  String
+  voting    Voting       @relation(fields: [votingId], references: [id], onDelete: Cascade)
+  optionId  String
+  option    VotingOption @relation(fields: [optionId], references: [id], onDelete: Cascade)
+  unitId    String
+  unit      Unit         @relation(fields: [unitId], references: [id], onDelete: Cascade)
+  userId    String?
+  user      User?        @relation(fields: [userId], references: [id], onDelete: SetNull)
+  createdAt DateTime     @default(now())
+
+  @@unique([votingId, unitId])
 }
 
 model Vehicle {
@@ -170,7 +218,10 @@ model Invoice {
   version       Int         @default(0)
   operationId   String?
   operation     PaymentOperation? @relation(fields: [operationId], references: [id])
-  paymentAttempt PaymentAttempt?
+  currentPaymentAttemptId String?
+  currentPaymentAttempt PaymentAttempt? @relation("CurrentAttempt", fields: [id, currentPaymentAttemptId], references: [invoiceId, id], onDelete: Restrict, onUpdate: Restrict)
+  @@index([id, currentPaymentAttemptId])
+  paymentAttempts PaymentAttempt[]
   audits        InvoiceAudit[]
 
   // Relacionamentos
@@ -202,7 +253,7 @@ model PaymentOperation {
 
 model PaymentAttempt {
   id                String   @id @default(uuid())
-  invoiceId         String   @unique
+  invoiceId         String
   invoice           Invoice  @relation(fields: [invoiceId], references: [id])
   externalReference String   @unique
   idempotencyKey    String   @unique
@@ -225,6 +276,9 @@ model PaymentAttempt {
   updatedAt         DateTime @updatedAt
 
   @@index([state, retryAt])
+  @@index([invoiceId])
+  @@unique([invoiceId, id])
+  currentFor Invoice[] @relation("CurrentAttempt")
 }
 
 model PaymentWebhook {
@@ -259,4 +313,111 @@ model InvoiceAudit {
   createdAt  DateTime @default(now())
 
   @@index([invoiceId, createdAt])
+}
+
+// RF-014 — áreas comuns do condomínio (salão de festas, churrasqueira...).
+model CommonArea {
+  id           String        @id @default(uuid())
+  name         String
+  description  String?       @db.Text
+  capacity     Int?
+  rules        String?       @db.Text
+  isActive     Boolean       @default(true)
+  reservations Reservation[]
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+}
+
+enum ReservationStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
+// RF-015 — reserva de área comum. `date` guarda o dia (00:00 UTC) e o
+// horário fica em startTime/endTime no formato "HH:mm", como no plano.
+model Reservation {
+  id              String            @id @default(uuid())
+  date            DateTime
+  startTime       String
+  endTime         String
+  status          ReservationStatus @default(PENDING)
+  rejectionReason String?
+  userId          String
+  user            User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  commonAreaId    String
+  commonArea      CommonArea        @relation(fields: [commonAreaId], references: [id], onDelete: Cascade)
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  @@index([commonAreaId, date])
+  @@index([userId])
+}
+
+enum IncidentCategory {
+  BARULHO
+  MANUTENCAO
+  SEGURANCA
+  LIMPEZA
+  OUTRO
+}
+
+enum IncidentStatus {
+  OPEN
+  IN_PROGRESS
+  RESOLVED
+  CLOSED
+}
+
+// RF-019 — ocorrências registradas por moradores e respondidas pela gestão.
+model Incident {
+  id          String           @id @default(uuid())
+  title       String
+  description String           @db.Text
+  category    IncidentCategory
+  status      IncidentStatus   @default(OPEN)
+  response    String?          @db.Text
+  respondedAt DateTime?
+  authorId    String
+  author      User             @relation("IncidentAuthor", fields: [authorId], references: [id], onDelete: Cascade)
+  unitId      String?
+  unit        Unit?            @relation(fields: [unitId], references: [id], onDelete: SetNull)
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  @@index([authorId])
+  @@index([status])
+}
+
+enum ParkingType {
+  RESIDENT
+  VISITOR
+  DISABLED
+}
+
+model ParkingSpot {
+  id        String      @id @default(uuid())
+  number    String      @unique
+  type      ParkingType
+  unitId    String?
+  unit      Unit?       @relation(fields: [unitId], references: [id], onDelete: SetNull)
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+
+  @@index([unitId])
+}
+
+model InboxNotification {
+  id String @id @default(uuid())
+  key String @unique @db.VarChar(191)
+  userId String
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type String @db.VarChar(16)
+  sourceId String
+  title String
+  description String
+  createdAt DateTime @default(now())
+  readAt DateTime?
+  @@index([userId, createdAt])
 }

@@ -1,3 +1,4 @@
+import { hasPanelAccess } from '../lib/access';
 import { useState, useCallback, useEffect, useRef, type ReactNode } from 'react';
 import { AuthContext } from './authStore';
 import { authService } from '../services/authService';
@@ -5,16 +6,9 @@ import type { User } from '../types/user';
 import type { LoginRequest } from '../types/auth';
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-    // O token virou cookie httpOnly — invisível para o JS. O que sobra no
-    // browser é um cache do perfil, lido uma única vez no primeiro render para
-    // o gate do `ProtectedLayout` já avaliar a sessão certa no primeiro frame.
-    // É um palpite otimista: quem dá a palavra final é o `/auth/me`.
-    const [user, setUser] = useState<User | null>(() => authService.getCachedUser());
-
-    // Com cache, renderiza otimista e revalida em background. Sem cache não dá
-    // para saber se existe cookie (é httpOnly), então espera o /auth/me
-    // responder antes de decidir entre painel e login.
-    const [isLoading, setIsLoading] = useState<boolean>(() => authService.getCachedUser() === null);
+    // O perfil só autentica o painel depois da validação no servidor.
+    const [user, setUser] = useState<User | null>(null);
+    const [isLoading, setIsLoading] = useState(true);
 
     // Um login/logout concorrente com a revalidação inicial não pode ser
     // sobrescrito pela resposta atrasada do /auth/me.
@@ -27,8 +21,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             .me()
             .then((freshUser) => {
                 if (!active || settledByUser.current) return;
-                setUser(freshUser);
-                authService.cacheUser(freshUser);
+                if (hasPanelAccess(freshUser)) {
+                    setUser(freshUser);
+                    authService.cacheUser(freshUser);
+                } else {
+                    setUser(null);
+                    authService.clearCachedUser();
+                }
             })
             .catch(() => {
                 // Cookie ausente, expirado ou conta sem acesso: derruba o cache.
@@ -48,6 +47,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const login = useCallback(async (data: LoginRequest) => {
         const response = await authService.login(data);
         settledByUser.current = true;
+        if (!hasPanelAccess(response.user)) {
+            setUser(null);
+            authService.clearCachedUser();
+            throw new Error('Seu perfil deve acessar o aplicativo do morador.');
+        }
         setUser(response.user);
         authService.cacheUser(response.user);
     }, []);

@@ -35,11 +35,7 @@ export interface User {
   isCouncilMember: boolean;
   condominiumId: string;
   unitId: string | null;
-  /**
-   * A API só devolve a relação `unit` em `GET /users/:id` (restrito a
-   * ADMIN/FUNCIONARIO). O `POST /auth/login` devolve apenas `unitId`.
-   * Ver `userService.resolveUnit`.
-   */
+  /** Relação disponível no perfil atualizado de GET /auth/me. */
   unit?: Unit | null;
   createdAt: string;
   updatedAt: string;
@@ -61,7 +57,6 @@ export interface Notice {
   targetType: TargetType;
   status: NoticeStatus;
   priority: NoticePriority;
-  condominiumId: string;
   targetUnitId: string | null;
   targetUnit: Unit | null;
   authorId: string;
@@ -94,7 +89,6 @@ export interface CondoEvent {
   category: EventCategory;
   capacity: number | null;
   status: EventStatus;
-  condominiumId: string;
   targetUnitId: string | null;
   targetUnit: Unit | null;
   authorId: string;
@@ -107,12 +101,56 @@ export interface CondoEvent {
 export interface LoginResponse {
   user: User;
   token: string;
+  refreshToken: string;
 }
 
-/** Payload do JWT, devolvido por `GET /users/me` dentro de `perfil`. */
-export interface SessionProfile {
+export interface CommonArea {
   id: string;
-  role: UserRole;
-  iat?: number;
-  exp?: number;
+  name: string;
+  description: string | null;
+  capacity: number | null;
+  rules: string | null;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type ReservationStatus = 'PENDING' | 'APPROVED' | 'REJECTED' | 'CANCELLED';
+export interface ReservationInput {
+  commonAreaId: string;
+  date: string;
+  startTime: string;
+  endTime: string;
+}
+export interface Reservation {
+  id: string;
+  date: string;
+  startTime: string;
+  endTime: string;
+  status: ReservationStatus;
+  rejectionReason: string | null;
+  createdAt: string;
+  commonArea: Pick<CommonArea, 'id' | 'name'>;
+  user: { id: string; name: string; unit: Pick<Unit, 'id' | 'block' | 'number'> | null };
+}
+
+export type IncidentCategory = 'BARULHO' | 'MANUTENCAO' | 'SEGURANCA' | 'LIMPEZA' | 'OUTRO';
+export type IncidentStatus = 'OPEN' | 'IN_PROGRESS' | 'RESOLVED' | 'CLOSED';
+export interface IncidentInput {
+  title: string;
+  description: string;
+  category: IncidentCategory;
+}
+export interface Incident {
+  id: string;
+  title: string;
+  description: string;
+  category: IncidentCategory;
+  status: IncidentStatus;
+  response: string | null;
+  respondedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+  author: { id: string; name: string };
+  unit: Pick<Unit, 'id' | 'block' | 'number'> | null;
 }

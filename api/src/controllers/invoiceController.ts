@@ -1,3 +1,4 @@
+import { logger } from '../lib/logger';
 import { Response } from 'express';
 import { PaymentError } from '../lib/paymentDomain';
 import { paymentWebhookService } from '../services/paymentWebhookService';
@@ -9,7 +10,7 @@ function respondError(res: Response, error: unknown) {
     res.status(error.statusCode).json({ error: error.message, code: error.code });
     return;
   }
-  console.error('invoice_request_failed', { code: 'INTERNAL_ERROR' });
+  logger.error({ code: 'INTERNAL_ERROR' }, 'Falha ao processar solicitação de fatura.');
   res.status(500).json({ error: 'Não foi possível concluir a operação.' });
 }
 
@@ -160,6 +161,14 @@ export const invoiceController = {
     } catch (error: unknown) {
       respondError(res, error);
     }
+  },
+  async reissue(req: AuthRequest, res: Response) {
+    try { res.status(202).json(await invoiceService.reissue(req.params.id as string, req.user!, req.body?.reason, req.get('Idempotency-Key'))); }
+    catch (error) { respondError(res, error); }
+  },
+  async attempts(req: AuthRequest, res: Response) {
+    try { res.json(await invoiceService.attempts(req.params.id as string, req.user!)); }
+    catch (error) { respondError(res, error); }
   },
   async health(req: AuthRequest, res: Response) {
     try { res.json(await invoiceService.health(req.user!)); }

@@ -1,0 +1,4068 @@
+openapi: 3.0.3
+info:
+  title: DomusApp API
+  version: 1.0.0
+  description: "Contrato centralizado das rotas. Autenticação por cookie httpOnly ou Bearer como alternativas. Para cookie
+    web, faça login: o navegador não permite definir o cookie manualmente no Authorize. Entradas passam pelos schemas
+    Zod e regras dos serviços. Rotas protegidas validam cadastro ACTIVE e tokenVersion no banco a cada requisição; tokens revogados recebem 401 e indisponibilidade de validação recebe 503. Tokens legados sem versão exigem novo login."
+servers:
+  - url: /
+security:
+  - cookieAuth: []
+  - bearerAuth: []
+paths:
+  "/reports/occupancy":
+    get:
+      tags: ["Relatórios"]
+      summary: "Taxa atual de ocupação por bloco"
+      description: "Acesso exclusivo a ADMIN, FUNCIONARIO e MORADOR com isSyndic=true. Conta uma unidade como ocupada se existir ao menos um MORADOR ACTIVE vinculado. ADMIN/FUNCIONARIO e moradores inativos não ocupam. Blocos nulos, vazios ou só com espaços são agrupados em Sem bloco. Taxa percentual = ocupadas ÷ total × 100; total geral ponderado por unidades. Não recebe período."
+      responses:
+        "200":
+          description: "Relatório calculado; listas vazias e totais zero quando não há dados."
+          content:
+            "application/json":
+              schema:
+                "$ref": "#/components/schemas/ReportOccupancy"
+        "400":
+          "$ref": "#/components/responses/400"
+        "401":
+          "$ref": "#/components/responses/401"
+        "403":
+          "$ref": "#/components/responses/403"
+        "500":
+          "$ref": "#/components/responses/500"
+        "503":
+          "$ref": "#/components/responses/503"
+  "/reports/charges-summary":
+    get:
+      tags: ["Relatórios"]
+      summary: "Cobranças por mês de vencimento"
+      description: "Acesso exclusivo a ADMIN, FUNCIONARIO e MORADOR com isSyndic=true. Filtra Invoice.dueDate por dias inclusivos no calendário UTC usado no cadastro das faturas (AAAA-MM-DD); agrega pelo mês de vencimento nesse mesmo calendário. PAID é paga; OVERDUE é vencida independentemente da data; PENDING é vencida somente quando dueDate < instante atual (comparação estrita), caso contrário pendente. Outros estados (canceladas, expiradas, rejeitadas, estornadas, contestadas e parcialmente estornadas) são excluídos. Não altera status nem consulta o provedor. Valores são strings decimais exatas. Taxa de inadimplência = valor vencido ÷ total pago/pendente/vencido × 100, com uma casa decimal; denominador zero resulta em 0. Retorna somente meses com cobranças elegíveis."
+      parameters: [{"name":"startDate","in":"query","required":false,"description":"Primeiro dia civil incluído (AAAA-MM-DD). Padrão: primeiro dia do mês de endDate menos 11 meses.","schema":{"type":"string","format":"date"}},{"name":"endDate","in":"query","required":false,"description":"Último dia civil incluído (AAAA-MM-DD). Padrão: hoje em America/Sao_Paulo. Início ≤ fim; máximo de 24 meses, sem incluir o aniversário de dois anos. Datas entre 1000-01-01 e 9998-12-31.","schema":{"type":"string","format":"date"}}]
+      responses:
+        "200":
+          description: "Relatório calculado; listas vazias e totais zero quando não há dados."
+          content:
+            "application/json":
+              schema:
+                "$ref": "#/components/schemas/ReportCharges"
+        "400":
+          "$ref": "#/components/responses/400"
+        "401":
+          "$ref": "#/components/responses/401"
+        "403":
+          "$ref": "#/components/responses/403"
+        "500":
+          "$ref": "#/components/responses/500"
+        "503":
+          "$ref": "#/components/responses/503"
+  "/reports/incidents":
+    get:
+      tags: ["Relatórios"]
+      summary: "Ocorrências por categoria e status"
+      description: "Acesso exclusivo a ADMIN, FUNCIONARIO e MORADOR com isSyndic=true. Filtra Incident.createdAt pelos dias inclusivos em America/Sao_Paulo. Contagens por categoria e por status atual; nenhuma informação pessoal, título ou descrição é retornada."
+      parameters: [{"name":"startDate","in":"query","required":false,"description":"Primeiro dia civil incluído (AAAA-MM-DD). Padrão: primeiro dia do mês de endDate menos 11 meses.","schema":{"type":"string","format":"date"}},{"name":"endDate","in":"query","required":false,"description":"Último dia civil incluído (AAAA-MM-DD). Padrão: hoje em America/Sao_Paulo. Início ≤ fim; máximo de 24 meses, sem incluir o aniversário de dois anos. Datas entre 1000-01-01 e 9998-12-31.","schema":{"type":"string","format":"date"}}]
+      responses:
+        "200":
+          description: "Relatório calculado; listas vazias e totais zero quando não há dados."
+          content:
+            "application/json":
+              schema:
+                "$ref": "#/components/schemas/ReportIncidents"
+        "400":
+          "$ref": "#/components/responses/400"
+        "401":
+          "$ref": "#/components/responses/401"
+        "403":
+          "$ref": "#/components/responses/403"
+        "500":
+          "$ref": "#/components/responses/500"
+        "503":
+          "$ref": "#/components/responses/503"
+  "/reports/reservations":
+    get:
+      tags: ["Relatórios"]
+      summary: "Reservas por área comum e status"
+      description: "Acesso exclusivo a ADMIN, FUNCIONARIO e MORADOR com isSyndic=true. Filtra Reservation.date pelo dia civil inclusivo, respeitando o armazenamento a 00:00 UTC. Contagens por área (identificada por ID, incluindo áreas inativas com reservas históricas) e por status atual. Todos os status são incluídos; solicitações aprovadas não comprovam uso efetivo."
+      parameters: [{"name":"startDate","in":"query","required":false,"description":"Primeiro dia civil incluído (AAAA-MM-DD). Padrão: primeiro dia do mês de endDate menos 11 meses.","schema":{"type":"string","format":"date"}},{"name":"endDate","in":"query","required":false,"description":"Último dia civil incluído (AAAA-MM-DD). Padrão: hoje em America/Sao_Paulo. Início ≤ fim; máximo de 24 meses, sem incluir o aniversário de dois anos. Datas entre 1000-01-01 e 9998-12-31.","schema":{"type":"string","format":"date"}}]
+      responses:
+        "200":
+          description: "Relatório calculado; listas vazias e totais zero quando não há dados."
+          content:
+            "application/json":
+              schema:
+                "$ref": "#/components/schemas/ReportReservations"
+        "400":
+          "$ref": "#/components/responses/400"
+        "401":
+          "$ref": "#/components/responses/401"
+        "403":
+          "$ref": "#/components/responses/403"
+        "500":
+          "$ref": "#/components/responses/500"
+        "503":
+          "$ref": "#/components/responses/503"
+  /api/status:
+    get:
+      tags:
+        - Sistema
+      summary: Consultar disponibilidade da API
+      description: ""
+      security: []
+      responses:
+        "200":
+          description: Operação concluída.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  timestamp:
+                    type: string
+                    format: date-time
+  /auth/login:
+    post:
+      tags:
+        - auth
+      summary: Iniciar sessão
+      description: Web recebe cookies httpOnly domusapp_token e domusapp_refresh; client=mobile recebe também token e
+        refreshToken. Com client=panel, perfil sem acesso ao painel (morador sem isSyndic) recebe 403
+        sem cookies.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Login"
+      responses:
+        "200":
+          description: Operação concluída.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Session"
+        "400":
+          $ref: "#/components/responses/400"
+        "401":
+          $ref: "#/components/responses/401"
+        "403":
+          $ref: "#/components/responses/403"
+        "429":
+          $ref: "#/components/responses/429"
+        "500":
+          $ref: "#/components/responses/500"
+  /auth/logout:
+    post:
+      tags:
+        - auth
+      summary: Encerrar e revogar sessão
+      description: Pública para permitir remover cookies mesmo após expiração.
+      security: []
+      responses:
+        "200":
+          description: Operação concluída.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Message"
+        "503":
+          $ref: "#/components/responses/503"
+  /auth/refresh:
+    post:
+      tags:
+        - auth
+      summary: Renovar sessão
+      description: ""
+      security: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Refresh"
+      responses:
+        "200":
+          description: Operação concluída.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Message"
+        "400":
+          $ref: "#/components/responses/400"
+        "401":
+          $ref: "#/components/responses/401"
+        "429":
+          $ref: "#/components/responses/429"
+        "500":
+          $ref: "#/components/responses/500"
+  /auth/forgot-password:
+    post:
+      tags:
+        - auth
+      summary: Solicitar recuperação de senha
+      description: ""
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ForgotPassword"
+      responses:
+        "200":
+          description: Operação concluída.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Message"
+        "400":
+          $ref: "#/components/responses/400"
+        "429":
+          $ref: "#/components/responses/429"
+  /auth/reset-password:
+    post:
+      tags:
+        - auth
+      summary: Redefinir senha
+      description: ""
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ResetPassword"
+      responses:
+        "200":
+          description: Operação concluída.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Message"
+        "400":
+          $ref: "#/components/responses/400"
+        "429":
+          $ref: "#/components/responses/429"
+        "500":
+          $ref: "#/components/responses/500"
+  /auth/me:
+    get:
+      tags:
+        - auth
+      summary: Consultar usuário da sessão
+      description: Retorna o próprio perfil atualizado com unidade, para qualquer usuário ACTIVE autenticado. Não concede privilégios administrativos; usuários inativos ou excluídos recebem 401.
+      responses:
+        "200":
+          description: Operação concluída.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  user:
+                    $ref: "#/components/schemas/User"
+        "400":
+          $ref: "#/components/responses/400"
+        "401":
+          $ref: "#/components/responses/401"
+        "403":
+          $ref: "#/components/responses/403"
+        "500":
+          $ref: "#/components/responses/500"
+  /users/me:
+    get:
+      tags:
+        - users
+      summary: Consultar perfil do token (legado)
+      deprecated: true
+      description: Mantido por compatibilidade. Clientes novos devem consultar GET /auth/me.
+      responses:
+        "200":
+          description: Operação concluída.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  perfil:
+                    $ref: "#/components/schemas/User"
+        "400":
+          $ref: "#/components/responses/400"
+        "401":
+          $ref: "#/components/responses/401"
+        "403":
+          $ref: "#/components/responses/403"
+        "500":
+          $ref: "#/components/responses/500"
+  /users:
+    get:
+      tags:
+        - users
+      summary: Listar e buscar usuários
+      description: "Perfis permitidos: ADMIN, FUNCIONARIO. SYNDIC corresponde ao atributo isSyndic."
+      parameters:
+        - name: search
+          in: query
+          required: false
+          schema:
+            type: string
+            maxLength: 191
+      responses:
+        "200":
+          description: Operação concluída.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/User"
+        "400":
+          $ref: "#/components/responses/400"
+        "401":
+          $ref: "#/components/responses/401"
+        "403":
+          $ref: "#/components/responses/403"
+        "500":
+          $ref: "#/components/responses/500"
+    post:
+      tags:
+        - users
+      summary: Criar usuário
+      description: "Perfis permitidos: ADMIN. SYNDIC corresponde ao atributo isSyndic."
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UserCreate"
+      responses:
+        "201":
+          description: Operação concluída.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "400":
+          $ref: "#/components/responses/400"
+        "401":
+          $ref: "#/components/responses/401"
+        "403":
+          $ref: "#/components/responses/403"
+        "500":
+          $ref: "#/components/responses/500"
+  /users/{id}:
+    get:
+      tags:
+        - users
+      summary: Buscar usuário
+      description: "Perfis permitidos: ADMIN, FUNCIONARIO. SYNDIC corresponde ao atributo isSyndic."
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Operação concluída.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "400":
+          $ref: "#/components/responses/400"
+        "401":
+          $ref: "#/components/responses/401"
+        "403":
+          $ref: "#/components/responses/403"
+        "404":
+          $ref: "#/components/responses/404"
+        "500":
+          $ref: "#/components/responses/500"
+    put:
+      tags:
+        - users
+      summary: Atualizar usuário
+      description: "Perfis permitidos: ADMIN. SYNDIC corresponde ao atributo isSyndic."
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UserUpdate"
+      responses:
+        "200":
+          description: Operação concluída.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "400":
+          $ref: "#/components/responses/400"
+        "401":
+          $ref: "#/components/responses/401"
+        "403":
+          $ref: "#/components/responses/403"
+        "500":
+          $ref: "#/components/responses/500"
+    delete:
+      tags:
+        - users
+      summary: Excluir usuário
+      description: "Perfis permitidos: ADMIN. SYNDIC corresponde ao atributo isSyndic."
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Operação concluída.
+        "400":
+          $ref: "#/components/responses/400"
+        "401":
+          $ref: "#/components/responses/401"
+        "403":
+          $ref: "#/components/responses/403"
+        "500":
+          $ref: "#/components/responses/500"
+  /units:
+    get:
+      tags:
+        - units
+      summary: Listar unidades
+      description: "Perfis permitidos: ADMIN, FUNCIONARIO. SYNDIC corresponde ao atributo isSyndic."
+      responses:
+        "200":
+          description: Operação concluída.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: string
+                      format: uuid
+                    type:
+                      type: string
+                      enum:
+                        - APARTMENT
+                        - HOUSE
+                    block:
+                      type: string
+                      maxLength: 50
+                    number:
+                      type: string
+                      minLength: 1
+                      maxLength: 20
+                    parkingSpots:
+                      type: integer
+                      minimum: 0
+                      readOnly: true
+                      description: Contador derivado das vagas atribuídas; não editável.
+                    parkingSpotRecords:
+                      type: array
+                      readOnly: true
+                      items:
+                        $ref: "#/components/schemas/ParkingSpotRecord"
+                      description: Vagas numeradas atribuídas, ordenadas por número. Números PROV são provisórios, criados na migração para preservar os limites existentes.
+        "400":
+          $ref: "#/components/responses/400"
+        "401":
+          $ref: "#/components/responses/401"
+        "403":
+          $ref: "#/components/responses/403"
+        "500":
+          $ref: "#/components/responses/500"
+    post:
+      tags:
+        - units
+      summary: Criar unidade
+      description: "Perfis permitidos: ADMIN. SYNDIC corresponde ao atributo isSyndic."
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UnitCreate"
+      responses:
+        "201":
+          description: Operação concluída.
+        "400":
+          $ref: "#/components/responses/400"
+        "401":
+          $ref: "#/components/responses/401"
+        "403":
+          $ref: "#/components/responses/403"
+        "500":
+          $ref: "#/components/responses/500"
+  /units/{id}:
+    put:
+      tags:
+        - units
+      summary: Atualizar unidade
+      description: "Perfis permitidos: ADMIN. SYNDIC corresponde ao atributo isSyndic."
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UnitUpdate"
+      responses:
+        "200":
+          description: Operação concluída.
+        "400":
+          $ref: "#/components/responses/400"
+        "401":
+          $ref: "#/components/responses/401"
+        "403":
+          $ref: "#/components/responses/403"
+        "500":
+          $ref: "#/components/responses/500"
+    delete:
+      tags:
+        - units
+      summary: Excluir unidade
+      description: "Perfis permitidos: ADMIN. SYNDIC corresponde ao atributo isSyndic."
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Operação concluída.
+        "400":
+          $ref: "#/components/responses/400"
+        "401":
+          $ref: "#/components/responses/401"
+        "403":
+          $ref: "#/components/responses/403"
+        "500":
+          $ref: "#/components/responses/500"
+  /notices:
+    get:
+      tags:
+        - notices
+      summary: Listar avisos
+      description: ""
+      responses:
+        "200":
+          description: Operação concluída.
+        "400":
+          $ref: "#/components/responses/400"
+        "401":
+          $ref: "#/components/responses/401"
+        "403":
+          $ref: "#/components/responses/403"
+        "500":
+          $ref: "#/components/responses/500"
+    post:
+      tags:
+        - notices
+      summary: Criar registro em avisos
+      description: "Perfis permitidos: ADMIN, SYNDIC. SYNDIC corresponde ao atributo isSyndic."
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/NoticeCreate"
+      responses:
+        "201":
+          description: Operação concluída.
+        "400":
+          $ref: "#/components/responses/400"
+        "401":
+          $ref: "#/components/responses/401"
+        "403":
+          $ref: "#/components/responses/403"
+        "500":
+          $ref: "#/components/responses/500"
+  /notices/{id}:
+    put:
+      tags: [notices]
+      summary: Editar registro parcialmente
+      description: "ADMIN edita qualquer aviso; síndica somente os próprios. Mudanças de título, conteúdo ou destinatários resetam leituras. Status e prioridade preservam leituras. Campos omitidos são preservados; exige pelo menos um campo editável. Campos desconhecidos são descartados."
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NoticeUpdate'
+      responses:
+        '200':
+          description: Registro atualizado.
+          content:
+            application/json:
+              schema:
+                type: object
+        '400':
+          $ref: '#/components/responses/400'
+        '401':
+          $ref: '#/components/responses/401'
+        '403':
+          $ref: '#/components/responses/403'
+        '404':
+          $ref: '#/components/responses/404'
+        '409':
+          $ref: '#/components/responses/409'
+    delete:
+      tags:
+        - notices
+      summary: Excluir registro de avisos
+      description: "Perfis permitidos: ADMIN, SYNDIC. SYNDIC corresponde ao atributo isSyndic."
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Operação concluída.
+        "400":
+          $ref: "#/components/responses/400"
+        "401":
+          $ref: "#/components/responses/401"
+        "403":
+          $ref: "#/components/responses/403"
+        "500":
+          $ref: "#/components/responses/500"
+  /events:
+    get:
+      tags:
+        - events
+      summary: Listar eventos
+      description: ""
+      responses:
+        "200":
+          description: Operação concluída.
+        "400":
+          $ref: "#/components/responses/400"
+        "401":
+          $ref: "#/components/responses/401"
+        "403":
+          $ref: "#/components/responses/403"
+        "500":
+          $ref: "#/components/responses/500"
+    post:
+      tags:
+        - events
+      summary: Criar registro em eventos
+      description: "Perfis permitidos: ADMIN, SYNDIC. SYNDIC corresponde ao atributo isSyndic."
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EventCreate"
+      responses:
+        "201":
+          description: Operação concluída.
+        "400":
+          $ref: "#/components/responses/400"
+        "401":
+          $ref: "#/components/responses/401"
+        "403":
+          $ref: "#/components/responses/403"
+        "500":
+          $ref: "#/components/responses/500"
+  /events/{id}:
+    put:
+      tags: [events]
+      summary: Editar registro parcialmente
+      description: "ADMIN edita qualquer evento; síndica somente os próprios. Permite publicar e cancelar eventos. Campos omitidos são preservados; exige pelo menos um campo editável. Campos desconhecidos são descartados."
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EventUpdate'
+      responses:
+        '200':
+          description: Registro atualizado.
+          content:
+            application/json:
+              schema:
+                type: object
+        '400':
+          $ref: '#/components/responses/400'
+        '401':
+          $ref: '#/components/responses/401'
+        '403':
+          $ref: '#/components/responses/403'
+        '404':
+          $ref: '#/components/responses/404'
+        '409':
+          $ref: '#/components/responses/409'
+    delete:
+      tags:
+        - events
+      summary: Excluir registro de eventos
+      description: "Perfis permitidos: ADMIN, SYNDIC. SYNDIC corresponde ao atributo isSyndic."
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Operação concluída.
+        "400":
+          $ref: "#/components/responses/400"
+        "401":
+          $ref: "#/components/responses/401"
+        "403":
+          $ref: "#/components/responses/403"
+        "500":
+          $ref: "#/components/responses/500"
+  /votings:
+    get:
+      tags: [votings]
+      summary: Listar votações e o voto da unidade
+      description: >-
+        ADMIN, FUNCIONARIO e MORADOR (incluindo síndica). myVote corresponde ao voto
+        da unidade atual do usuário, mesmo que outro morador tenha votado. É null
+        sem unidade ou sem voto. Somente o painel (ADMIN/FUNCIONARIO/síndica)
+        recebe options[].votes antes do encerramento. Para moradores comuns,
+        votes é omitido enquanto agora <= endDate. Status é derivado das datas
+        pelo cliente. A unidade não é um parâmetro.
+      responses:
+        '200':
+          description: Array de votações, sem paginação.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ResidentVoting'
+        '400':
+          $ref: '#/components/responses/400'
+        '401':
+          $ref: '#/components/responses/401'
+        '403':
+          $ref: '#/components/responses/403'
+    post:
+      tags:
+        - votings
+      summary: Criar registro em votações
+      description: "Perfis permitidos: ADMIN, SYNDIC. SYNDIC corresponde ao atributo isSyndic."
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/VotingCreate"
+      responses:
+        "201":
+          description: Operação concluída.
+        "400":
+          $ref: "#/components/responses/400"
+        "401":
+          $ref: "#/components/responses/401"
+        "403":
+          $ref: "#/components/responses/403"
+        "500":
+          $ref: "#/components/responses/500"
+  /votings/{id}:
+    put:
+      tags: [votings]
+      summary: Editar registro parcialmente
+      description: "ADMIN e síndica editam somente votações antes do início e sem votos. Início final deve permanecer futuro; opções omitidas ou iguais preservam IDs. Campos omitidos são preservados; exige pelo menos um campo editável. Campos desconhecidos são descartados."
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VotingUpdate'
+      responses:
+        '200':
+          description: Registro atualizado.
+          content:
+            application/json:
+              schema:
+                type: object
+        '400':
+          $ref: '#/components/responses/400'
+        '401':
+          $ref: '#/components/responses/401'
+        '403':
+          $ref: '#/components/responses/403'
+        '404':
+          $ref: '#/components/responses/404'
+        '409':
+          $ref: '#/components/responses/409'
+    delete:
+      tags:
+        - votings
+      summary: Excluir registro de votações
+      description: "Perfis permitidos: ADMIN, SYNDIC. SYNDIC corresponde ao atributo isSyndic."
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Operação concluída.
+        "400":
+          $ref: "#/components/responses/400"
+        "401":
+          $ref: "#/components/responses/401"
+        "403":
+          $ref: "#/components/responses/403"
+        "500":
+          $ref: "#/components/responses/500"
+  /votings/{id}/votes:
+    post:
+      tags:
+        - votings
+      summary: Registrar o voto da unidade do morador
+      description: "Perfil permitido: MORADOR com unidade. Um voto por unidade em cada votação, aceito só entre o início e o
+        término (inclusive)."
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - optionId
+              properties:
+                optionId:
+                  type: string
+                  format: uuid
+      responses:
+        "201":
+          description: Voto registrado.
+        "400":
+          $ref: "#/components/responses/400"
+        "401":
+          $ref: "#/components/responses/401"
+        "403":
+          $ref: "#/components/responses/403"
+        "404":
+          $ref: "#/components/responses/404"
+        "409":
+          $ref: "#/components/responses/409"
+        "500":
+          $ref: "#/components/responses/500"
+  /notices/{id}/read:
+    post:
+      tags:
+        - notices
+      summary: Marcar aviso como lido para a pessoa autenticada
+      description: "Morador só marca avisos publicados para todos ou para a própria unidade (403 nos demais)."
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Operação concluída.
+        "400":
+          $ref: "#/components/responses/400"
+        "401":
+          $ref: "#/components/responses/401"
+        "403":
+          $ref: "#/components/responses/403"
+        "500":
+          $ref: "#/components/responses/500"
+  /vehicles:
+    get:
+      tags: [vehicles]
+      summary: Listar veículos
+      description: "ADMIN e FUNCIONARIO. Filtros combinados; placa parcial normalizada. Ordenação por bloco, número da unidade e placa. A contagem da unidade inclui todos os seus veículos, independentemente dos filtros."
+      parameters:
+        - name: plate
+          in: query
+          schema:
+            type: string
+            maxLength: 20
+        - name: unitId
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: block
+          in: query
+          description: Bloco exato, sem espaços nas extremidades.
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 191
+      responses:
+        "200":
+          description: Veículos e ocupação total de suas unidades.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/PanelVehicle"
+        "400":
+          $ref: "#/components/responses/400"
+        "401":
+          $ref: "#/components/responses/401"
+        "403":
+          $ref: "#/components/responses/403"
+        "500":
+          $ref: "#/components/responses/500"
+    post:
+      tags: [vehicles]
+      summary: Cadastrar veículo
+      description: "ADMIN deve informar unitId de unidade existente. MORADOR usa a própria unidade; unitId informado é ignorado. FUNCIONARIO não cadastra. Ambos usam o mesmo lock transacional da unidade e o limite Unit.parkingSpots. Unidade cheia ou sem vagas retorna 400; placa duplicada retorna 409."
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/VehicleCreate"
+      responses:
+        "201":
+          description: Veículo cadastrado.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Vehicle"
+        "400":
+          $ref: "#/components/responses/400"
+        "401":
+          $ref: "#/components/responses/401"
+        "403":
+          $ref: "#/components/responses/403"
+        "404":
+          description: Unidade informada não encontrada.
+        "409":
+          description: Já existe um veículo cadastrado com esta placa.
+        "500":
+          $ref: "#/components/responses/500"
+  /vehicles/me:
+    get:
+      tags:
+        - vehicles
+      summary: Listar meus veículos
+      description: "Perfis permitidos: MORADOR. SYNDIC corresponde ao atributo isSyndic."
+      responses:
+        "200":
+          description: Operação concluída.
+        "400":
+          $ref: "#/components/responses/400"
+        "401":
+          $ref: "#/components/responses/401"
+        "403":
+          $ref: "#/components/responses/403"
+        "500":
+          $ref: "#/components/responses/500"
+  /vehicles/{id}:
+    put:
+      tags: [vehicles]
+      summary: Editar registro parcialmente
+      description: "Somente ADMIN. Unidade não pode ser alterada. Placa duplicada retorna 409. Campos omitidos são preservados; exige pelo menos um campo editável. Campos desconhecidos são descartados."
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VehicleUpdate'
+      responses:
+        '200':
+          description: Registro atualizado.
+          content:
+            application/json:
+              schema:
+                type: object
+        '400':
+          $ref: '#/components/responses/400'
+        '401':
+          $ref: '#/components/responses/401'
+        '403':
+          $ref: '#/components/responses/403'
+        '404':
+          $ref: '#/components/responses/404'
+        '409':
+          $ref: '#/components/responses/409'
+    delete:
+      tags:
+        - vehicles
+      summary: Excluir registro de veículos
+      description: "Morador só pode excluir seus próprios registros. Perfis permitidos: ADMIN, MORADOR. SYNDIC corresponde ao
+        atributo isSyndic."
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Operação concluída.
+        "400":
+          $ref: "#/components/responses/400"
+        "401":
+          $ref: "#/components/responses/401"
+        "403":
+          $ref: "#/components/responses/403"
+        "500":
+          $ref: "#/components/responses/500"
+  /pets:
+    get:
+      tags: [pets]
+      summary: Listar pets do condomínio
+      description: "ADMIN e FUNCIONARIO. Filtros combinados por AND; search procura parte do nome do pet ou do dono. Ordena por bloco, número da unidade, nome do pet e id. Dados do dono limitados a id, nome, telefone e unidade, sem CPF ou e-mail."
+      parameters:
+        - name: species
+          in: query
+          schema:
+            type: string
+            enum: [CACHORRO, GATO, PASSARO, OUTRO]
+        - name: size
+          in: query
+          schema:
+            type: string
+            enum: [PEQUENO, MEDIO, GRANDE]
+        - name: unitId
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: block
+          in: query
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 191
+        - name: search
+          in: query
+          schema:
+            type: string
+            maxLength: 191
+      responses:
+        "200":
+          description: Pets com dono e unidade.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/PetPanel"
+        "400":
+          $ref: "#/components/responses/400"
+        "401":
+          $ref: "#/components/responses/401"
+        "403":
+          $ref: "#/components/responses/403"
+        "500":
+          $ref: "#/components/responses/500"
+    post:
+      tags: [pets]
+      summary: Cadastrar pet
+      description: "ADMIN deve informar ownerId de um MORADOR ACTIVE. MORADOR continua cadastrando para si; ownerId válido enviado é ignorado. FUNCIONARIO não pode cadastrar. Espécie e porte aceitam letras minúsculas e são normalizados."
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PetCreate"
+      responses:
+        "201":
+          description: Pet cadastrado.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PetRecord"
+        "400":
+          $ref: "#/components/responses/400"
+        "401":
+          $ref: "#/components/responses/401"
+        "403":
+          $ref: "#/components/responses/403"
+        "500":
+          $ref: "#/components/responses/500"
+  /pets/me:
+    get:
+      tags:
+        - pets
+      summary: Listar meus animais
+      description: "Perfis permitidos: MORADOR. SYNDIC corresponde ao atributo isSyndic."
+      responses:
+        "200":
+          description: Operação concluída.
+        "400":
+          $ref: "#/components/responses/400"
+        "401":
+          $ref: "#/components/responses/401"
+        "403":
+          $ref: "#/components/responses/403"
+        "500":
+          $ref: "#/components/responses/500"
+  /pets/{id}:
+    put:
+      tags: [pets]
+      summary: Editar pet parcialmente
+      description: "ADMIN ou MORADOR dono. Apenas name, species e size são editáveis. ownerId e demais campos desconhecidos são descartados."
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PetUpdate"
+      responses:
+        "200":
+          description: Pet atualizado.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PetRecord"
+        "400":
+          $ref: "#/components/responses/400"
+        "401":
+          $ref: "#/components/responses/401"
+        "403":
+          $ref: "#/components/responses/403"
+        "404":
+          $ref: "#/components/responses/404"
+    delete:
+      tags: [pets]
+      summary: Remover pet
+      description: ADMIN ou MORADOR dono. FUNCIONARIO somente consulta.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Pet removido.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Pet removido com sucesso.
+        "400":
+          $ref: "#/components/responses/400"
+        "401":
+          $ref: "#/components/responses/401"
+        "403":
+          $ref: "#/components/responses/403"
+        "404":
+          $ref: "#/components/responses/404"
+  /invoices/webhook:
+    post:
+      tags:
+        - invoices
+      summary: Receber webhook de Order do Mercado Pago
+      description: Assinatura HMAC validada pelo servidor, com proteção contra replay e divergência de conta/ambiente. Sem JWT.
+      security: []
+      parameters:
+        - name: x-signature
+          in: header
+          required: true
+          schema:
+            type: string
+        - name: x-request-id
+          in: header
+          required: true
+          schema:
+            type: string
+        - name: data.id
+          in: query
+          required: false
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Webhook"
+      responses:
+        "200":
+          description: Operação concluída.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  received:
+                    type: boolean
+        "400":
+          $ref: "#/components/responses/400"
+        "401":
+          $ref: "#/components/responses/401"
+        "409":
+          $ref: "#/components/responses/409"
+        "500":
+          $ref: "#/components/responses/500"
+        "503":
+          $ref: "#/components/responses/503"
+  /invoices:
+    get:
+      tags:
+        - invoices
+      summary: Listar minhas faturas
+      description: Lista paginada com dados Pix conforme estado da emissão.
+      parameters:
+        - name: status
+          in: query
+          required: false
+          schema:
+            type: string
+            enum:
+              - PENDING
+              - PAID
+              - OVERDUE
+              - CANCELLED
+              - EXPIRED
+              - REJECTED
+              - REFUNDED
+              - CHARGED_BACK
+              - PARTIALLY_REFUNDED
+        - name: type
+          in: query
+          required: false
+          schema:
+            type: string
+            enum:
+              - MONTHLY_FEE
+              - EXTRAORDINARY
+              - FINE
+              - OTHER
+        - name: startDate
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date-time
+        - name: endDate
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date-time
+        - name: page
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100000
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+      responses:
+        "200":
+          description: Operação concluída.
+        "400":
+          $ref: "#/components/responses/400"
+        "401":
+          $ref: "#/components/responses/401"
+        "403":
+          $ref: "#/components/responses/403"
+        "500":
+          $ref: "#/components/responses/500"
+    post:
+      tags:
+        - invoices
+      summary: Criar cobrança Pix
+      description: "Perfis permitidos: ADMIN, FUNCIONARIO, SYNDIC. SYNDIC corresponde ao atributo isSyndic."
+      parameters:
+        - name: Idempotency-Key
+          in: header
+          required: true
+          schema:
+            type: string
+            pattern: ^[A-Za-z0-9_-]{16,128}$
+          description: Reutilize a chave e o mesmo conteúdo nas tentativas da mesma operação.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/InvoiceCreate"
+      responses:
+        "201":
+          description: Cobrança já emitida ou recuperada por idempotência.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Invoice"
+        "202":
+          description: Operação aceita para processamento assíncrono.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Invoice"
+        "400":
+          $ref: "#/components/responses/400"
+        "401":
+          $ref: "#/components/responses/401"
+        "403":
+          $ref: "#/components/responses/403"
+        "404":
+          $ref: "#/components/responses/404"
+        "409":
+          $ref: "#/components/responses/409"
+        "500":
+          $ref: "#/components/responses/500"
+        "503":
+          $ref: "#/components/responses/503"
+  /invoices/batch:
+    post:
+      tags:
+        - invoices
+      summary: Criar cobranças em lote
+      description: "Perfis permitidos: ADMIN, FUNCIONARIO, SYNDIC. SYNDIC corresponde ao atributo isSyndic."
+      parameters:
+        - name: Idempotency-Key
+          in: header
+          required: true
+          schema:
+            type: string
+            pattern: ^[A-Za-z0-9_-]{16,128}$
+          description: Reutilize a chave e o mesmo conteúdo nas tentativas da mesma operação.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/InvoiceBatch"
+      responses:
+        "202":
+          description: Operação aceita para processamento assíncrono.
+        "400":
+          $ref: "#/components/responses/400"
+        "401":
+          $ref: "#/components/responses/401"
+        "403":
+          $ref: "#/components/responses/403"
+        "404":
+          $ref: "#/components/responses/404"
+        "409":
+          $ref: "#/components/responses/409"
+        "500":
+          $ref: "#/components/responses/500"
+        "503":
+          $ref: "#/components/responses/503"
+  /invoices/stats:
+    get:
+      tags:
+        - invoices
+      summary: Consultar estatísticas das minhas faturas
+      description: ""
+      responses:
+        "200":
+          description: Operação concluída.
+        "400":
+          $ref: "#/components/responses/400"
+        "401":
+          $ref: "#/components/responses/401"
+        "403":
+          $ref: "#/components/responses/403"
+        "500":
+          $ref: "#/components/responses/500"
+  /invoices/payments/health:
+    get:
+      tags:
+        - invoices
+      summary: Consultar saúde operacional dos pagamentos
+      description: "Perfis permitidos: ADMIN, FUNCIONARIO, SYNDIC. SYNDIC corresponde ao atributo isSyndic."
+      responses:
+        "200":
+          description: Operação concluída.
+        "400":
+          $ref: "#/components/responses/400"
+        "401":
+          $ref: "#/components/responses/401"
+        "403":
+          $ref: "#/components/responses/403"
+        "404":
+          $ref: "#/components/responses/404"
+        "409":
+          $ref: "#/components/responses/409"
+        "500":
+          $ref: "#/components/responses/500"
+        "503":
+          $ref: "#/components/responses/503"
+  /invoices/all:
+    get:
+      tags:
+        - invoices
+      summary: Listar todas as faturas
+      description: "Perfis permitidos: ADMIN, FUNCIONARIO. SYNDIC corresponde ao atributo isSyndic."
+      parameters:
+        - name: status
+          in: query
+          required: false
+          schema:
+            type: string
+            enum:
+              - PENDING
+              - PAID
+              - OVERDUE
+              - CANCELLED
+              - EXPIRED
+              - REJECTED
+              - REFUNDED
+              - CHARGED_BACK
+              - PARTIALLY_REFUNDED
+        - name: type
+          in: query
+          required: false
+          schema:
+            type: string
+            enum:
+              - MONTHLY_FEE
+              - EXTRAORDINARY
+              - FINE
+              - OTHER
+        - name: startDate
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date-time
+        - name: endDate
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date-time
+        - name: page
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100000
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+        - name: userId
+          in: query
+          required: false
+          schema:
+            type: string
+            format: uuid
+        - name: unitId
+          in: query
+          required: false
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Operação concluída.
+        "400":
+          $ref: "#/components/responses/400"
+        "401":
+          $ref: "#/components/responses/401"
+        "403":
+          $ref: "#/components/responses/403"
+        "500":
+          $ref: "#/components/responses/500"
+  /invoices/unit/{unitId}:
+    get:
+      tags:
+        - invoices
+      summary: Listar faturas da unidade
+      description: "Perfis permitidos: ADMIN, FUNCIONARIO, SYNDIC. SYNDIC corresponde ao atributo isSyndic."
+      parameters:
+        - name: status
+          in: query
+          required: false
+          schema:
+            type: string
+            enum:
+              - PENDING
+              - PAID
+              - OVERDUE
+              - CANCELLED
+              - EXPIRED
+              - REJECTED
+              - REFUNDED
+              - CHARGED_BACK
+              - PARTIALLY_REFUNDED
+        - name: type
+          in: query
+          required: false
+          schema:
+            type: string
+            enum:
+              - MONTHLY_FEE
+              - EXTRAORDINARY
+              - FINE
+              - OTHER
+        - name: startDate
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date-time
+        - name: endDate
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date-time
+        - name: page
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100000
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+        - name: unitId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Operação concluída.
+        "400":
+          $ref: "#/components/responses/400"
+        "401":
+          $ref: "#/components/responses/401"
+        "403":
+          $ref: "#/components/responses/403"
+        "500":
+          $ref: "#/components/responses/500"
+  /invoices/unit/{unitId}/stats:
+    get:
+      tags:
+        - invoices
+      summary: Consultar estatísticas da unidade
+      description: "Perfis permitidos: ADMIN, FUNCIONARIO, SYNDIC. SYNDIC corresponde ao atributo isSyndic."
+      parameters:
+        - name: unitId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Operação concluída.
+        "400":
+          $ref: "#/components/responses/400"
+        "401":
+          $ref: "#/components/responses/401"
+        "403":
+          $ref: "#/components/responses/403"
+        "500":
+          $ref: "#/components/responses/500"
+  /invoices/{id}:
+    get:
+      tags:
+        - invoices
+      summary: Consultar fatura e dados Pix
+      description: Morador só pode consultar sua própria fatura.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Operação concluída.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Invoice"
+        "400":
+          $ref: "#/components/responses/400"
+        "401":
+          $ref: "#/components/responses/401"
+        "403":
+          $ref: "#/components/responses/403"
+        "404":
+          $ref: "#/components/responses/404"
+        "409":
+          $ref: "#/components/responses/409"
+        "500":
+          $ref: "#/components/responses/500"
+        "503":
+          $ref: "#/components/responses/503"
+    delete:
+      tags:
+        - invoices
+      summary: Cancelar fatura preservando auditoria
+      description: "Perfis permitidos: ADMIN, FUNCIONARIO, SYNDIC. SYNDIC corresponde ao atributo isSyndic."
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/InvoiceReason"
+      responses:
+        "200":
+          description: Operação concluída.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Invoice"
+        "400":
+          $ref: "#/components/responses/400"
+        "401":
+          $ref: "#/components/responses/401"
+        "403":
+          $ref: "#/components/responses/403"
+        "404":
+          $ref: "#/components/responses/404"
+        "409":
+          $ref: "#/components/responses/409"
+        "500":
+          $ref: "#/components/responses/500"
+        "503":
+          $ref: "#/components/responses/503"
+  /invoices/{id}/audit:
+    get:
+      tags:
+        - invoices
+      summary: Consultar auditoria da fatura
+      description: "Perfis permitidos: ADMIN, FUNCIONARIO, SYNDIC. SYNDIC corresponde ao atributo isSyndic."
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Operação concluída.
+        "400":
+          $ref: "#/components/responses/400"
+        "401":
+          $ref: "#/components/responses/401"
+        "403":
+          $ref: "#/components/responses/403"
+        "404":
+          $ref: "#/components/responses/404"
+        "409":
+          $ref: "#/components/responses/409"
+        "500":
+          $ref: "#/components/responses/500"
+        "503":
+          $ref: "#/components/responses/503"
+  /invoices/{id}/attempts:
+    get:
+      tags:
+        - invoices
+      summary: Consultar histórico de tentativas da fatura
+      description: "Perfis permitidos: ADMIN, FUNCIONARIO, SYNDIC. SYNDIC corresponde ao atributo isSyndic."
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Operação concluída.
+        "400":
+          $ref: "#/components/responses/400"
+        "401":
+          $ref: "#/components/responses/401"
+        "403":
+          $ref: "#/components/responses/403"
+        "404":
+          $ref: "#/components/responses/404"
+        "409":
+          $ref: "#/components/responses/409"
+        "500":
+          $ref: "#/components/responses/500"
+        "503":
+          $ref: "#/components/responses/503"
+  /invoices/{id}/reconcile:
+    post:
+      tags:
+        - invoices
+      summary: Conciliar fatura com o provedor
+      description: "Perfis permitidos: ADMIN, FUNCIONARIO, SYNDIC. SYNDIC corresponde ao atributo isSyndic."
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/InvoiceReason"
+      responses:
+        "200":
+          description: Operação concluída.
+        "400":
+          $ref: "#/components/responses/400"
+        "401":
+          $ref: "#/components/responses/401"
+        "403":
+          $ref: "#/components/responses/403"
+        "404":
+          $ref: "#/components/responses/404"
+        "409":
+          $ref: "#/components/responses/409"
+        "500":
+          $ref: "#/components/responses/500"
+        "503":
+          $ref: "#/components/responses/503"
+  /invoices/{id}/retry:
+    post:
+      tags:
+        - invoices
+      summary: Reagendar emissão da fatura
+      description: "Perfis permitidos: ADMIN, FUNCIONARIO, SYNDIC. SYNDIC corresponde ao atributo isSyndic."
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/InvoiceReason"
+      responses:
+        "202":
+          description: Operação aceita para processamento assíncrono.
+        "400":
+          $ref: "#/components/responses/400"
+        "401":
+          $ref: "#/components/responses/401"
+        "403":
+          $ref: "#/components/responses/403"
+        "404":
+          $ref: "#/components/responses/404"
+        "409":
+          $ref: "#/components/responses/409"
+        "500":
+          $ref: "#/components/responses/500"
+        "503":
+          $ref: "#/components/responses/503"
+  /invoices/{id}/reissue:
+    post:
+      tags:
+        - invoices
+      summary: Reemitir Pix encerrado — Reagendar emissão da fatura
+      description: "Perfis permitidos: ADMIN, FUNCIONARIO, SYNDIC. SYNDIC corresponde ao atributo isSyndic."
+      parameters:
+        - name: Idempotency-Key
+          in: header
+          required: true
+          schema:
+            type: string
+
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/InvoiceReason"
+      responses:
+        "202":
+          description: Operação aceita para processamento assíncrono.
+        "400":
+          $ref: "#/components/responses/400"
+        "401":
+          $ref: "#/components/responses/401"
+        "403":
+          $ref: "#/components/responses/403"
+        "404":
+          $ref: "#/components/responses/404"
+        "409":
+          $ref: "#/components/responses/409"
+        "500":
+          $ref: "#/components/responses/500"
+        "503":
+          $ref: "#/components/responses/503"
+  /invoices/{id}/status:
+    put:
+      tags:
+        - invoices
+      summary: Registrar baixa ou cancelamento manual
+      description: "Perfis permitidos: ADMIN, FUNCIONARIO, SYNDIC. SYNDIC corresponde ao atributo isSyndic."
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/InvoiceStatus"
+      responses:
+        "200":
+          description: Operação concluída.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Invoice"
+        "400":
+          $ref: "#/components/responses/400"
+        "401":
+          $ref: "#/components/responses/401"
+        "403":
+          $ref: "#/components/responses/403"
+        "404":
+          $ref: "#/components/responses/404"
+        "409":
+          $ref: "#/components/responses/409"
+        "500":
+          $ref: "#/components/responses/500"
+        "503":
+          $ref: "#/components/responses/503"
+  /api/docs:
+    get:
+      tags:
+        - Sistema
+      summary: Abrir documentação Swagger UI
+      description: ""
+      security: []
+      responses:
+        "200":
+          description: Página HTML do Swagger UI em /api/docs/.
+        "301":
+          description: Redirecionamento para /api/docs/.
+  /api/docs/openapi.yaml:
+    get:
+      tags:
+        - Sistema
+      summary: Obter contrato OpenAPI em YAML
+      description: ""
+      security: []
+      responses:
+        "200":
+          description: Contrato centralizado.
+          content:
+            application/yaml:
+              schema:
+                type: string
+  /common-areas:
+    get:
+      tags:
+        - common-areas
+      summary: Listar áreas comuns
+      description: Qualquer autenticado. Painel recebe todas; morador recebe só as ativas.
+      responses:
+        "200":
+          description: Áreas ordenadas por nome.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/CommonArea"
+        "401":
+          $ref: "#/components/responses/401"
+        "500":
+          $ref: "#/components/responses/500"
+    post:
+      tags:
+        - common-areas
+      summary: Criar área comum
+      description: "Perfil permitido: ADMIN."
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CommonAreaCreate"
+      responses:
+        "201":
+          description: Área criada.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CommonArea"
+        "400":
+          $ref: "#/components/responses/400"
+        "401":
+          $ref: "#/components/responses/401"
+        "403":
+          $ref: "#/components/responses/403"
+        "500":
+          $ref: "#/components/responses/500"
+  /common-areas/{id}:
+    put:
+      tags:
+        - common-areas
+      summary: Editar área comum
+      description: "Perfil permitido: ADMIN. Campos opcionais, mas pelo menos um é obrigatório."
+      parameters: &a1
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CommonAreaUpdate"
+      responses:
+        "200":
+          description: Área atualizada.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CommonArea"
+        "400":
+          $ref: "#/components/responses/400"
+        "401":
+          $ref: "#/components/responses/401"
+        "403":
+          $ref: "#/components/responses/403"
+        "404":
+          $ref: "#/components/responses/404"
+        "500":
+          $ref: "#/components/responses/500"
+    delete:
+      tags:
+        - common-areas
+      summary: Remover área comum
+      description: "Perfil permitido: ADMIN. Recusada (400) se houver reserva pendente ou aprovada de hoje em diante; nesse
+        caso, desative a área."
+      parameters: *a1
+      responses:
+        "200":
+          description: Área removida.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Message"
+        "400":
+          $ref: "#/components/responses/400"
+        "401":
+          $ref: "#/components/responses/401"
+        "403":
+          $ref: "#/components/responses/403"
+        "404":
+          $ref: "#/components/responses/404"
+        "500":
+          $ref: "#/components/responses/500"
+  /reservations:
+    get:
+      tags:
+        - reservations
+      summary: Listar reservas
+      description: Morador recebe só as próprias; painel (ADMIN, FUNCIONARIO, síndica) recebe todas.
+      parameters:
+        - name: status
+          in: query
+          required: false
+          schema:
+            type: string
+            enum:
+              - PENDING
+              - APPROVED
+              - REJECTED
+              - CANCELLED
+        - name: commonAreaId
+          in: query
+          required: false
+          schema:
+            type: string
+            format: uuid
+        - name: from
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date
+        - name: to
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date
+      responses:
+        "200":
+          description: Reservas, das mais recentes para as mais antigas.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Reservation"
+        "400":
+          $ref: "#/components/responses/400"
+        "401":
+          $ref: "#/components/responses/401"
+        "500":
+          $ref: "#/components/responses/500"
+    post:
+      tags:
+        - reservations
+      summary: Solicitar reserva
+      description: "Perfil permitido: MORADOR (inclui a síndica). Horários em Brasília (UTC-03:00). Cria como PENDING; 409 se
+        colidir com reserva aprovada."
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReservationCreate"
+      responses:
+        "201":
+          description: Reserva criada como PENDING.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Reservation"
+        "400":
+          $ref: "#/components/responses/400"
+        "401":
+          $ref: "#/components/responses/401"
+        "403":
+          $ref: "#/components/responses/403"
+        "404":
+          $ref: "#/components/responses/404"
+        "409":
+          $ref: "#/components/responses/409"
+        "500":
+          $ref: "#/components/responses/500"
+  /reservations/{id}/approve:
+    put:
+      tags:
+        - reservations
+      summary: Aprovar reserva
+      description: "Perfis permitidos: ADMIN e síndica. Só PENDING e ainda não iniciada; 409 se já houver aprovada no mesmo
+        horário."
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Reserva aprovada.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Reservation"
+        "400":
+          $ref: "#/components/responses/400"
+        "401":
+          $ref: "#/components/responses/401"
+        "403":
+          $ref: "#/components/responses/403"
+        "404":
+          $ref: "#/components/responses/404"
+        "409":
+          $ref: "#/components/responses/409"
+        "500":
+          $ref: "#/components/responses/500"
+  /reservations/{id}/reject:
+    put:
+      tags:
+        - reservations
+      summary: Rejeitar reserva
+      description: "Perfis permitidos: ADMIN e síndica. Só PENDING."
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                reason:
+                  type: string
+                  maxLength: 500
+      responses:
+        "200":
+          description: Reserva rejeitada.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Reservation"
+        "400":
+          $ref: "#/components/responses/400"
+        "401":
+          $ref: "#/components/responses/401"
+        "403":
+          $ref: "#/components/responses/403"
+        "404":
+          $ref: "#/components/responses/404"
+        "500":
+          $ref: "#/components/responses/500"
+  /reservations/{id}:
+    delete:
+      tags:
+        - reservations
+      summary: Cancelar reserva
+      description: Só o morador dono. Muda para CANCELLED (não apaga); só PENDING ou APPROVED ainda não iniciada.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Reserva cancelada.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Reservation"
+        "400":
+          $ref: "#/components/responses/400"
+        "401":
+          $ref: "#/components/responses/401"
+        "403":
+          $ref: "#/components/responses/403"
+        "404":
+          $ref: "#/components/responses/404"
+        "500":
+          $ref: "#/components/responses/500"
+  /incidents:
+    get:
+      tags:
+        - incidents
+      summary: Listar ocorrências
+      description: Morador recebe só as próprias; painel recebe todas.
+      parameters:
+        - name: status
+          in: query
+          required: false
+          schema:
+            type: string
+            enum:
+              - OPEN
+              - IN_PROGRESS
+              - RESOLVED
+              - CLOSED
+        - name: category
+          in: query
+          required: false
+          schema:
+            type: string
+            enum:
+              - BARULHO
+              - MANUTENCAO
+              - SEGURANCA
+              - LIMPEZA
+              - OUTRO
+      responses:
+        "200":
+          description: Ocorrências, das mais recentes para as mais antigas.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Incident"
+        "400":
+          $ref: "#/components/responses/400"
+        "401":
+          $ref: "#/components/responses/401"
+        "403":
+          $ref: "#/components/responses/403"
+        "500":
+          $ref: "#/components/responses/500"
+    post:
+      tags:
+        - incidents
+      summary: Registrar ocorrência
+      description: "Perfil permitido: MORADOR com unidade (inclui a síndica). A unidade vem do usuário autenticado, nunca do body."
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/IncidentCreate"
+      responses:
+        "201":
+          description: Ocorrência registrada como OPEN.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Incident"
+        "400":
+          $ref: "#/components/responses/400"
+        "401":
+          $ref: "#/components/responses/401"
+        "403":
+          $ref: "#/components/responses/403"
+        "500":
+          $ref: "#/components/responses/500"
+  /incidents/{id}:
+    get:
+      tags:
+        - incidents
+      summary: Consultar ocorrência
+      description: Mesma visibilidade da listagem; ocorrência de outro morador responde 404.
+      parameters: &a2
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Ocorrência.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Incident"
+        "400":
+          $ref: "#/components/responses/400"
+        "401":
+          $ref: "#/components/responses/401"
+        "403":
+          $ref: "#/components/responses/403"
+        "404":
+          $ref: "#/components/responses/404"
+        "500":
+          $ref: "#/components/responses/500"
+    put:
+      tags:
+        - incidents
+      summary: Atualizar status ou responder ocorrência
+      description: "Perfis permitidos: ADMIN, FUNCIONARIO e síndica. Enviar response grava respondedAt; ocorrência CLOSED não
+        muda mais (400)."
+      parameters: *a2
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/IncidentUpdate"
+      responses:
+        "200":
+          description: Ocorrência atualizada.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Incident"
+        "400":
+          $ref: "#/components/responses/400"
+        "401":
+          $ref: "#/components/responses/401"
+        "403":
+          $ref: "#/components/responses/403"
+        "404":
+          $ref: "#/components/responses/404"
+        "500":
+          $ref: "#/components/responses/500"
+  /notifications:
+    get:
+      tags: [notifications]
+      summary: Listar a central pessoal de notificações
+      description: >-
+        Retorna comunicados PUBLISHED e eventos PUBLISHED ou CANCELLED destinados a ALL
+        ou à unidade atual do usuário, inclusive para síndicos. Sem unidade, retorna
+        apenas ALL. Inclui as ocorrências do próprio usuário que já têm resposta ou
+        status diferente de OPEN; nelas createdAt é a data da última alteração, e
+        uma alteração depois da leitura volta a deixá-las não lidas.
+        Ordenação por createdAt decrescente, com desempate pelo id.
+        isRead de NOTICE usa NoticeRead, compartilhado com POST /notices/{id}/read;
+        edições do comunicado podem invalidar essa leitura. Não envia rascunhos.
+      responses:
+        '200':
+          description: Notificações visíveis, ou uma lista vazia.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Notification'
+        '401':
+          $ref: '#/components/responses/401'
+        '503':
+          description: Não foi possível validar a sessão.
+        '500':
+          $ref: '#/components/responses/500'
+  /notifications/{type}/{id}/read:
+    post:
+      tags: [notifications]
+      summary: Marcar uma notificação visível como lida
+      description: >-
+        Operação idempotente e individual. O id é o sourceId (UUID do comunicado,
+        evento ou ocorrência), não o id composto da notificação. NOTICE também grava NoticeRead
+        na mesma transação. Não concede a visão de painel para síndicos.
+      parameters:
+        - in: path
+          name: type
+          required: true
+          schema:
+            type: string
+            enum: [NOTICE, EVENT, INCIDENT]
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Leitura confirmada.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [message]
+                properties:
+                  message:
+                    type: string
+                    example: Notificação lida.
+        '400':
+          $ref: '#/components/responses/400'
+        '401':
+          $ref: '#/components/responses/401'
+        '404':
+          description: Item inexistente, rascunho ou não destinado ao usuário.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: Notificação não encontrada.
+        '503':
+          description: Não foi possível validar a sessão.
+        '500':
+          $ref: '#/components/responses/500'
+  /parking-spots:
+    get:
+      tags: [parking-spots]
+      summary: Listar vagas numeradas
+      description: "Perfis permitidos: ADMIN e FUNCIONARIO, seguindo a consulta de unidades. Síndica não gerencia vagas. Filtros combinados por interseção. Livre significa sem unidade atribuída; não indica ocupação física por veículo."
+      parameters:
+        - name: type
+          in: query
+          schema:
+            $ref: "#/components/schemas/ParkingType"
+        - name: block
+          in: query
+          schema:
+            type: string
+            maxLength: 50
+          description: Bloco/quadra da unidade atribuída.
+        - name: unitId
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: free
+          in: query
+          schema:
+            type: string
+            enum:
+              - "true"
+              - "false"
+          description: "true: sem unidade; false: atribuída."
+      responses:
+        "200":
+          description: Operação concluída.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ParkingSpot"
+        "400":
+          $ref: "#/components/responses/400"
+        "401":
+          $ref: "#/components/responses/401"
+        "403":
+          $ref: "#/components/responses/403"
+    post:
+      tags: [parking-spots]
+      summary: Criar vaga numerada
+      description: "Perfis permitidos: ADMIN e FUNCIONARIO, seguindo a consulta de unidades. Síndica não gerencia vagas. Cria sem unidade. Para vincular RESIDENT ou DISABLED, utilize a rota assign."
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ParkingSpotInput"
+      responses:
+        "201":
+          description: Operação concluída.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ParkingSpot"
+        "400":
+          $ref: "#/components/responses/400"
+        "401":
+          $ref: "#/components/responses/401"
+        "403":
+          $ref: "#/components/responses/403"
+        "409":
+          $ref: "#/components/responses/409"
+  /parking-spots/me:
+    get:
+      tags: [parking-spots]
+      summary: Consultar vagas da própria unidade
+      description: Apenas MORADOR (incluindo síndica). A unidade vem do cadastro do usuário autenticado; parâmetros não alteram o vínculo consultado. Sem unidade retorna lista vazia. Não expõe dados de moradores.
+      responses:
+        "200":
+          description: Operação concluída.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ParkingSpot"
+        "401":
+          $ref: "#/components/responses/401"
+        "403":
+          $ref: "#/components/responses/403"
+        "404":
+          $ref: "#/components/responses/404"
+  /parking-spots/{id}:
+    put:
+      tags: [parking-spots]
+      summary: Editar número ou tipo da vaga
+      description: "Perfis permitidos: ADMIN e FUNCIONARIO, seguindo a consulta de unidades. Síndica não gerencia vagas. Atualização parcial; ao menos um campo. Vaga atribuída não pode virar VISITOR (409): desatribua primeiro."
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ParkingSpotUpdate"
+      responses:
+        "200":
+          description: Operação concluída.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ParkingSpot"
+        "400":
+          $ref: "#/components/responses/400"
+        "401":
+          $ref: "#/components/responses/401"
+        "403":
+          $ref: "#/components/responses/403"
+        "404":
+          $ref: "#/components/responses/404"
+        "409":
+          $ref: "#/components/responses/409"
+    delete:
+      tags: [parking-spots]
+      summary: Remover vaga
+      description: "Perfis permitidos: ADMIN e FUNCIONARIO, seguindo a consulta de unidades. Síndica não gerencia vagas. Recalcula o contador na mesma transação. Se a unidade ficar com mais veículos do que vagas, retorna 409 e reverte a remoção."
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Operação concluída.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Message"
+        "400":
+          $ref: "#/components/responses/400"
+        "401":
+          $ref: "#/components/responses/401"
+        "403":
+          $ref: "#/components/responses/403"
+        "404":
+          $ref: "#/components/responses/404"
+        "409":
+          $ref: "#/components/responses/409"
+  /parking-spots/{id}/assign:
+    put:
+      tags: [parking-spots]
+      summary: Atribuir, transferir ou desatribuir vaga
+      description: "Perfis permitidos: ADMIN e FUNCIONARIO, seguindo a consulta de unidades. Síndica não gerencia vagas. Somente RESIDENT e DISABLED podem ter unidade. VISITOR com unitId não nulo retorna 400. Atribuição repetida é idempotente. Locks da vaga e das unidades em ordem fixa protegem contadores e o cadastro concorrente de veículos. Transferência, desatribuição ou remoção que deixe veículos excedentes retorna 409 e reverte toda a transação."
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ParkingSpotAssign"
+      responses:
+        "200":
+          description: Operação concluída.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ParkingSpot"
+        "400":
+          $ref: "#/components/responses/400"
+        "401":
+          $ref: "#/components/responses/401"
+        "403":
+          $ref: "#/components/responses/403"
+        "404":
+          $ref: "#/components/responses/404"
+        "409":
+          $ref: "#/components/responses/409"
+  /notifications/inbox/{id}/read:
+    post:
+      tags: [notifications]
+      summary: Registrar leitura de evento persistido da caixa pessoal
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200': { description: Leitura confirmada }
+        '401': { $ref: '#/components/responses/401' }
+        '404': { $ref: '#/components/responses/404' }
+  /invoices/payers:
+    get:
+      tags: [invoices]
+      summary: Listar pagadores para emissão financeira
+      description: ADMIN, FUNCIONARIO e síndica; não concede gestão de cadastros.
+      responses:
+        '200': { description: Moradores com dados necessários à emissão }
+        '403': { $ref: '#/components/responses/403' }
+  /invoices/units:
+    get:
+      tags: [invoices]
+      summary: Listar unidades para filtros financeiros
+      responses:
+        '200': { description: Unidades disponíveis }
+        '403': { $ref: '#/components/responses/403' }
+  /units/options:
+    get:
+      tags: [units]
+      summary: Listar identificadores e nomes de unidades para destinatários
+      responses:
+        '200': { description: Opções de unidades sem dados de moradores }
+        '403': { $ref: '#/components/responses/403' }
+components:
+  securitySchemes:
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: domusapp_token
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    PetPanel:
+      allOf:
+        - $ref: "#/components/schemas/PetRecord"
+        - type: object
+          required: [owner]
+          properties:
+            owner:
+              type: object
+              required: [id, name, phone, unit]
+              properties:
+                id:
+                  type: string
+                  format: uuid
+                name:
+                  type: string
+                phone:
+                  type: string
+                  nullable: true
+                unit:
+                  type: object
+                  nullable: true
+                  required: [id, type, block, number]
+                  properties:
+                    id:
+                      type: string
+                      format: uuid
+                    type:
+                      type: string
+                      enum: [APARTMENT, HOUSE]
+                    block:
+                      type: string
+                      nullable: true
+                    number:
+                      type: string
+    PetRecord:
+      type: object
+      required: [id, name, species, size, ownerId, createdAt, updatedAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        species:
+          type: string
+          enum: [CACHORRO, GATO, PASSARO, OUTRO]
+        size:
+          type: string
+          enum: [PEQUENO, MEDIO, GRANDE]
+        ownerId:
+          type: string
+          format: uuid
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    PanelVehicle:
+      allOf:
+        - $ref: "#/components/schemas/Vehicle"
+        - type: object
+          required: [unit]
+          properties:
+            unit:
+              type: object
+              required: [id, type, block, number, parkingSpots, _count]
+              properties:
+                id:
+                  type: string
+                  format: uuid
+                type:
+                  type: string
+                  enum: [APARTMENT, HOUSE]
+                block:
+                  type: string
+                  nullable: true
+                number:
+                  type: string
+                parkingSpots:
+                  type: integer
+                  minimum: 0
+                _count:
+                  type: object
+                  required: [vehicles]
+                  properties:
+                    vehicles:
+                      type: integer
+                      minimum: 0
+    Vehicle:
+      type: object
+      required: [id, plate, model, color, unitId, createdAt, updatedAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        plate:
+          type: string
+        model:
+          type: string
+        color:
+          type: string
+          nullable: true
+        unitId:
+          type: string
+          format: uuid
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    ParkingType:
+      type: string
+      enum:
+        - RESIDENT
+        - VISITOR
+        - DISABLED
+      description: Morador, visitante ou PcD.
+    ParkingSpotInput:
+      type: object
+      additionalProperties: false
+      required:
+        - number
+        - type
+      properties:
+        number:
+          type: string
+          minLength: 1
+          maxLength: 80
+          example: A-01
+          description: Único. Espaços são removidos e letras convertidas para maiúsculas.
+        type:
+          $ref: "#/components/schemas/ParkingType"
+    ParkingSpotUpdate:
+      type: object
+      additionalProperties: false
+      minProperties: 1
+      properties:
+        number:
+          type: string
+          minLength: 1
+          maxLength: 80
+          example: A-01
+          description: Único. Espaços são removidos e letras convertidas para maiúsculas.
+        type:
+          $ref: "#/components/schemas/ParkingType"
+    ParkingSpotAssign:
+      type: object
+      additionalProperties: false
+      required:
+        - unitId
+      properties:
+        unitId:
+          type: string
+          format: uuid
+          nullable: true
+          description: Unidade de destino. null desatribui a vaga.
+    ParkingSpotRecord:
+      type: object
+      required:
+        - id
+        - number
+        - type
+        - unitId
+      properties:
+        id:
+          type: string
+          format: uuid
+        number:
+          type: string
+        type:
+          $ref: "#/components/schemas/ParkingType"
+        unitId:
+          type: string
+          format: uuid
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    ParkingSpot:
+      allOf:
+        - $ref: "#/components/schemas/ParkingSpotRecord"
+        - type: object
+          required:
+            - unit
+          properties:
+            unit:
+              type: object
+              nullable: true
+              properties:
+                id:
+                  type: string
+                  format: uuid
+                type:
+                  type: string
+                  enum:
+                    - APARTMENT
+                    - HOUSE
+                block:
+                  type: string
+                  nullable: true
+                number:
+                  type: string
+    ReportPeriod:
+      type: "object"
+      required: ["startDate","endDate"]
+      properties:
+        startDate:
+          type: "string"
+          format: "date"
+          example: "2026-01-01"
+        endDate:
+          type: "string"
+          format: "date"
+          example: "2026-11-07"
+    ReportMoney:
+      type: "string"
+      pattern: "^[0-9]+\\.[0-9]{2}$"
+      description: "Valor monetário decimal exato em reais, com duas casas; pode ser zero ou exceder o teto de uma fatura."
+      example: "12345.67"
+    ReportOccupancyTotals:
+      type: "object"
+      required: ["total","occupied","occupancyRate"]
+      properties:
+        total:
+          type: "integer"
+          minimum: 0
+        occupied:
+          type: "integer"
+          minimum: 0
+        occupancyRate:
+          type: "number"
+          minimum: 0
+          maximum: 100
+          example: 33.3
+    ReportOccupancy:
+      type: "object"
+      required: ["byBlock","total"]
+      properties:
+        byBlock:
+          type: "array"
+          items:
+            type: "object"
+            required: ["block","total","occupied","occupancyRate"]
+            properties:
+              block:
+                type: "string"
+                example: "Sem bloco"
+              total:
+                type: "integer"
+                minimum: 0
+              occupied:
+                type: "integer"
+                minimum: 0
+              occupancyRate:
+                type: "number"
+                minimum: 0
+                maximum: 100
+                example: 33.3
+        total:
+          "$ref": "#/components/schemas/ReportOccupancyTotals"
+    ReportChargeBucket:
+      type: "object"
+      required: ["count","amount"]
+      properties:
+        count:
+          type: "integer"
+          minimum: 0
+        amount:
+          "$ref": "#/components/schemas/ReportMoney"
+    ReportChargeSummary:
+      type: "object"
+      required: ["paid","pending","overdue","total","delinquencyRate"]
+      properties:
+        paid:
+          "$ref": "#/components/schemas/ReportChargeBucket"
+        pending:
+          "$ref": "#/components/schemas/ReportChargeBucket"
+        overdue:
+          "$ref": "#/components/schemas/ReportChargeBucket"
+        total:
+          "$ref": "#/components/schemas/ReportChargeBucket"
+        delinquencyRate:
+          type: "number"
+          minimum: 0
+          maximum: 100
+          example: 33.3
+    ReportCharges:
+      type: "object"
+      required: ["period","summary","byMonth"]
+      properties:
+        period:
+          "$ref": "#/components/schemas/ReportPeriod"
+        summary:
+          "$ref": "#/components/schemas/ReportChargeSummary"
+        byMonth:
+          type: "array"
+          items:
+            allOf: [{"$ref":"#/components/schemas/ReportChargeSummary"},{"type":"object","required":["month"],"properties":{"month":{"type":"string","pattern":"^[0-9]{4}-[0-9]{2}$","example":"2026-11"}}}]
+    ReportIncidents:
+      type: "object"
+      required: ["period","total","byCategory","byStatus"]
+      properties:
+        period:
+          "$ref": "#/components/schemas/ReportPeriod"
+        total:
+          type: "integer"
+          minimum: 0
+        byCategory:
+          type: "array"
+          items:
+            type: "object"
+            required: ["category","count"]
+            properties:
+              category:
+                type: "string"
+                enum: ["BARULHO","MANUTENCAO","SEGURANCA","LIMPEZA","OUTRO"]
+              count:
+                type: "integer"
+                minimum: 0
+        byStatus:
+          type: "array"
+          items:
+            type: "object"
+            required: ["status","count"]
+            properties:
+              status:
+                type: "string"
+                enum: ["OPEN","IN_PROGRESS","RESOLVED","CLOSED"]
+              count:
+                type: "integer"
+                minimum: 0
+    ReportReservations:
+      type: "object"
+      required: ["period","total","byArea","byStatus"]
+      properties:
+        period:
+          "$ref": "#/components/schemas/ReportPeriod"
+        total:
+          type: "integer"
+          minimum: 0
+        byArea:
+          type: "array"
+          items:
+            type: "object"
+            required: ["areaId","areaName","count","byStatus"]
+            properties:
+              areaId:
+                type: "string"
+                format: "uuid"
+              areaName:
+                type: "string"
+              count:
+                type: "integer"
+                minimum: 0
+              byStatus:
+                type: "array"
+                items:
+                  type: "object"
+                  required: ["status","count"]
+                  properties:
+                    status:
+                      type: "string"
+                      enum: ["PENDING","APPROVED","REJECTED","CANCELLED"]
+                    count:
+                      type: "integer"
+                      minimum: 0
+        byStatus:
+          type: "array"
+          items:
+            type: "object"
+            required: ["status","count"]
+            properties:
+              status:
+                type: "string"
+                enum: ["PENDING","APPROVED","REJECTED","CANCELLED"]
+              count:
+                type: "integer"
+                minimum: 0
+    ResidentVoting:
+      type: object
+      required: [id, title, description, startDate, endDate, author, options, myVote]
+      properties:
+        id: { type: string, format: uuid }
+        title: { type: string }
+        description: { type: string }
+        startDate: { type: string, format: date-time }
+        endDate: { type: string, format: date-time }
+        authorId: { type: string, format: uuid }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+        author:
+          type: object
+          required: [name, role]
+          properties:
+            name: { type: string }
+            role: { type: string, enum: [ADMIN, FUNCIONARIO, MORADOR] }
+        options:
+          type: array
+          items:
+            type: object
+            required: [id, text]
+            properties:
+              id: { type: string, format: uuid }
+              text: { type: string }
+              votes:
+                type: integer
+                minimum: 0
+                description: Omitido antes do encerramento para quem não tem acesso ao painel.
+              votingId: { type: string, format: uuid }
+              createdAt: { type: string, format: date-time }
+        myVote:
+          type: object
+          nullable: true
+          required: [optionId, votedAt, votedBy]
+          properties:
+            optionId: { type: string, format: uuid }
+            votedAt: { type: string, format: date-time }
+            votedBy:
+              type: string
+              nullable: true
+              description: Nome de quem votou; null se o usuário foi removido.
+    Notification:
+      type: object
+      required: [id, type, sourceId, title, description, createdAt, isRead]
+      properties:
+        id:
+          type: string
+          description: Identificador composto TYPE:UUID, usado como chave na lista.
+          example: NOTICE:ba382bf4-653b-4b7e-b0c0-d22d53657d39
+        type:
+          type: string
+          enum: [NOTICE, EVENT, INCIDENT, INVOICE, RESERVATION, VOTING]
+        eventId:
+          type: string
+          format: uuid
+          description: Quando presente, usar este UUID na rota /notifications/inbox/{id}/read.
+        sourceId:
+          type: string
+          format: uuid
+        title:
+          type: string
+        description:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        isRead:
+          type: boolean
+    PetUpdate:
+      type: "object"
+      minProperties: 1
+      properties:
+        name:
+          type: "string"
+          minLength: 1
+          maxLength: 191
+        species:
+          type: "string"
+          enum: ["CACHORRO", "GATO", "PASSARO", "OUTRO"]
+        size:
+          type: "string"
+          enum: ["PEQUENO", "MEDIO", "GRANDE"]
+    VehicleUpdate:
+      type: "object"
+      minProperties: 1
+      properties:
+        plate:
+          type: "string"
+          description: "Normalizada para formato ABC1234 ou ABC1D23; única."
+        model:
+          type: "string"
+          minLength: 1
+          maxLength: 191
+        color:
+          type: "string"
+          maxLength: 191
+          nullable: true
+    VotingUpdate:
+      type: "object"
+      minProperties: 1
+      properties:
+        title:
+          type: "string"
+          minLength: 1
+          maxLength: 191
+        description:
+          type: "string"
+          minLength: 1
+        startDate:
+          type: "string"
+          format: "date-time"
+        endDate:
+          type: "string"
+          format: "date-time"
+        options:
+          type: "array"
+          minItems: 2
+          items:
+            type: "string"
+            minLength: 1
+            maxLength: 191
+    EventUpdate:
+      type: "object"
+      minProperties: 1
+      properties:
+        title:
+          type: "string"
+          minLength: 1
+          maxLength: 191
+        content:
+          type: "string"
+          minLength: 1
+        eventDate:
+          type: "string"
+          format: "date-time"
+        location:
+          type: "string"
+          maxLength: 191
+          nullable: true
+        targetType:
+          type: "string"
+          enum: ["ALL", "UNIT"]
+        targetUnitId:
+          type: "string"
+          format: "uuid"
+          nullable: true
+        category:
+          type: "string"
+          enum: ["ASSEMBLEIA", "CONFRATERNIZACAO", "MANUTENCAO", "REUNIAO", "OUTRO"]
+        capacity:
+          type: "integer"
+          minimum: 1
+          nullable: true
+        status:
+          type: "string"
+          enum: ["DRAFT", "PUBLISHED", "CANCELLED"]
+    NoticeUpdate:
+      type: "object"
+      minProperties: 1
+      properties:
+        title:
+          type: "string"
+          minLength: 1
+          maxLength: 191
+        content:
+          type: "string"
+          minLength: 1
+        targetType:
+          type: "string"
+          enum: ["ALL", "UNIT"]
+        targetUnitId:
+          type: "string"
+          format: "uuid"
+          nullable: true
+        status:
+          type: "string"
+          enum: ["DRAFT", "PUBLISHED"]
+        priority:
+          type: "string"
+          enum: ["NORMAL", "URGENT"]
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+        code:
+          type: string
+        errors:
+          type: object
+          additionalProperties:
+            type: array
+            items:
+              type: string
+      required:
+        - error
+    Message:
+      type: object
+      properties:
+        message:
+          type: string
+      required:
+        - message
+    Login:
+      type: object
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          format: password
+        client:
+          type: string
+          enum:
+            - mobile
+            - panel
+      required:
+        - email
+        - password
+    Refresh:
+      type: object
+      properties:
+        client:
+          type: string
+          enum:
+            - mobile
+        refreshToken:
+          type: string
+          maxLength: 4096
+          description: Mobile; web usa cookie httpOnly domusapp_refresh.
+    ForgotPassword:
+      type: object
+      properties:
+        email:
+          type: string
+          format: email
+          maxLength: 191
+      required:
+        - email
+    ResetPassword:
+      type: object
+      properties:
+        token:
+          type: string
+          format: uuid
+        newPassword:
+          type: string
+          format: password
+          minLength: 8
+          description: De 8 caracteres a 72 bytes UTF-8. Nunca registrar em logs.
+      required:
+        - token
+        - newPassword
+    UserCreate:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 2
+          maxLength: 100
+        email:
+          type: string
+          format: email
+        cpf:
+          type: string
+          description: CPF válido; pontuação removida.
+        phone:
+          type: string
+          description: Vazio ou 10/11 dígitos com DDD.
+        password:
+          type: string
+          format: password
+          minLength: 8
+          description: De 8 caracteres a 72 bytes UTF-8. Nunca registrar em logs.
+        role:
+          type: string
+          enum:
+            - ADMIN
+            - FUNCIONARIO
+            - MORADOR
+        unitId:
+          type: string
+          format: uuid
+          nullable: true
+        status:
+          type: string
+          enum:
+            - ACTIVE
+            - INACTIVE
+        isSyndic:
+          type: boolean
+        isCouncilMember:
+          type: boolean
+      required:
+        - name
+        - email
+        - cpf
+        - password
+      description: MORADOR precisa de unidade válida conforme regra do serviço.
+    UserUpdate:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 2
+          maxLength: 100
+        email:
+          type: string
+          format: email
+        cpf:
+          type: string
+          description: CPF válido; pontuação removida.
+        phone:
+          type: string
+          description: Vazio ou 10/11 dígitos com DDD.
+        password:
+          type: string
+          format: password
+          minLength: 8
+          description: De 8 caracteres a 72 bytes UTF-8. Nunca registrar em logs.
+        role:
+          type: string
+          enum:
+            - ADMIN
+            - FUNCIONARIO
+            - MORADOR
+        unitId:
+          type: string
+          format: uuid
+          nullable: true
+        status:
+          type: string
+          enum:
+            - ACTIVE
+            - INACTIVE
+        isSyndic:
+          type: boolean
+        isCouncilMember:
+          type: boolean
+    UnitCreate:
+      type: object
+      additionalProperties: false
+      description: Quantidade de vagas é derivada dos registros numerados. Enviar parkingSpots é rejeitado (400).
+      properties:
+        type:
+          type: string
+          enum:
+            - APARTMENT
+            - HOUSE
+        block:
+          type: string
+          maxLength: 50
+        number:
+          type: string
+          minLength: 1
+          maxLength: 20
+      required:
+        - number
+    UnitUpdate:
+      type: object
+      additionalProperties: false
+      description: Quantidade de vagas é derivada dos registros numerados. Enviar parkingSpots é rejeitado (400).
+      properties:
+        type:
+          type: string
+          enum:
+            - APARTMENT
+            - HOUSE
+        block:
+          type: string
+          maxLength: 50
+        number:
+          type: string
+          minLength: 1
+          maxLength: 20
+    NoticeCreate:
+      type: object
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 200
+        content:
+          type: string
+          minLength: 1
+        targetType:
+          type: string
+          enum:
+            - ALL
+            - UNIT
+        targetUnitId:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum:
+            - DRAFT
+            - PUBLISHED
+        priority:
+          type: string
+          enum:
+            - NORMAL
+            - URGENT
+      required:
+        - title
+        - content
+      description: targetUnitId é obrigatório quando targetType=UNIT.
+    EventCreate:
+      type: object
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 200
+        content:
+          type: string
+          minLength: 1
+        eventDate:
+          type: string
+          format: date-time
+        location:
+          type: string
+          maxLength: 200
+        targetType:
+          type: string
+          enum:
+            - ALL
+            - UNIT
+        targetUnitId:
+          type: string
+          format: uuid
+        category:
+          type: string
+          enum:
+            - ASSEMBLEIA
+            - CONFRATERNIZACAO
+            - MANUTENCAO
+            - REUNIAO
+            - OUTRO
+        capacity:
+          type: integer
+          minimum: 1
+          nullable: true
+        status:
+          type: string
+          enum:
+            - DRAFT
+            - PUBLISHED
+            - CANCELLED
+      required:
+        - title
+        - content
+        - eventDate
+      description: targetUnitId é obrigatório quando targetType=UNIT.
+    VotingCreate:
+      type: object
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 200
+        description:
+          type: string
+          minLength: 1
+        startDate:
+          type: string
+          format: date-time
+        endDate:
+          type: string
+          format: date-time
+        options:
+          type: array
+          items:
+            type: string
+            minLength: 1
+          minItems: 2
+      required:
+        - title
+        - description
+        - startDate
+        - endDate
+        - options
+      description: endDate deve ser posterior a startDate.
+    VehicleCreate:
+      type: object
+      required: [plate, model]
+      properties:
+        plate:
+          type: string
+          description: Placa antiga ou Mercosul, normalizada sem pontuação e em maiúsculas.
+          example: ABC1D23
+        model:
+          type: string
+          minLength: 1
+          maxLength: 191
+        color:
+          type: string
+          maxLength: 191
+        unitId:
+          type: string
+          format: uuid
+          description: Obrigatório para ADMIN; ignorado para MORADOR. Não é editável em PUT.
+    PetCreate:
+      type: object
+      required: [name, species, size]
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 191
+        species:
+          type: string
+          enum: [CACHORRO, GATO, PASSARO, OUTRO]
+        size:
+          type: string
+          enum: [PEQUENO, MEDIO, GRANDE]
+        ownerId:
+          type: string
+          format: uuid
+          description: "Obrigatório para ADMIN: id de um morador ativo. Ignorado para MORADOR."
+    InvoiceCreate:
+      type: object
+      properties:
+        description:
+          type: string
+          minLength: 1
+          maxLength: 191
+        amount:
+          oneOf:
+            - type: string
+              pattern: ^[0-9]+(\.[0-9]{1,2})?$
+            - type: number
+              minimum: 0.01
+          description: Valor positivo com até duas casas decimais.
+        dueDate:
+          type: string
+          format: date-time
+        type:
+          type: string
+          enum:
+            - MONTHLY_FEE
+            - EXTRAORDINARY
+            - FINE
+            - OTHER
+        referenceMonth:
+          type: string
+          format: date-time
+          nullable: true
+        userId:
+          type: string
+          format: uuid
+        unitId:
+          type: string
+          format: uuid
+      required:
+        - description
+        - amount
+        - dueDate
+        - userId
+        - unitId
+    InvoiceBatch:
+      type: object
+      properties:
+        description:
+          type: string
+          minLength: 1
+          maxLength: 191
+        amount:
+          oneOf:
+            - type: string
+              pattern: ^[0-9]+(\.[0-9]{1,2})?$
+            - type: number
+              minimum: 0.01
+          description: Valor positivo com até duas casas decimais.
+        dueDate:
+          type: string
+          format: date-time
+        type:
+          type: string
+          enum:
+            - MONTHLY_FEE
+            - EXTRAORDINARY
+            - FINE
+            - OTHER
+        referenceMonth:
+          type: string
+          format: date-time
+          nullable: true
+        userIds:
+          type: array
+          items:
+            type: string
+            format: uuid
+          minItems: 1
+          maxItems: 100
+          uniqueItems: true
+      required:
+        - description
+        - amount
+        - dueDate
+        - userIds
+    InvoiceReason:
+      type: object
+      properties:
+        reason:
+          type: string
+          minLength: 1
+          maxLength: 191
+    InvoiceStatus:
+      type: object
+      properties:
+        status:
+          type: string
+          enum:
+            - PAID
+            - CANCELLED
+        reason:
+          type: string
+          minLength: 1
+          maxLength: 191
+      required:
+        - status
+    Webhook:
+      type: object
+      properties:
+        type:
+          type: string
+        data:
+          type: object
+          properties:
+            id:
+              oneOf:
+                - type: string
+                - type: integer
+                  minimum: 0
+        user_id:
+          oneOf:
+            - type: string
+            - type: integer
+              minimum: 0
+        live_mode:
+          type: boolean
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        email:
+          type: string
+          format: email
+        role:
+          type: string
+          enum:
+            - ADMIN
+            - FUNCIONARIO
+            - MORADOR
+        status:
+          type: string
+          enum:
+            - ACTIVE
+            - INACTIVE
+        unitId:
+          type: string
+          format: uuid
+          nullable: true
+        isSyndic:
+          type: boolean
+        isCouncilMember:
+          type: boolean
+    Session:
+      type: object
+      properties:
+        user:
+          $ref: "#/components/schemas/User"
+        token:
+          type: string
+          description: Somente client=mobile.
+        refreshToken:
+          type: string
+          description: Somente client=mobile.
+    Invoice:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        description:
+          type: string
+          minLength: 1
+          maxLength: 191
+        amount:
+          oneOf:
+            - type: string
+              pattern: ^[0-9]+(\.[0-9]{1,2})?$
+            - type: number
+              minimum: 0.01
+          description: Valor positivo com até duas casas decimais.
+        dueDate:
+          type: string
+          format: date-time
+        type:
+          type: string
+          enum:
+            - MONTHLY_FEE
+            - EXTRAORDINARY
+            - FINE
+            - OTHER
+        referenceMonth:
+          type: string
+          format: date-time
+          nullable: true
+        userId:
+          type: string
+          format: uuid
+        unitId:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum:
+            - PENDING
+            - PAID
+            - OVERDUE
+            - CANCELLED
+            - EXPIRED
+            - REJECTED
+            - REFUNDED
+            - CHARGED_BACK
+            - PARTIALLY_REFUNDED
+        issuanceStatus:
+          type: string
+        requiresReview:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+        paidAt:
+          type: string
+          format: date-time
+          nullable: true
+    CommonAreaCreate:
+      type: object
+      required:
+        - name
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+        description:
+          type: string
+          nullable: true
+        capacity:
+          type: integer
+          minimum: 1
+          nullable: true
+        rules:
+          type: string
+          nullable: true
+        isActive:
+          type: boolean
+    CommonAreaUpdate:
+      type: object
+      minProperties: 1
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+        description:
+          type: string
+          nullable: true
+        capacity:
+          type: integer
+          minimum: 1
+          nullable: true
+        rules:
+          type: string
+          nullable: true
+        isActive:
+          type: boolean
+    CommonArea:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+        description:
+          type: string
+          nullable: true
+        capacity:
+          type: integer
+          minimum: 1
+          nullable: true
+        rules:
+          type: string
+          nullable: true
+        isActive:
+          type: boolean
+        createdAt: &a3
+          type: string
+          format: date-time
+        updatedAt: *a3
+    ReservationCreate:
+      type: object
+      required:
+        - commonAreaId
+        - date
+        - startTime
+        - endTime
+      properties:
+        commonAreaId:
+          type: string
+          format: uuid
+        date:
+          type: string
+          format: date
+          example: 2026-12-20
+        startTime:
+          type: string
+          pattern: ^([01]\d|2[0-3]):[0-5]\d$
+          example: 14:00
+        endTime:
+          type: string
+          pattern: ^([01]\d|2[0-3]):[0-5]\d$
+          example: 22:00
+    Reservation:
+      type: object
+      properties:
+        id: &a4
+          type: string
+          format: uuid
+        date:
+          type: string
+          format: date-time
+          description: Meia-noite UTC do dia reservado.
+        startTime:
+          type: string
+        endTime:
+          type: string
+        status:
+          type: string
+          enum:
+            - PENDING
+            - APPROVED
+            - REJECTED
+            - CANCELLED
+        rejectionReason:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        commonArea:
+          type: object
+          properties:
+            id: *a4
+            name:
+              type: string
+        user:
+          type: object
+          properties:
+            id: *a4
+            name:
+              type: string
+            unit:
+              type: object
+              nullable: true
+              properties:
+                id: *a4
+                block:
+                  type: string
+                  nullable: true
+                number:
+                  type: string
+    IncidentCreate:
+      type: object
+      required:
+        - title
+        - description
+        - category
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 200
+        description:
+          type: string
+          minLength: 1
+        category:
+          type: string
+          enum:
+            - BARULHO
+            - MANUTENCAO
+            - SEGURANCA
+            - LIMPEZA
+            - OUTRO
+    IncidentUpdate:
+      type: object
+      minProperties: 1
+      properties:
+        status:
+          type: string
+          enum:
+            - OPEN
+            - IN_PROGRESS
+            - RESOLVED
+            - CLOSED
+        response:
+          type: string
+          maxLength: 2000
+    Incident:
+      type: object
+      properties:
+        id: &a6
+          type: string
+          format: uuid
+        title:
+          type: string
+        description:
+          type: string
+        category:
+          type: string
+          enum:
+            - BARULHO
+            - MANUTENCAO
+            - SEGURANCA
+            - LIMPEZA
+            - OUTRO
+        status:
+          type: string
+          enum:
+            - OPEN
+            - IN_PROGRESS
+            - RESOLVED
+            - CLOSED
+        response:
+          type: string
+          nullable: true
+        respondedAt:
+          type: string
+          format: date-time
+          nullable: true
+        createdAt: &a5
+          type: string
+          format: date-time
+        updatedAt: *a5
+        author:
+          type: object
+          properties:
+            id: *a6
+            name:
+              type: string
+        unit:
+          type: object
+          nullable: true
+          properties:
+            id: *a6
+            block:
+              type: string
+              nullable: true
+            number:
+              type: string
+  responses:
+    "400":
+      $ref: "#/components/responses/400"
+    "401":
+      $ref: "#/components/responses/401"
+    "403":
+      $ref: "#/components/responses/403"
+    "404":
+      $ref: "#/components/responses/404"
+    "409":
+      $ref: "#/components/responses/409"
+    "429":
+      $ref: "#/components/responses/429"
+    "500":
+      $ref: "#/components/responses/500"
+    "503":
+      $ref: "#/components/responses/503"

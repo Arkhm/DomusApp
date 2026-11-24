@@ -1,5 +1,6 @@
+import { userRepository } from '../repositories/userRepository';
 import { Request, Response, NextFunction } from 'express';
-import jwt from 'jsonwebtoken';
+import { verifyAccessToken } from '../lib/authTokens';
 import { AUTH_COOKIE, clearAuthCookie } from '../lib/authCookie';
 
 export interface AuthRequest extends Request {
@@ -13,7 +14,7 @@ export interface AuthRequest extends Request {
 // Fonte primária do token: o cookie httpOnly enviado automaticamente pelo
 // browser. O header Authorization continua aceito como fallback para clientes
 // que não têm cookie jar (Postman, testes, futuro app mobile com SecureStore).
-const extractToken = (req: AuthRequest): string | undefined => {
+export const extractToken = (req: AuthRequest): string | undefined => {
   const cookieToken = req.cookies?.[AUTH_COOKIE];
   if (cookieToken) return cookieToken;
 
@@ -26,7 +27,7 @@ const extractToken = (req: AuthRequest): string | undefined => {
   return headerToken;
 };
 
-export const authMiddleware = (req: AuthRequest, res: Response, next: NextFunction) => {
+export const authMiddleware = async (req: AuthRequest, res: Response, next: NextFunction) => {
   const token = extractToken(req);
 
   if (!token) {
@@ -34,20 +35,27 @@ export const authMiddleware = (req: AuthRequest, res: Response, next: NextFuncti
     return;
   }
 
+  let decoded: ReturnType<typeof verifyAccessToken>;
   try {
-    // Descriptografa e valida a assinatura usando o segredo do seu .env
-    const secret = process.env.JWT_SECRET as string;
-    const decoded = jwt.verify(token, secret) as { id: string; role: string; isSyndic?: boolean };
-
-    // Acopla os dados do usuário (id e role) na requisição.
-    req.user = decoded;
-
-    next();
-  } catch (error) {
-    // Token expirado/adulterado: derruba o cookie para o browser não continuar
-    // reenviando lixo em toda requisição.
+    decoded = verifyAccessToken(token);
+  } catch {
     clearAuthCookie(res);
     res.status(401).json({ error: 'Token inválido ou expirado.' });
     return;
   }
+
+  let user;
+  try {
+    user = await userRepository.findAuthState(decoded.id);
+  } catch {
+    res.status(503).json({ error: 'Não foi possível validar a sessão. Tente novamente.' });
+    return;
+  }
+  if (!user || user.status !== 'ACTIVE' || user.tokenVersion !== decoded.tokenVersion) {
+    clearAuthCookie(res);
+    res.status(401).json({ error: 'Sessão inválida ou revogada.' });
+    return;
+  }
+  req.user = { id: user.id, role: user.role, isSyndic: user.isSyndic };
+  next();
 };

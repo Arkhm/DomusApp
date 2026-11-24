@@ -156,6 +156,14 @@ async function main() {
   check('Cookie marcado SameSite=Strict (proteção CSRF)', cookie?.flags.samesite?.toLowerCase() === 'strict', `recebido: ${cookie?.flags.samesite ?? '(ausente)'}`);
   check('Cookie tem Max-Age definido (expira sozinho)', !!cookie?.flags['max-age'], `recebido: ${cookie?.flags['max-age'] ?? '(ausente)'}`);
 
+  const refreshCookie = getCookie(loginRes, 'domusapp_refresh');
+  check('Refresh cookie httpOnly com path restrito e validade de 7 dias',
+    !!refreshCookie?.flags.httponly && refreshCookie.flags.path === '/auth/refresh' &&
+    refreshCookie.flags['max-age'] === '604800');
+  check('Refresh cookie usa as mesmas flags Secure/SameSite do access',
+    refreshCookie?.flags.secure === cookie?.flags.secure && refreshCookie?.flags.samesite === cookie?.flags.samesite);
+  check('Access cookie expira em 15 minutos', cookie?.flags['max-age'] === '900');
+
   const bodyKeys = Object.keys(loginBody ?? {});
   check(
     'Resposta NÃO devolve token no corpo (nada para o front guardar)',
@@ -187,6 +195,13 @@ async function main() {
   const protectedRes = await fetch(`${API_URL}/users`, { headers: sessionHeader });
   check('Rota de negócio (/users) aceita a sessão do cookie', protectedRes.status === 200, `status: ${protectedRes.status}`);
 
+  const refreshRes = await fetch(`${API_URL}/auth/refresh`, {
+    method: 'POST', headers: { Origin: ORIGIN, Cookie: `domusapp_refresh=${refreshCookie?.value ?? ''}` },
+  });
+  const rotatedRefresh = getCookie(refreshRes, 'domusapp_refresh');
+  check('Refresh válido emite novo access e rotaciona o refresh', refreshRes.status === 200 &&
+    !!getCookie(refreshRes, 'domusapp_token') && !!rotatedRefresh && rotatedRefresh.value !== refreshCookie?.value);
+
   const logoutRes = await fetch(`${API_URL}/auth/logout`, { method: 'POST', headers: sessionHeader });
   const clearedCookie = getCookie(logoutRes, 'domusapp_token');
   check('POST /auth/logout responde 200', logoutRes.status === 200, `status: ${logoutRes.status}`);
@@ -195,6 +210,12 @@ async function main() {
     !!clearedCookie && clearedCookie.value === '',
     clearedCookie ? clearedCookie.raw.split(';').slice(0, 2).join(';') : '(nenhum Set-Cookie)'
   );
+
+  check('Logout apaga também o refresh cookie', getCookie(logoutRes, 'domusapp_refresh')?.value === '');
+  const revokedRefresh = await fetch(`${API_URL}/auth/refresh`, {
+    method: 'POST', headers: { Origin: ORIGIN, Cookie: `domusapp_refresh=${rotatedRefresh?.value ?? ''}` },
+  });
+  check('Refresh anterior ao logout é revogado', revokedRefresh.status === 401);
 
   // ── 2. Rate limiting ───────────────────────────────────────────────────────
   // Por último: estoura a cota de login deste IP pelos próximos 15 minutos.

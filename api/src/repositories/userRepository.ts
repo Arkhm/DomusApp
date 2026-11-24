@@ -1,12 +1,35 @@
+import { Prisma } from '@prisma/client';
 import { prisma } from '../lib/prisma';
 
 export const userRepository = {
+  findAuthState: (id: string) => prisma.user.findUnique({ where: { id },
+    select: { id: true, status: true, role: true, isSyndic: true, tokenVersion: true },
+  }),
+
+  revokeTokens: async (id: string, expectedVersion: number) => {
+    if (!Number.isInteger(expectedVersion) || expectedVersion < 0) throw new Error('Versão de sessão inválida.');
+    return prisma.user.updateMany({ where: { id, tokenVersion: expectedVersion },
+      data: { tokenVersion: { increment: 1 } } });
+  },
+
+  consumeResetToken: async (id: string, tokenHash: string, password: string) => {
+    const result = await prisma.user.updateMany({
+      where: { id, resetToken: tokenHash, resetTokenExpiry: { gt: new Date() } },
+      data: { password, resetToken: null, resetTokenExpiry: null, tokenVersion: { increment: 1 } },
+    });
+    return result.count === 1;
+  },
+
   findByEmail: async (email: string) => {
     return await prisma.user.findUnique({ where: { email } });
   },
 
   findByCpf: async (cpf: string) => {
     return await prisma.user.findUnique({ where: { cpf } });
+  },
+
+  findByResetTokenHash: async (resetToken: string) => {
+    return await prisma.user.findUnique({ where: { resetToken } });
   },
 
   findById: async (id: string) => {
@@ -53,6 +76,16 @@ export const userRepository = {
 
   create: async (data: any) => {
     return await prisma.user.create({ data });
+  },
+
+  // `null` quando o usuário sumiu ou o tokenVersion mudou desde a leitura (P2025).
+  updateIfVersion: async (id: string, tokenVersion: number, data: any) => {
+    try {
+      return await prisma.user.update({ where: { id, tokenVersion }, data });
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025') return null;
+      throw error;
+    }
   },
 
   update: async (id: string, data: any) => {

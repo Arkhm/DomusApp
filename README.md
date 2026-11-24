@@ -29,7 +29,7 @@ O DomusApp é uma plataforma moderna para gestão de condomínios, facilitando a
 ```
 /api      → Backend da aplicação
 /web      → Frontend web (painel administrativo)
-/mobile   → App mobile (em planejamento — destino dos moradores)
+/mobile   → App Expo dos moradores
 ```
 
 ---
@@ -70,7 +70,7 @@ O `.env.example` reúne as variáveis de banco, autenticação, pagamentos e fer
 
 **3. Confira o banco e suba os contêineres:**
 
-O fluxo local usa `db push`; o serviço `migrations` é opcional. Confira a estratégia de banco em [report.md](report.md#2-containers-e-inicialização).
+O fluxo local usa `db push`; o serviço `migrations` é opcional.
 
 ```bash
 docker compose up -d --build
@@ -107,7 +107,7 @@ docker compose up -d --build
 docker compose logs --tail=100 api payment-worker
 ```
 
-Ao alterar o schema local, execute `docker compose exec api npx prisma db push`, `docker compose exec api npx prisma generate` e reinicie API e worker. Não repita o seed. O volume `api_node_modules` é compartilhado, e os volumes persistem em `docker compose down` sem `-v`. O perfil opcional `migrations` mantém o caminho de migrações versionadas; consulte o relatório antes de trocar de estratégia.
+Ao alterar o schema local, execute `docker compose exec api npx prisma db push`, `docker compose exec api npx prisma generate` e reinicie API e worker. Não repita o seed. O volume `api_node_modules` é compartilhado, e os volumes persistem em `docker compose down` sem `-v`. O perfil opcional `migrations` mantém o caminho de migrações versionadas; confira as migrações antes de trocar de estratégia.
 
 ---
 
@@ -119,11 +119,15 @@ O painel web é **administrativo** — só estas pessoas conseguem logar:
 - `role = FUNCIONARIO` — equipe operacional (porteiro, zelador)
 - `role = MORADOR && isSyndic = true` — a síndica eleita
 
-**Morador comum (`MORADOR && !isSyndic`) é bloqueado no login** com 401 + "Sua conta não tem acesso ao painel administrativo." Ele será atendido pelo app mobile (em desenvolvimento).
+**Morador comum pode autenticar e usar o mobile**, mas não é autorizado a abrir o painel web. `GET /auth/me` identifica qualquer usuário ativo; o painel verifica `hasPanelAccess` e a API protege cada recurso por suas permissões.
 
-**Quem pode mutar (criar/excluir):** apenas `ADMIN`. Síndica e funcionário acessam em **modo leitura** — veem tudo (inclusive rascunhos e contadores de leitura), mas não têm botões de "Novo X" nem ícones de lixeira.
+**Permissões:** ADMIN gerencia os módulos. FUNCIONARIO opera cobranças e atende ocorrências, mantendo leitura nos cadastros restritos. A síndica administra cobranças, avalia reservas e atende ocorrências; cria comunicados, eventos e votações e edita/exclui os próprios. Votações só podem ser editadas antes do início e sem votos. Usuários, unidades, vagas e gestão geral de veículos/pets mantêm suas restrições específicas. O painel oculta acessos não autorizados, e a API continua validando cada operação.
 
 ---
+
+## Cadastro de usuários
+
+Somente administradores autenticados criam usuários, pelo endpoint `POST /users` no painel web. O mesmo endpoint cadastra administradores, funcionários e moradores; moradores devem estar vinculados a uma unidade. Não há autocadastro: o morador recebe suas credenciais da administração. No ambiente de desenvolvimento, o seed cria o administrador inicial.
 
 ## 👤 Credenciais (geradas no seed)
 
@@ -168,6 +172,130 @@ cd api && npm run check:security
 - João Marcelo Conceição Sousa
 - Juliano Aparecido Bernardo Quirino Junior
 
+## Áreas comuns, reservas e ocorrências
+
+- **Áreas comuns (RF-014)** — `/common-areas`. `ADMIN` cria, edita, ativa/desativa e remove; o morador só vê as áreas ativas. Área com reserva pendente ou aprovada de hoje em diante não pode ser removida: desative-a.
+- **Reservas (RF-015)** — `/reservations`. O morador solicita (`PENDING`) e cancela as próprias; `ADMIN` e síndica aprovam ou rejeitam. Datas `YYYY-MM-DD` e horários `HH:mm` no fuso de Brasília. Não há reserva no passado nem duas aprovadas no mesmo horário da mesma área: a checagem trava a área no banco, então duas aprovações simultâneas não passam juntas (409).
+- **Ocorrências (RF-019)** — `/incidents`. O morador registra (a unidade vem do cadastro dele) e acompanha as próprias; `ADMIN`, funcionário e síndica mudam o status e respondem. Ocorrência encerrada (`CLOSED`) não muda mais. O aviso ao morador quando o status muda fica para o módulo de notificações.
+
+No painel web: **Áreas comuns**, **Reservas** e **Ocorrências** no menu lateral. No app mobile: **Reservas** e **Ocorrências** na Home do morador. Contrato completo no Swagger.
+
 ## Pagamentos
 
 A referência técnica da integração Pix também está em [api/docs/mercado-pago.md](api/docs/mercado-pago.md).
+
+## Qualidade, documentação e imagens de produção
+
+Use Node 22. Os testes da API carregam o Axios de web e mobile, portanto instale as dependências dos três projetos.
+
+```bash
+npm ci --prefix api
+npm ci --prefix web
+npm ci --prefix mobile
+cd api
+npx prisma generate
+npm run typecheck
+npm test
+npm run test:coverage
+```
+
+A cobertura inclui todos os serviços e repositórios, mesmo sem teste, e exige **70% das linhas**. Integrações precisam de MySQL descartável com nome terminado em `_test`, migrações aplicadas e `RUN_DB_INTEGRATION=true` / `RUN_PAYMENT_INTEGRATION=true` no ambiente ou no `api/.env` local ignorado. Configure `DATABASE_HOST/PORT/USER/PASSWORD/NAME/URL` e os segredos independentes `JWT_SECRET` / `JWT_REFRESH_SECRET`. Não execute integrações no banco de uso. O CI cria `domusapp_test`, aplica `prisma migrate deploy` e usa credenciais fictícias. Para os clientes: `cd web && npm test && npm run build` e `cd mobile && npx tsc --noEmit`.
+
+Swagger UI: **http://localhost:3333/api/docs/**. O contrato central está em [api/docs/openapi.yaml](api/docs/openapi.yaml), também disponível em `/api/docs/openapi.yaml`. Cookie `domusapp_token` e Bearer são alternativas. Para cookie, faça login pelo Swagger; para mobile, use Bearer em Authorize. O Helmet permanece ativo: só a documentação permite seus estilos inline e HTTP local; scripts e assets vêm da própria API.
+
+API e worker emitem JSON pelo Pino. `LOG_LEVEL` aceita `trace/debug/info/warn/error/fatal/silent`; o padrão é `info`, ou `silent` em `NODE_ENV=test` quando não configurado. Veja `docker compose logs -f api payment-worker`. Os registros usam IDs e códigos operacionais, sem bodies, senhas, tokens ou cabeçalhos de autenticação. Apenas o preview do Ethereal é registrado em desenvolvimento para testar recuperação sem SMTP; SMTP real não registra conteúdo nem link. Não há log automático de requisições nem `pino-pretty` em produção.
+
+O Compose usa `target: development`, volumes e `npm run dev`. Os estágios de produção são construídos separadamente:
+
+```bash
+docker build --target production -t domus-api-prod api
+docker build --target production --build-arg VITE_API_URL=https://api.seudominio.com -t domus-web-prod web
+```
+
+A API compila os pontos de entrada do servidor e worker via `tsc`; `npm start` executa `node dist/server.js` (fora do Docker, rode `npm run build` antes). A imagem final usa o usuário `node`, inclui Prisma Client gerado e contrato, e remove devDependencies e peers opcionais de desenvolvimento (CLI Prisma e TypeScript). O próprio build verifica a importação do client e a ausência de Prisma CLI, TypeScript e tsx. Migrações continuam separadas: a imagem final não inclui a CLI Prisma. O worker na mesma imagem usa `npm run payments:worker:prod`.
+
+O web gera Vite e serve com nginx na porta **80**, com fallback para `index.html` nas rotas do React. `VITE_API_URL` é público e fixado **no build**; alterá-lo exige reconstruir. Inclua a origem real do web em `ALLOWED_ORIGIN` da API.
+
+## Identificação da sessão
+
+Web e mobile usam `GET /auth/me` para consultar o próprio perfil atualizado com unidade (`{ user }`), sem senha ou dados de recuperação. Exige token válido e cadastro ACTIVE. `GET /users/me` permanece legado, com o contrato anterior, por compatibilidade. A consulta de perfil não concede acesso administrativo: as permissões das rotas e dos serviços continuam obrigatórias. O painel aceita somente ADMIN, FUNCIONARIO e morador síndico; uma recusa de acesso ao painel não dispara logout global no mobile.
+
+## Revogação imediata de sessão
+
+Access tokens (15 minutos) e refresh tokens (7 dias) carregam `tokenVersion`. Cada requisição protegida consulta o cadastro atual: usuário excluído, inativo ou com versão diferente recebe 401. Cargo e flag de síndica usados na autorização vêm do banco. Falha de consulta retorna 503 sem autorizar a operação nem apagar os cookies.
+
+Logout e recuperação de senha revogam as sessões de todos os dispositivos. Edição administrativa de senha, cargo, status ou flag de síndica também incrementa a versão na mesma escrita; campos comuns não encerram sessões. Repetir logout com um token antigo não revoga sessões emitidas posteriormente. Tokens anteriores a esta atualização, sem versão, exigem novo login. Requisições já autorizadas e em execução não são canceladas.
+
+## Operação financeira e notificações internas
+
+O detalhe de cobrança permite baixa manual, cancelamento, conciliação, recuperação de emissão e reemissão de Pix encerrado, com justificativa e auditoria. A reemissão mantém a mesma dívida e preserva as tentativas anteriores. Um Pix ativo não é substituído: o provedor deve confirmar o encerramento anterior. Pagamento tardio de tentativa histórica encerra o Pix substituto quando possível e exige revisão; uma falha de conferência mantém a operação bloqueada. O ambiente TEST nunca quita a dívida por aprovação simulada.
+
+Vencimentos são dias civis: uma dívida só vence após terminar seu dia em Brasília. Os indicadores em aberto incluem pendentes e vencidas. Os seletores financeiros da síndica não concedem gestão de cadastros.
+
+Web e mobile exibem comunicados, eventos, ocorrências e a caixa persistente de cobranças, reservas e votações. A gestão recebe pendências de reservas, atendimento e revisão financeira. A caixa usa chaves de deduplicação, leitura individual e captura transacional de snapshots; é consultada sem escritas e atualizada pelo worker independente `notification-worker` a cada minuto. A listagem mostra até 100 itens persistidos e a retenção é de 180 dias. Ela representa as situações observadas, não um histórico completo de todas as transições intermediárias. A operação de domínio continua sendo a fonte da verdade. Não há push com o aplicativo fechado.
+
+As migrações `20261121190000_multiple_payment_attempts` e `20261121200000_inbox_notifications` preservam dados existentes. Regenerar o Prisma Client e reiniciar API/worker após aplicá-las. Testes de integração devem usar exclusivamente uma base terminada em `_test`.
+
+### Correções da revisão do PR
+
+O seletor de pagadores devolve apenas identificação, unidade e elegibilidade calculada no servidor; CPF/e-mail permanecem internos à emissão. Consultas de faturas também minimizam os dados do morador. As opções de unidades compartilham controller/service/repository, mantendo as URLs antigas por compatibilidade.
+
+A migração `20261122010000_review_integrity` valida a existência e o pertencimento da tentativa corrente à fatura e vincula notificações ao usuário com exclusão em cascata. Notificações órfãs de usuários já removidos são descartadas durante essa migração. Não edite migrações já aplicadas.
+
+O worker financeiro retira da fila automática tentativas de cobranças bloqueadas, registrando revisão e auditoria. O worker de notificações opera separadamente e não depende de credenciais do Mercado Pago. Após atualizar, aplique a migração, gere o Prisma Client e inicie `docker compose up -d notification-worker`, reiniciando API e payment-worker. A justificativa financeira é limitada uniformemente a 191 caracteres.
+
+A suíte da API executa arquivos sequencialmente: as integrações compartilham a mesma base de teste e algumas consultas usam agregações globais, portanto execução simultânea pode causar interferência entre fixtures e deadlocks de limpeza. Os testes de concorrência dentro de cada cenário permanecem ativos.
+
+## Recuperação de senha por e-mail
+
+A API usa SMTP genérico (Nodemailer), tanto localmente quanto hospedada. No Brevo,
+configure o remetente autorizado em **Transactional**, copie o login SMTP e gere
+uma **chave SMTP** (diferente da chave API). Configure no `.env` ignorado:
+
+```dotenv
+SMTP_HOST="smtp-relay.brevo.com"
+SMTP_PORT="587"
+SMTP_SECURE="false"
+SMTP_USER="login-do-painel-smtp"
+SMTP_PASS="chave-smtp"
+SMTP_FROM='"DomusApp" <remetente-autorizado@seudominio.com>'
+FRONTEND_URL="http://localhost:5173"
+```
+
+A porta 587/2525 exige STARTTLS; na 465 use `SMTP_SECURE=true`. Não desative a
+verificação de certificados. Para outros provedores, use as credenciais próprias.
+Autentique seu domínio conforme as instruções do provedor para melhorar a entrega.
+
+Após alterar o ambiente, recrie a API (restart não atualiza as variáveis):
+
+```bash
+docker compose up -d --force-recreate api
+docker compose exec api npm run mail:verify
+```
+
+O diagnóstico verifica conexão/autenticação, sem enviar e sem comprovar entrega.
+Para execução direta, exporte as variáveis ou use `node --env-file=../.env --import tsx scripts/verify-mail.ts`
+a partir de `api`. Sem SMTP em desenvolvimento, o Ethereal captura o e-mail e
+registra um preview; ele não entrega ao destinatário. Em produção, SMTP e
+`FRONTEND_URL` com HTTPS são obrigatórios e validados na inicialização da API.
+Falhas de envio são registradas sem dados sensíveis; a resposta pública permanece genérica.
+Não há fila persistente nem retentativa automática: em falha, solicite outro link.
+Uma nova solicitação invalida o link anterior.
+
+No celular físico, `localhost` aponta para o próprio aparelho: use o IP LAN da
+máquina em `FRONTEND_URL` e `DOMUS_API_URL`; ajuste `VITE_API_URL` e `ALLOWED_ORIGIN`
+para os endereços acessíveis. O mobile solicita o link; a nova senha é definida
+no navegador. Após concluir, volte ao app e entre. Não há autocadastro.
+
+No servidor, use a URL pública HTTPS do web em `FRONTEND_URL`, ajuste CORS,
+URL da API e cookies/proxy conforme a hospedagem. Sirva `/redefinir-senha`
+diretamente com fallback do React Router. Libere saída para a porta SMTP;
+se houver lista de IPs no Brevo, adicione o IP público de saída do servidor.
+É possível usar a mesma conta Brevo localmente e no servidor, com chaves separadas.
+O deploy completo e a configuração de DNS/HTTPS da hospedagem são etapas externas.
+
+Para aceitar a integração, teste com um usuário de demonstração cujo e-mail você
+controla: solicite pelo web/app, confira o recebimento e o destino do link,
+redefina a senha e entre no app com a nova senha. Confirme que o link usado não
+funciona novamente e que as sessões anteriores são revogadas. Repita com a URL
+pública após hospedar. Nunca versione credenciais nem links de recuperação.

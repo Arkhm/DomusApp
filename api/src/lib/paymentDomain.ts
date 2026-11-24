@@ -118,10 +118,16 @@ export function verifyWebhookSignature(input: {
   return hash(manifest);
 }
 
+export function currentAttempt<T extends { paymentAttempts?: any[]; currentPaymentAttemptId?: string | null; paymentAttempt?: any }>(invoice: T) {
+  return { ...invoice, paymentAttempt: invoice.paymentAttempts === undefined ? invoice.paymentAttempt : invoice.paymentAttempts?.find(a => a.id === invoice.currentPaymentAttemptId) ??
+    (!invoice.currentPaymentAttemptId ? invoice.paymentAttempts?.[0] : null) ?? null };
+}
+
 export function publicInvoice<T extends Record<string, any>>(invoice: T) {
-  const { mpResponse, paymentAttempt, operationId, ...result } = invoice;
-  const active = paymentAttempt?.state === 'ACTIVE';
-  return { ...result, mpQrCode: active ? invoice.mpQrCode : null, mpQrCodeBase64: active ? invoice.mpQrCodeBase64 : null,
+  const { mpResponse, paymentAttempt, paymentAttempts, currentPaymentAttemptId, operationId, ...result } = currentAttempt(invoice);
+  const active = paymentAttempt?.state === 'ACTIVE' && (!paymentAttempt.expiresAt || new Date(paymentAttempt.expiresAt).getTime() > Date.now()) && !invoice.requiresReview && ['PENDING', 'OVERDUE'].includes(invoice.status);
+  const user = result.user ? { id: result.user.id, name: result.user.name } : result.user;
+  return { ...result, ...(result.user ? { user } : {}), mpQrCode: active ? invoice.mpQrCode : null, mpQrCodeBase64: active ? invoice.mpQrCodeBase64 : null,
     issuanceStatus: paymentAttempt?.state ?? (invoice.mpOrderId ? 'LEGACY' : 'NOT_ISSUED'),
     paymentEnvironment: paymentAttempt?.environment ?? null,
     paymentAmount: paymentAttempt?.amount?.toString() ?? null,

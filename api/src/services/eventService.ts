@@ -1,6 +1,9 @@
+import { unitRepository } from '../repositories/unitRepository';
+import { HttpError } from '../lib/httpError';
+import { updateEventSchema } from '../schemas/updateSchemas';
+import { UpdateActor, requireEditor, isSyndic, hasPanelAccess } from '../lib/access';
 import { eventRepository } from '../repositories/eventRepository';
 import { userRepository } from '../repositories/userRepository';
-import { hasPanelAccess } from '../lib/access';
 
 const VALID_STATUS = new Set(['DRAFT', 'PUBLISHED', 'CANCELLED']);
 const VALID_CATEGORY = new Set([
@@ -12,6 +15,23 @@ const VALID_CATEGORY = new Set([
 ]);
 
 export const eventService = {
+  async update(id: string, input: unknown, actor: UpdateActor) {
+    requireEditor(actor, isSyndic(actor));
+    const data = updateEventSchema.parse(input);
+    const record = await eventRepository.findById(id);
+    if (!record) throw new HttpError(404, 'Registro não encontrado.');
+    requireEditor(actor, isSyndic(actor) && record.authorId === actor.id);
+    const targetType = data.targetType ?? record.targetType;
+    const targetUnitId = data.targetUnitId !== undefined ? data.targetUnitId : record.targetUnitId;
+    if (targetType === 'UNIT' && (!targetUnitId || !await unitRepository.findById(targetUnitId))) {
+      throw new HttpError(400, 'Informe uma unidade existente para o destinatário.');
+    }
+    if (data.targetType !== undefined || data.targetUnitId !== undefined) {
+      data.targetUnitId = targetType === 'ALL' ? null : targetUnitId;
+    }
+    return eventRepository.update(id, { ...data, eventDate: data.eventDate ? new Date(data.eventDate) : undefined });
+  },
+
   async create(data: {
     title: string;
     content: string;
@@ -43,7 +63,7 @@ export const eventService = {
     if (data.status && !VALID_STATUS.has(data.status)) {
       throw new Error('Status inválido. Use DRAFT, PUBLISHED ou CANCELLED.');
     }
-    if (data.capacity != null && (typeof data.capacity !== 'number' || data.capacity < 1)) {
+    if (data.capacity != null && (!Number.isInteger(data.capacity) || data.capacity < 1)) {
       throw new Error('Capacidade deve ser um número inteiro maior que zero (ou ausente).');
     }
 

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
 import { listNotices, countUnread } from '../services/noticeService';
 import { findNextEvent, listEvents } from '../services/eventService';
 import { toApiFailure, type ApiFailure } from '../services/api';
@@ -57,15 +58,19 @@ export function useHomeSummary(): UseHomeSummaryResult {
     };
   }, []);
 
-  const load = useCallback(async (mode: 'initial' | 'refresh') => {
+  const hasLoaded = useRef(false);
+
+  // `silent`: volta de outra tela (ex.: leu um comunicado) — atualiza sem spinner.
+  const load = useCallback(async (mode: 'initial' | 'refresh' | 'silent') => {
     if (mode === 'refresh') setIsRefreshing(true);
-    else setIsLoading(true);
+    else if (mode === 'initial') setIsLoading(true);
 
     try {
       const [notices, events] = await Promise.all([listNotices(), listEvents()]);
       if (!isMounted.current) return;
       setSummary(buildSummary(notices, events));
       setFailure(null);
+      hasLoaded.current = true;
     } catch (error) {
       if (!isMounted.current) return;
       setSummary(EMPTY_SUMMARY);
@@ -77,9 +82,11 @@ export function useHomeSummary(): UseHomeSummaryResult {
     }
   }, []);
 
-  useEffect(() => {
-    void load('initial');
-  }, [load]);
+  useFocusEffect(
+    useCallback(() => {
+      void load(hasLoaded.current ? 'silent' : 'initial');
+    }, [load]),
+  );
 
   const reload = useCallback(() => {
     void load('refresh');

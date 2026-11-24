@@ -1,12 +1,14 @@
+import NotificationBell from './NotificationBell';
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Bell, ChevronDown, LogOut, Lock, User as UserIcon } from 'lucide-react';
+import { ChevronDown, LogOut, Lock, Moon, Sun, User as UserIcon } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import toast from 'react-hot-toast';
 import { useAuth } from '../../hooks/useAuth';
 import LiveClock from '../luxury/LiveClock';
 import { getInitials, roleLabel } from '../luxury/formatters';
 import { useGeoCity } from '../../hooks/useGeoCity';
+import { useTheme } from '../../hooks/useTheme';
 
 interface HeaderProps {
     title: string;
@@ -15,6 +17,7 @@ interface HeaderProps {
 
 export default function Header({ title, eyebrow }: HeaderProps) {
     const { user, logout } = useAuth();
+    const { theme, toggleTheme } = useTheme();
     const navigate = useNavigate();
     const [menuOpen, setMenuOpen] = useState(false);
     const menuRef = useRef<HTMLDivElement>(null);
@@ -90,7 +93,7 @@ export default function Header({ title, eyebrow }: HeaderProps) {
                 </div>
             </div>
 
-            <div style={{ display: 'flex', alignItems: 'center', gap: 24 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
                 {/* Clock — concierge feel */}
                 <div style={{ textAlign: 'right' }}>
                     <div
@@ -110,32 +113,18 @@ export default function Header({ title, eyebrow }: HeaderProps) {
 
                 <div style={{ width: 1, height: 32, background: 'var(--color-line-strong)' }} />
 
-                {/* Bell */}
                 <button
-                    title="Notificações"
-                    style={{
-                        position: 'relative',
-                        background: 'none',
-                        border: 'none',
-                        color: 'var(--color-bone-dim)',
-                        cursor: 'pointer',
-                        padding: 8,
-                    }}
+                    type="button"
+                    className="theme-toggle"
+                    onClick={toggleTheme}
+                    aria-label="Modo escuro"
+                    aria-pressed={theme === 'dark'}
+                    title={theme === 'dark' ? 'Ativar modo claro' : 'Ativar modo escuro'}
                 >
-                    <Bell size={18} strokeWidth={1.4} />
-                    <span
-                        style={{
-                            position: 'absolute',
-                            top: 6,
-                            right: 6,
-                            width: 6,
-                            height: 6,
-                            borderRadius: '50%',
-                            background: 'var(--color-metal-1)',
-                            boxShadow: '0 0 6px var(--color-metal-1)',
-                        }}
-                    />
+                    {theme === 'dark' ? <Sun size={18} strokeWidth={1.4} aria-hidden="true" /> : <Moon size={18} strokeWidth={1.4} aria-hidden="true" />}
                 </button>
+
+                <NotificationBell key={user?.id} />
 
                 <div style={{ width: 1, height: 32, background: 'var(--color-line-strong)' }} />
 
@@ -209,7 +198,7 @@ export default function Header({ title, eyebrow }: HeaderProps) {
                                 </div>
                                 <div style={{ padding: 4 }}>
                                     <DropdownItem icon={<UserIcon size={14} />} label="Meu perfil" onClick={() => handleComingSoon('Meu perfil')} />
-                                    <DropdownItem icon={<Lock size={14} />} label="Alterar senha" onClick={() => handleComingSoon('Alterar senha')} />
+                                    <DropdownItem icon={<Lock size={14} />} label="Alterar senha" onClick={() => { setMenuOpen(false); navigate('/esqueci-senha'); }} />
                                 </div>
                                 <div style={{ borderTop: '1px solid var(--color-line)', padding: 4 }}>
                                     <DropdownItem

@@ -1,3 +1,4 @@
+import ContentEditor from '../../components/ContentEditor';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { motion } from 'motion/react';
 import { Plus, Trash2, Loader2, Vote as VoteIcon, Users, BarChart3, Activity } from 'lucide-react';
@@ -144,7 +145,7 @@ export default function VotingsList() {
                             Decisões coletivas, transparência de votos e acompanhamento ao vivo dos resultados.
                         </p>
                     </div>
-                    {canMutate && (
+                    {(canMutate || (user?.role === 'MORADOR' && user.isSyndic)) && (
                         <button onClick={() => setIsModalOpen(true)} className="btn-gold">
                             <Plus size={12} />
                             Nova votação
@@ -279,7 +280,7 @@ export default function VotingsList() {
                                 total={total}
                                 delay={i * 0.05}
                                 onDelete={() => setDeletingVoting(voting)}
-                                canMutate={canMutate}
+                                canMutate={canMutate} onSaved={load}
                             />
                         ))}
                     </div>
@@ -397,6 +398,7 @@ function VotingCard({
     delay,
     onDelete,
     canMutate,
+    onSaved,
 }: {
     voting: Voting;
     status: VotingStatus;
@@ -404,6 +406,7 @@ function VotingCard({
     delay: number;
     onDelete: () => void;
     canMutate: boolean;
+    onSaved: () => void;
 }) {
     const winnerId = useMemo(() => {
         if (total === 0) return null;
@@ -441,14 +444,17 @@ function VotingCard({
                         {total} {total === 1 ? 'voto' : 'votos'}
                     </span>
                 </div>
-                {canMutate && (
-                    <IconBtn
-                        icon={<Trash2 size={14} />}
-                        danger
-                        onClick={onDelete}
-                        title="Excluir votação"
-                    />
-                )}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                    <ContentEditor records={[voting]} resource="votings" onSaved={onSaved} />
+                    {canMutate && (
+                        <IconBtn
+                            icon={<Trash2 size={14} />}
+                            danger
+                            onClick={onDelete}
+                            title="Excluir votação"
+                        />
+                    )}
+                </div>
             </div>
 
             {/* Title + description */}

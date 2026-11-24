@@ -26,6 +26,8 @@ interface InputProps {
   returnKeyType?: TextInputProps['returnKeyType'];
   onSubmitEditing?: () => void;
   editable?: boolean;
+  multiline?: boolean;
+  maxLength?: number;
 }
 
 export function Input({
@@ -42,6 +44,8 @@ export function Input({
   returnKeyType,
   onSubmitEditing,
   editable = true,
+  multiline = false,
+  maxLength,
 }: InputProps): React.JSX.Element {
   const [isFocused, setIsFocused] = useState(false);
   const [isSecureVisible, setIsSecureVisible] = useState(false);
@@ -73,11 +77,13 @@ export function Input({
           returnKeyType={returnKeyType}
           onSubmitEditing={onSubmitEditing}
           editable={editable}
+          multiline={multiline}
+          maxLength={maxLength}
           onFocus={() => setIsFocused(true)}
           onBlur={() => setIsFocused(false)}
           accessibilityLabel={label}
           accessibilityHint={error ?? undefined}
-          style={styles.input}
+          style={[styles.input, multiline ? styles.multiline : null]}
         />
 
         {isPassword ? (
@@ -145,6 +151,10 @@ const styles = StyleSheet.create({
     // O anel dos botões fica: para quem navega por teclado, é o único
     // indicador de foco que eles têm.
     outlineWidth: 0,
+  },
+  multiline: {
+    minHeight: layout.minTouchTarget * 3,
+    textAlignVertical: 'top',
   },
   adornment: {
     minWidth: layout.minTouchTarget,

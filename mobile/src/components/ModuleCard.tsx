@@ -9,8 +9,8 @@ interface ModuleCardProps {
   label: string;
   icon: IoniconName;
   onPress: () => void;
-  /** Marca módulos que ainda não têm tela própria. */
-  isComingSoon?: boolean;
+  /** Contador exibido no canto do cartão (ex.: notificações não lidas). */
+  badge?: number | null;
 }
 
 /**
@@ -21,13 +21,13 @@ export function ModuleCard({
   label,
   icon,
   onPress,
-  isComingSoon = false,
+  badge = null,
 }: ModuleCardProps): React.JSX.Element {
   return (
     <Pressable
       onPress={onPress}
       accessibilityRole="button"
-      accessibilityLabel={isComingSoon ? `${label}. Em breve.` : label}
+      accessibilityLabel={badge ? `${label}. ${badge} ${badge === 1 ? 'não lida' : 'não lidas'}.` : label}
       accessibilityHint={`Abrir ${label}`}
       style={({ pressed }) => [styles.card, elevation.card, pressed ? styles.pressed : null]}
     >
@@ -39,7 +39,11 @@ export function ModuleCard({
         {label}
       </Text>
 
-      {isComingSoon ? <View style={styles.dot} accessibilityElementsHidden /> : null}
+      {badge ? (
+        <View style={styles.badge} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+          <Text style={styles.badgeText}>{badge > 99 ? '99+' : badge}</Text>
+        </View>
+      ) : null}
     </Pressable>
   );
 }
@@ -72,13 +76,20 @@ const styles = StyleSheet.create({
     ...typography.labelSmall,
     color: colors.textPrimary,
   },
-  dot: {
+  badge: {
     position: 'absolute',
-    top: spacing.md,
-    right: spacing.md,
-    width: spacing.sm,
-    height: spacing.sm,
+    top: spacing.sm,
+    right: spacing.sm,
+    minWidth: 22,
+    height: 22,
+    paddingHorizontal: spacing.xs,
     borderRadius: radius.pill,
     backgroundColor: colors.accent,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  badgeText: {
+    ...typography.micro,
+    color: colors.brand,
   },
 });

@@ -3,6 +3,14 @@ import { votingService } from '../services/votingService';
 import { AuthRequest } from '../middlewares/authMiddleware';
 
 export const votingController = {
+  async update(req: AuthRequest, res: Response) {
+    try {
+      res.status(200).json(await votingService.update(req.params.id as string, req.body, req.user!));
+    } catch (error: any) {
+      res.status(error.statusCode ?? 400).json({ error: error.message });
+    }
+  },
+
   async create(req: AuthRequest, res: Response) {
     try {
       const authorId = req.user!.id;
@@ -15,20 +23,29 @@ export const votingController = {
 
   async list(req: AuthRequest, res: Response) {
     try {
-      const votings = await votingService.list();
+      const votings = await votingService.list(req.user!);
       res.status(200).json(votings);
     } catch (error: any) {
-      res.status(400).json({ error: error.message });
+      res.status(error.statusCode ?? 400).json({ error: error.message });
+    }
+  },
+
+  async vote(req: AuthRequest, res: Response) {
+    try {
+      const result = await votingService.vote(req.params.id as string, req.body.optionId, req.user!.id);
+      res.status(201).json(result);
+    } catch (error: any) {
+      res.status(error.statusCode ?? 400).json({ error: error.message });
     }
   },
 
   async delete(req: AuthRequest, res: Response) {
     try {
       const { id } = req.params;
-      const result = await votingService.delete(id as string);
+      const result = await votingService.delete(id as string, req.user!);
       res.status(200).json(result);
     } catch (error: any) {
-      res.status(400).json({ error: error.message });
+      res.status(error.statusCode ?? 400).json({ error: error.message });
     }
   }
 };

@@ -11,5 +11,5 @@ export function apiErrorMessage(error: unknown, fallback: string): string {
             return response.data.error;
         }
     }
-    return fallback;
+    return error instanceof Error ? error.message : fallback;
 }

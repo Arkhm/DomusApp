@@ -1,4 +1,4 @@
-import axios, { AxiosError, type AxiosInstance } from 'axios';
+import axios, { AxiosError, type AxiosInstance, type InternalAxiosRequestConfig } from 'axios';
 import Constants from 'expo-constants';
 import { secureStorage, STORAGE_KEYS } from './secureStorage';
 
@@ -18,6 +18,8 @@ export const api: AxiosInstance = axios.create({
 
 // Anexa o JWT em toda requisição autenticada.
 api.interceptors.request.use(async (config) => {
+  // Finish renewal before logout revokes the version and clears storage.
+  if (config.url === '/auth/logout') await refreshPromise?.catch(() => undefined);
   const token = await secureStorage.get(STORAGE_KEYS.token);
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
@@ -39,13 +41,53 @@ export function onUnauthorized(listener: UnauthorizedListener): () => void {
   };
 }
 
+let refreshPromise: Promise<void> | null = null;
+type RetryConfig = InternalAxiosRequestConfig & { _retry?: boolean };
+
+async function expireSession() {
+  await Promise.all([
+    secureStorage.remove(STORAGE_KEYS.token),
+    secureStorage.remove(STORAGE_KEYS.refreshToken),
+  ]);
+  unauthorizedListeners.forEach((listener) => listener());
+}
+
 api.interceptors.response.use(
   (response) => response,
-  (error: unknown) => {
-    if (isAxiosError(error) && error.response?.status === 401) {
-      unauthorizedListeners.forEach((listener) => listener());
+  async (error: unknown) => {
+    if (!isAxiosError(error) || error.response?.status !== 401) return Promise.reject(error);
+    const config = error.config as RetryConfig | undefined;
+    const noRefresh = ['/auth/login', '/auth/logout', '/auth/refresh', '/auth/forgot-password', '/auth/reset-password'];
+    if (!config || noRefresh.includes(config.url?.split('?')[0] ?? '')) return Promise.reject(error);
+    if (config._retry) {
+      await expireSession();
+      return Promise.reject(error);
     }
-    return Promise.reject(error);
+    config._retry = true;
+    try {
+      if (!refreshPromise) {
+        refreshPromise = (async () => {
+          const refreshToken = await secureStorage.get(STORAGE_KEYS.refreshToken);
+          if (!refreshToken) throw new Error('Sessão expirada.');
+          const { data } = await api.post<{ token: string; refreshToken: string }>('/auth/refresh', {
+            client: 'mobile', refreshToken,
+          });
+          if (typeof data.token !== 'string' || typeof data.refreshToken !== 'string') {
+            throw new Error('Resposta de sessão inválida.');
+          }
+          await Promise.all([
+            secureStorage.set(STORAGE_KEYS.token, data.token),
+            secureStorage.set(STORAGE_KEYS.refreshToken, data.refreshToken),
+          ]);
+        })().finally(() => { refreshPromise = null; });
+      }
+      await refreshPromise;
+    } catch (refreshError) {
+      const failure = toApiFailure(refreshError, 'Falha ao renovar sessão.');
+      if (failure.kind !== 'network' && failure.kind !== 'server') await expireSession();
+      return Promise.reject(refreshError);
+    }
+    return api(config);
   },
 );
 

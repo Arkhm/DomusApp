@@ -1,3 +1,4 @@
+import { logger } from '../lib/logger';
 import 'dotenv/config';
 import { paymentRepository } from '../repositories/paymentRepository';
 import { paymentService } from '../services/paymentService';
@@ -24,11 +25,11 @@ async function main() {
         }
       }
     } catch (error) {
-      console.error('payment_worker_failed', { code: error instanceof PaymentError ? error.code : 'WORKER_INTERNAL_ERROR' });
+      logger.error({ code: error instanceof PaymentError ? error.code : 'WORKER_INTERNAL_ERROR' }, 'Falha no worker de pagamentos.');
     }
     if (!stopping) await new Promise(resolve => setTimeout(resolve, 5000));
   }
 }
 
-main().catch(() => { console.error('payment_worker_configuration_failed'); process.exitCode = 1; })
+main().catch(() => { logger.error({ code: 'WORKER_CONFIGURATION_FAILED' }, 'Falha na configuração do worker de pagamentos.'); process.exitCode = 1; })
   .finally(() => prisma.$disconnect());

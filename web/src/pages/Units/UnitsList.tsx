@@ -388,6 +388,9 @@ export default function UnitsList() {
                                         />
                                     </div>
 
+                                    <div style={{ marginBottom: 20, overflowWrap: 'anywhere' }}>
+                                        <Detail label="Vagas numeradas" value={u.parkingSpotRecords?.map(spot => spot.number).join(', ') || 'Nenhuma vaga atribuída'} />
+                                    </div>
                                     {/* Resident */}
                                     <div
                                         style={{
